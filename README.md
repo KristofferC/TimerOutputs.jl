@@ -2,9 +2,9 @@
 
 [![Build Status](https://travis-ci.org/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.org/KristofferC/TimerOutputs.jl)
 
-`TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program. It is similar to the `@time` macro in Base except you also give a label to the block you time. In the end of the program it is possible to print a nicely formatted table presetning how much time was spent in each section and how many calls were made.
+`TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program. It is similar to the `@time` macro in Base except you also give a label to the block you time. In the end of the program it is possible to print a nicely formatted table presenting how much time was spent in each section and how many calls were made.
 
-This package is inspired by the `TimerOutputs` class in [deal.ii](https://dealii.org/) which works in a similar way.
+This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/) which works in a similar way.
 
 ## Usage
 
@@ -53,4 +53,4 @@ Printing `to` now gives a formatted table showing the number of calls, the total
 
 # Disable
 
-By setting the variable `DISABLE_TIMING = true` in Julia before loading `TimerOutputs`, the `@timeit` macro is changed to just return the value it operates on.
+By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to just return the value it operates on.
