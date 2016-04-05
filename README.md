@@ -39,7 +39,8 @@ end
 Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the total time since `to` was created.
 
 
-```
+```julia
+julia> print(to)
 +---------------------------------------------+------------+------------+
 | Total wallclock time elapsed since start    |   2.548 s  |            |
 |                                             |            |            |
@@ -57,4 +58,4 @@ A `TimerOutput` can be reset by calling `reset!(to::TimerOutput)`. This removes 
 
 # Disable
 
-By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to just return the value it operates on.
+By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the (small) overhead of the timings without having to actually remove the macros from the code.
