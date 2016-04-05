@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.org/KristofferC/TimerOutputs.jl)
 
-`TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program. It exports a macro `@timeit` that is similar to the `@time` macro in Base except you also give a label to the block you time. In the end of the program it is possible to print a nicely formatted table presenting how much time was spent in each section and how many calls were made.
+`TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program. It exports the macro `@timeit` that is similar to the `@time` macro in Base except one also assigns a label to the code section being timed. It is then possible to print a nicely formatted table presenting how much time was spent in each section and how many calls were made. Multiple calls to code sections with the same label will accumulate the time data for that label.
 
 This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/) which works in a similar way.
 
@@ -14,18 +14,19 @@ The easiest way to show how the package work is with a simple example:
 using TimerOutputs
 
 # Create a TimerOutput, this is the main type that keeps track of everything.
+# It is possible to have multiple `TimerOutputs()` simultaneously.
 const to = TimerOutput()
 
-# Time a block of code with a label to the `TimerOutput` named "to"
-# Multiple `TimerOutput`s are possible
+# Time a section code with the label "sleep" to the `TimerOutput` named "to"
 @timeit to "sleep" sleep(0.2)
 
+# Create a function to later time
 rands() = for i in 1:10^7 rand() end
 
-# Returns the value on the right, like Base @time
+# Time the function, @timeit returns the value on the right, just like Base @time
 rand_vals = @timeit to "randoms" rands()
 
-# Time a multistatement block
+# Time a multi statement block
 b = @timeit to "multi statements" begin
     sleep(0.2)
     rands()
@@ -36,7 +37,7 @@ end
 @timeit to "sleep" sleep(0.3)
 ```
 
-Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the total time since `to` was created.
+Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created:
 
 
 ```julia
@@ -58,4 +59,4 @@ A `TimerOutput` can be reset by calling `reset!(to::TimerOutput)`. This removes 
 
 ## Disable
 
-By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the (small) overhead of the timings without having to actually remove the macros from the code.
+By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the (quite small) overhead of the timings without having to actually remove the macros from the code.

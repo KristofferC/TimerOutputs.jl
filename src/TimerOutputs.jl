@@ -3,8 +3,8 @@ module TimerOutputs
 include("utility.jl")
 
 import Base: show, time_ns
-
 export TimerOutput, @timeit, reset!
+
 
 typealias SectionName UTF8String
 
@@ -12,9 +12,9 @@ type TimeData
     ncalls::Int
     tottime::UInt64
 end
+
 ncalls(td::TimeData) = td.ncalls
 tottime(td::TimeData) = td.tottime
-
 Base.isless(self::TimeData, other::TimeData) = self.tottime < other.tottime
 
 
@@ -37,6 +37,7 @@ function reset!(to::TimerOutput)
     to.start_time = time_ns()
     return to
 end
+
 
 if !isdefined(Main, :DISABLE_TIMING)
     @eval begin

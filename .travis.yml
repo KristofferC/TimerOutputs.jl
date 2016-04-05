@@ -11,4 +11,4 @@ notifications:
 # uncomment the following lines to override the default test script
 #script:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("TimerOutput"); Pkg.test("TimerOutput"; coverage=true)'
+#  - julia -e 'Pkg.clone(pwd()); Pkg.build("TimerOutputs"); Pkg.test("TimerOutputs"; coverage=true)'

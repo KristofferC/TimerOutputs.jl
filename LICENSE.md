@@ -1,4 +1,4 @@
-The TimerOutput.jl package is licensed under the MIT "Expat" License:
+The TimerOutputs.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2016: Kristoffer Carlsson.
 >
