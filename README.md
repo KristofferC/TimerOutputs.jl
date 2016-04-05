@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.org/KristofferC/TimerOutputs.jl)
 
-`TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program. It is similar to the `@time` macro in Base except you also give a label to the block you time. In the end of the program it is possible to print a nicely formatted table presenting how much time was spent in each section and how many calls were made.
+`TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program. It exports a macro `@timeit` that is similar to the `@time` macro in Base except you also give a label to the block you time. In the end of the program it is possible to print a nicely formatted table presenting how much time was spent in each section and how many calls were made.
 
 This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/) which works in a similar way.
 
@@ -52,10 +52,10 @@ julia> print(to)
 +---------------------------------------------+------------+------------+
 ```
 
-# Reset
+## Reset
 
 A `TimerOutput` can be reset by calling `reset!(to::TimerOutput)`. This removes all saved data and updates the creation time of the `TimerOutput` instance.
 
-# Disable
+## Disable
 
 By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the (small) overhead of the timings without having to actually remove the macros from the code.
