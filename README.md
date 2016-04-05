@@ -40,6 +40,7 @@ Printing `to` now gives a formatted table showing the number of calls, the total
 
 
 ```
+print(to)
 +---------------------------------------------+------------+------------+
 | Total wallclock time elapsed since start    |   2.548 s  |            |
 |                                             |            |            |
