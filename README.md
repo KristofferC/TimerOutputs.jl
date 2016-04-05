@@ -51,6 +51,10 @@ Printing `to` now gives a formatted table showing the number of calls, the total
 +---------------------------------------------+------------+------------+
 ```
 
+# Reset
+
+A `TimerOutput` can be reset by calling `reset!(to::TimerOutput)`. This removes all saved data and updates the creation time of the `TimerOutput` instance.
+
 # Disable
 
 By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to just return the value it operates on.

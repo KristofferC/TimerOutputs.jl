@@ -27,14 +27,14 @@ sections(to::TimerOutput) = to.sections
 start(to::TimerOutput) = to.start_time
 
 function TimerOutput()
-    start_time = time_ns()
     sections = Dict{SectionName, TimeData}()
+    start_time = time_ns()
     return TimerOutput(start_time, sections)
 end
 
 function reset!(to::TimerOutput)
-    to.start_time = time_ns()
     to.sections = Dict{SectionName, TimeData}()
+    to.start_time = time_ns()
     return to
 end
 
