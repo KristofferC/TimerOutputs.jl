@@ -58,9 +58,15 @@ if !isdefined(Main, :DISABLE_TIMING)
     end
 else
     @eval begin
-        macro timeit(label::AbstractString, ex::Expr)
-            esc(ex)
+        macro timeit(args...)
+            return timer_expr_do_nothing(args...)
         end
+    end
+end
+
+function timer_expr_do_nothing(to::Symbol, label, ex::Expr)
+    quote
+        $(esc(ex))
     end
 end
 
