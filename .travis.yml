@@ -4,11 +4,14 @@ os:
   - linux
   - osx
 julia:
-  - release
-  - nightly
+    - release
+    - nightly
 notifications:
   email: false
 # uncomment the following lines to override the default test script
-#script:
-#  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("TimerOutputs"); Pkg.test("TimerOutputs"; coverage=true)'
+script:
+    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+    - julia -e 'Pkg.clone(pwd()); Pkg.test("TimerOutputs"; coverage=true)'
+
+after_success:
+- julia -e 'cd(Pkg.dir("TimerOutputs")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'

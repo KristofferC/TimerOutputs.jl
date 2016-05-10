@@ -1,12 +1,11 @@
 module TimerOutputs
 
-include("utility.jl")
+#using Compat; import Compat.String when Compat is tagged
 
 import Base: show, time_ns
-export TimerOutput, @timeit, reset!
+export TimerOutput, @timeit, @timer, reset_timer!, print_timer, time_section, enter_section, exit_section
 
-
-typealias SectionName UTF8String
+typealias SectionName UTF8String # String when Compat is tagged
 
 type TimeData
     ncalls::Int
@@ -17,77 +16,56 @@ ncalls(td::TimeData) = td.ncalls
 tottime(td::TimeData) = td.tottime
 Base.isless(self::TimeData, other::TimeData) = self.tottime < other.tottime
 
-
-type TimerOutput
-    start_time::UInt64
-    sections::Dict{SectionName, TimeData}
+function reset!(td::TimeData)
+    td.ncalls = 0
+    td.tottime = 0
 end
 
-sections(to::TimerOutput) = to.sections
-start(to::TimerOutput) = to.start_time
+abstract AbstractTimerOutput
 
-function TimerOutput()
-    sections = Dict{SectionName, TimeData}()
-    start_time = time_ns()
-    return TimerOutput(start_time, sections)
+start(to::AbstractTimerOutput) = to.start_time
+
+function show(io::IO, to::AbstractTimerOutput)
+    now = time_ns()
+    since_start = now - start(to)
+    print(io, "+--------------------------------+-----------+--------+---------+\n")
+    print(io, "| Wall time elapsed since start  |")
+    print(io, @sprintf("%8.3g s", since_start / 1e9))
+    print(io,                                             " |        |         |\n")
+    print(io, "|                                |           |        |         |\n")
+    print(io, "| Section              | n calls | wall time | % tot  | % timed |\n")
+    print(io, "+----------------------+---------+-----------+--------+---------+\n")
+    print_sections(io, to, since_start)
+    print(io, "+----------------------+---------+-----------+--------+---------+")
 end
 
-function reset!(to::TimerOutput)
-    to.sections = Dict{SectionName, TimeData}()
-    to.start_time = time_ns()
-    return to
-end
+function print_section(io::IO, section::AbstractString, time_data::TimeData, since_start, tot_timed)
+    if length(section) >= 20
+        section = section[1:20-3] * "..."
+    end
 
+    print(io, @sprintf("| %-20s | %7d | %7.3g s | %5.3g%% | %6.3g%% |\n", section, ncalls(time_data),
+                                                               tottime(time_data) / 1e9,
+                                                               tottime(time_data) / since_start * 100,
+                                                               tottime(time_data) / tot_timed * 100))
+end
 
 if !isdefined(Main, :DISABLE_TIMING)
     @eval begin
-        macro timeit(to::Symbol, label::AbstractString, ex::Expr)
-            quote
-               local time_data = get!(sections($(esc(to))), $(esc(label)), TimeData(0, 0))
-               local elapsedtime = time_ns()
-               local val = $(esc(ex))
-               elapsedtime = time_ns() - elapsedtime
-               time_data.tottime += elapsedtime
-               time_data.ncalls += 1
-               val
-            end
+        macro timeit(args...)
+            return timer_expr(args...)
         end
     end
 else
     @eval begin
-        macro timeit(to::Symbol, label::AbstractString, ex::Expr)
-            return esc(ex)
+        macro timeit(label::AbstractString, ex::Expr)
+            esc(ex)
         end
     end
 end
 
-function show(io::IO, to::TimerOutput)
-    now = time_ns()
-    since_start = now - start(to)
-    print(io, "+---------------------------------------------+------------+------------+\n")
-    print(io, "| Total wallclock time elapsed since start    |")
-    print(io, time_print(since_start))
-    print(io,                                                           " |            |\n")
-    print(io, "|                                             |            |            |\n")
-    print(io, "| Section                         | no. calls |  wall time | % of total |\n")
-    print(io, "+---------------------------------------------+------------+------------+\n")
-    keys_v = collect(keys(sections(to)))
-    values_v = collect(values(sections(to)))
-    for i in reverse(sortperm(values_v))
-        section = keys_v[i]
-        time_data = values_v[i]
-        if length(section) >= 31
-            section = section[1:31-3] * "..."
-        end
-        print(io, @sprintf("| %-31s | %9d |", section, ncalls(time_data)))
-        print(io, time_print(tottime(time_data)))
-        print(io, @sprintf(" | %8.2g %% |\n", tottime(time_data) / since_start * 100))
-    end
-    print(io, "+---------------------------------------------+------------+------------+\n")
-end
+timer_expr(args...) = throw(ErrorException("Invalid macro usage for @timeit"))
 
-# Compile so the first run looks ok
-to = TimerOutput()
-@timeit to "blah" sleep(0.000001)
+include("runtime_timer.jl")
 
 end # module

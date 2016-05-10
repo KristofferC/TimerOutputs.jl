@@ -8,7 +8,7 @@ This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.
 
 ## Usage
 
-The easiest way to show how the package work is with a simple example:
+The easiest way to show how the package work is with a few examples.
 
 ```julia
 using TimerOutputs
@@ -26,6 +26,26 @@ rands() = for i in 1:10^7 rand() end
 # Time the function, @timeit returns the value on the right, just like Base @time
 rand_vals = @timeit to "randoms" rands()
 
+# Explicit enter and exiting sections:
+function time_test()
+    enter_section(to, "test function")
+    sleep(0.5)
+    exit_section(to)
+end
+
+time_test()
+
+# "do"-syntax to support function that might throw or have mutliple return paths
+function i_will_throw()
+    time_section(to, "throwing") do
+        sleep(0.5)
+        throw(error("wups"))
+        print("nope")
+    end
+end
+
+i_will_throw()
+
 # Time a multi statement block
 b = @timeit to "multi statements" begin
     sleep(0.2)
@@ -37,26 +57,27 @@ end
 @timeit to "sleep" sleep(0.3)
 ```
 
-Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created:
-
+Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed:
 
 ```julia
 julia> print(to)
-+---------------------------------------------+------------+------------+
-| Total wallclock time elapsed since start    |   2.548 s  |            |
-|                                             |            |            |
-| Section                         | no. calls |  wall time | % of total |
-+---------------------------------------------+------------+------------+
-| sleep                           |         2 | 502.747 ms |       20 % |
-| multi statements                |         1 | 201.773 ms |      7.9 % |
-| randoms                         |         1 |  19.267 ms |     0.76 % |
-+---------------------------------------------+------------+------------+
++--------------------------------+-----------+--------+---------+
+| Wall time elapsed since start  |    6.21 s |        |         |
+|                                |           |        |         |
+| Section              | n calls | wall time | % tot  | % timed |
++----------------------+---------+-----------+--------+---------+
+| sleep                |       2 |   0.548 s |  8.82% |   30.7% |
+| throwing             |       1 |   0.504 s |  8.12% |   28.2% |
+| test function        |       1 |   0.502 s |  8.07% |   28.1% |
+| multi statements     |       1 |   0.216 s |  3.48% |   12.1% |
+| randoms              |       1 |  0.0162 s |  0.26% |  0.906% |
++----------------------+---------+-----------+--------+---------+
 ```
-
-## Reset
-
-A `TimerOutput` can be reset by calling `reset!(to::TimerOutput)`. This removes all saved data and updates the creation time of the `TimerOutput` instance.
 
 ## Disable
 
 By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the (quite small) overhead of the timings without having to actually remove the macros from the code.
+
+## Overhead
+
+There is a small overhead in the timings which means that this package is not intended to measure sections that finish very quickly.
