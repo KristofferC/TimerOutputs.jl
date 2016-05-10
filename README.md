@@ -8,7 +8,7 @@ This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.
 
 ## Usage
 
-The easiest way to show how the package work is with a few examples.
+The easiest way to show how the package work is with a few examples of different way of timing sections.
 
 ```julia
 using TimerOutputs
@@ -29,15 +29,17 @@ rand_vals = @timeit to "randoms" rands()
 # Explicit enter and exiting sections:
 function time_test()
     enter_section(to, "test function")
+    enter_section(to, "nested")
     sleep(0.5)
-    exit_section(to)
+    exit_section(to) # Using the last entered section by default
+    exit_section(to, "test function") # Can also be given explicitly 
 end
 
 time_test()
 
-# "do"-syntax to support function that might throw or have mutliple return paths
+# @timeit is exception safe
 function i_will_throw()
-    time_section(to, "throwing") do
+    @timeit to "throwing" begin
         sleep(0.5)
         throw(error("wups"))
         print("nope")
@@ -54,7 +56,9 @@ b = @timeit to "multi statements" begin
 end
 
 # Call to a previously used label adds to that timer and call counter
-@timeit to "sleep" sleep(0.3)
+for i in 1:100
+    @timeit to "sleep" sleep(0.01)
+end
 ```
 
 Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed:
@@ -62,22 +66,23 @@ Printing `to` now gives a formatted table showing the number of calls, the total
 ```julia
 julia> print(to)
 +--------------------------------+-----------+--------+---------+
-| Wall time elapsed since start  |    6.21 s |        |         |
+| Wall time elapsed since start  |    4.05 s |        |         |
 |                                |           |        |         |
 | Section              | n calls | wall time | % tot  | % timed |
 +----------------------+---------+-----------+--------+---------+
-| sleep                |       2 |   0.548 s |  8.82% |   30.7% |
-| throwing             |       1 |   0.504 s |  8.12% |   28.2% |
-| test function        |       1 |   0.502 s |  8.07% |   28.1% |
-| multi statements     |       1 |   0.216 s |  3.48% |   12.1% |
-| randoms              |       1 |  0.0162 s |  0.26% |  0.906% |
+| sleep                |     101 |    1.31 s |  32.4% |     43% |
+| throwing             |       1 |   0.502 s |  12.4% |   16.4% |
+| test function        |       1 |   0.501 s |  12.4% |   16.4% |
+| nested               |       1 |   0.501 s |  12.4% |   16.4% |
+| multi statements     |       1 |   0.218 s |  5.37% |   7.13% |
+| randoms              |       1 |  0.0178 s | 0.439% |  0.583% |
 +----------------------+---------+-----------+--------+---------+
 ```
 
 ## Disable
 
-By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the (quite small) overhead of the timings without having to actually remove the macros from the code.
+By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the overhead of the timings without having to actually remove the macros from the code.
 
 ## Overhead
 
-There is a small overhead in the timings which means that this package is not intended to measure sections that finish very quickly.
+There is a small overhead in the timings (a `try catch` for exception safety and a dictionary lookup for the label) which means that this package is not suitable to measure sections that finish very quickly.
