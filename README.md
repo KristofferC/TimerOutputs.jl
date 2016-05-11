@@ -79,6 +79,20 @@ julia> print(to)
 +----------------------+---------+-----------+--------+---------+
 ```
 
+## Resetting
+
+It is possible to reset a timer by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time:
+
+```jl
+julia> reset_timer!(to)
++--------------------------------+-----------+--------+---------+
+| Wall time elapsed since start  |6.43e-05 s |        |         |
+|                                |           |        |         |
+| Section              | n calls | wall time | % tot  | % timed |
++----------------------+---------+-----------+--------+---------+
++----------------------+---------+-----------+--------+---------+
+```
+
 ## Disable
 
 By setting the variable `DISABLE_TIMING = true` in Julia **before** loading `TimerOutputs`, the `@timeit` macro is changed to do nothing. This is useful if one wants to avoid the overhead of the timings without having to actually remove the macros from the code.
