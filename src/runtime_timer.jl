@@ -22,9 +22,13 @@ end
 
 function timer_expr(to::Symbol, label, ex::Expr)
     quote
-        time_section($(esc(to)), $(esc(label))) do
-            $(esc(ex))
-        end
+       local time_data = get!(sections($(esc(to))), $(esc(label)), TimeData(0, 0))
+       local elapsedtime = time_ns()
+       local val = $(esc(ex))
+       elapsedtime = time_ns() - elapsedtime
+       time_data.tottime += elapsedtime
+       time_data.ncalls += 1
+       val
     end
 end
 
