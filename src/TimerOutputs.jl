@@ -1,6 +1,6 @@
 module TimerOutputs
 
-#using Compat; import Compat.String when Compat is tagged
+import Compat.UTF8String
 
 import Base: show, time_ns
 export TimerOutput, @timeit, @timer, reset_timer!, print_timer, time_section, enter_section, exit_section
@@ -28,6 +28,7 @@ start(to::AbstractTimerOutput) = to.start_time
 function show(io::IO, to::AbstractTimerOutput)
     now = time_ns()
     since_start = now - start(to)
+    tot_timed = sum(tottimed(to))
     print(io, "+--------------------------------+-----------+--------+---------+\n")
     print(io, "| Wall time elapsed since start  |")
     print(io, @sprintf("%8.3g s", since_start / 1e9))
@@ -35,7 +36,7 @@ function show(io::IO, to::AbstractTimerOutput)
     print(io, "|                                |           |        |         |\n")
     print(io, "| Section              | n calls | wall time | % tot  | % timed |\n")
     print(io, "+----------------------+---------+-----------+--------+---------+\n")
-    print_sections(io, to, since_start)
+    print_sections(io, to, since_start, tot_timed)
     print(io, "+----------------------+---------+-----------+--------+---------+")
 end
 
@@ -73,5 +74,6 @@ end
 timer_expr(args...) = throw(ErrorException("Invalid macro usage for @timeit"))
 
 include("runtime_timer.jl")
+include("default_timer.jl")
 
 end # module

@@ -72,6 +72,7 @@ end
 @test_throws ArgumentError @timeit to 5 sleep(1)
 
 
+
 function foo3()
     to = TimerOutput()
 
@@ -102,9 +103,32 @@ function foo4()
     return to
 end
 
+
+
 to5 = foo4()
 
 @test "sec1" in keys(sections(to5))
 @test "sec2" in keys(sections(to5))
 
+time_section(to5, "sec3") do
+    sleep(0.01)
+end
+
+@test "sec2" in keys(sections(to5))
+
 print(to5)
+
+
+reset_timer!()
+
+@timeit "default_1" sleep(0.1)
+
+c = @timeit "default_1" 1+1
+@test c == 2
+
+print_timer()
+
+@test "default_1" in TimerOutputs.DEFAULT_TIMER.labels
+
+@test "sec2" in keys(sections(to5))
+

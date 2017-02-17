@@ -14,6 +14,15 @@ function TimerOutput()
     return TimerOutput(start_time, sections, start_times, "")
 end
 
+function tottimed(to::TimerOutput)
+    s = UInt64(0)
+    for time_data in values(to.sections)
+        s += time_data.tottime
+    end
+    return s
+end
+
+
 function reset_timer!(to::TimerOutput)
     to.sections = Dict{SectionName, TimeData}()
     to.start_time = time_ns()
@@ -26,14 +35,6 @@ function timer_expr(to::Symbol, label, ex::Expr)
             $(esc(ex))
         end
     end
-end
-
-function tottimed(to::TimerOutput)
-    s = UInt64(0)
-    for time_data in values(to.sections)
-        s += time_data.tottime
-    end
-    return s
 end
 
 function time_section(f::Function, to::TimerOutput, label)
@@ -68,10 +69,9 @@ function exit_section(to::TimerOutput, label::AbstractString = to.last_section)
     time_data.ncalls += 1
 end
 
-function print_sections(io::IO, to::TimerOutput, since_start)
+function print_sections(io::IO, to::TimerOutput, since_start, tot_timed)
     keys_v = collect(keys(sections(to)))
     values_v = collect(values(sections(to)))
-    tot_timed = tottimed(to)
     for i in reverse(sortperm(values_v))
         section = keys_v[i]
         time_data = values_v[i]
