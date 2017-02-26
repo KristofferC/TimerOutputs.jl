@@ -1,31 +1,17 @@
 type TimerOutput <: AbstractTimerOutput
     start_time::UInt64
-    sections::Dict{SectionName, TimeData}
-    start_times::Dict{SectionName, UInt64}
-    last_section::SectionName
+    sections::Dict{String, TimeData}
+    start_times::Dict{String, UInt64}
+    last_section::String
 end
 
 sections(to::TimerOutput) = to.sections
 
 function TimerOutput()
-    sections = Dict{SectionName, TimeData}()
+    sections = Dict{String, TimeData}()
     start_time = time_ns()
-    start_times = Dict{SectionName, UInt64}()
+    start_times = Dict{String, UInt64}()
     return TimerOutput(start_time, sections, start_times, "")
-end
-
-function reset_timer!(to::TimerOutput)
-    to.sections = Dict{SectionName, TimeData}()
-    to.start_time = time_ns()
-    return to
-end
-
-function timer_expr(to::Symbol, label, ex::Expr)
-    quote
-        time_section($(esc(to)), $(esc(label))) do
-            $(esc(ex))
-        end
-    end
 end
 
 function tottimed(to::TimerOutput)
@@ -34,6 +20,25 @@ function tottimed(to::TimerOutput)
         s += time_data.tottime
     end
     return s
+end
+
+
+function reset_timer!(to::TimerOutput)
+    to.sections = Dict{String, TimeData}()
+    to.start_time = time_ns()
+    return to
+end
+
+function timer_expr(to::Symbol, label::String, ex::Expr)
+    quote
+       local time_data = get!(sections($(esc(to))), $(esc(label)), TimeData(0, 0))
+       local elapsedtime = time_ns()
+       local val = $(esc(ex))
+       elapsedtime = time_ns() - elapsedtime
+       time_data.tottime += elapsedtime
+       time_data.ncalls += 1
+       val
+    end
 end
 
 function time_section(f::Function, to::TimerOutput, label)
@@ -68,10 +73,9 @@ function exit_section(to::TimerOutput, label::AbstractString = to.last_section)
     time_data.ncalls += 1
 end
 
-function print_sections(io::IO, to::TimerOutput, since_start)
+function print_sections(io::IO, to::TimerOutput, since_start, tot_timed)
     keys_v = collect(keys(sections(to)))
     values_v = collect(values(sections(to)))
-    tot_timed = tottimed(to)
     for i in reverse(sortperm(values_v))
         section = keys_v[i]
         time_data = values_v[i]
