@@ -3,9 +3,9 @@
 [![Build Status](https://travis-ci.org/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.org/KristofferC/TimerOutputs.jl) [![codecov](https://codecov.io/gh/KristofferC/TimerOutputs.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/KristofferC/TimerOutputs.jl)
 
 `TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program.
-It exports the macro `@timeit` that is similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
-It is then possible to print a nicely formatted table presenting how much time was spent in each section and how many calls were made.
-Multiple calls to code sections with the same label will accumulate the time data for that label.
+It's main functionality is the macro `@timeit` that is similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
+It is then possible to print a nicely formatted table presenting how much time was spent, how much allocations were performed and how many calls were made for each section.
+Multiple calls to code sections with the same label will accumulate the data for that label.
 
 An example of the output is shown below:
 
@@ -24,7 +24,7 @@ An example of the output is shown below:
  ══════════════════════════════════════════════════════════════════════════════
 ```
 
-This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/) which works in a similar way.
+This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/).
 
 ## Usage
 
@@ -74,7 +74,7 @@ for i in 1:100
 end
 ```
 
-Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed:
+Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed. Similar information is given for allocations:
 
 ```
  ═════════════════════════════════════════════════════════════════════════════
@@ -94,7 +94,7 @@ Printing `to` now gives a formatted table showing the number of calls, the total
 
 ## Resetting
 
-It is possible to reset a timer by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time:
+A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time:
 
 ```julia
 julia> reset_timer!(to)
@@ -111,7 +111,7 @@ julia> reset_timer!(to)
 ## Default Timer
 
 It is often the case that one timer is enough. There is therefore a version of `@timeit` that does not take a `TimerOutput` instance.
-This default timer is printed using `print_timer()`, reset using `reset_timer!()` and printed using `print_timer()`.
+This default timer is printed using `print_timer(io::IO = STDOUT)` and reset using `reset_timer!()`.
 For example:
 
 ```julia
@@ -140,8 +140,7 @@ which prints:
 Note that only the `@timeit` functionality is provided for the default timer.
 This means that it is cannot be used in an exception safe way.
 
-
-## Print settings
+## Settings for the printed table
 
 The section with allocation can be disabled from printing with `enable_allocations!(::Bool)`:
 
@@ -165,9 +164,9 @@ julia> to
  ════════════════════════════════════════════════════
 ```
 
-Sorting of the section can be done with `sortmode!(mode::Symbol)` where `mode` can be `:time` or `:allocated`.
+The sorting of the sections can be chosen with `sortmode!(mode::Symbol)` where `mode` can be `:time` (default) or `:allocated`.
 
-The characters used to draw the horizaontal lines are changed with `linemode!(mode::Symbol)` where `mode` can be `:unicode` (default) or `:ascii`.
+The characters used to draw the horizontal lines are changed with `linemode!(mode::Symbol)` where `mode` can be `:unicode` (default) or `:ascii`.
 The ASCII version looks as:
 
 ```julia
