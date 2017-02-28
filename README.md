@@ -46,12 +46,10 @@ rands() = for i in 1:10^7 rand() end
 # Time the function, @timeit returns the value being evaluated, just like Base @time
 rand_vals = @timeit to "randoms" rands()
 
-# Explicit enter and exiting sections:
+# Explicit enter and exiting sections:8
 function time_test()
     enter_section(to, "test function")
-    enter_section(to, "nested")
     sleep(0.5)
-    exit_section(to) # Using the last entered section by default
     exit_section(to, "test function") # Can also be given explicitly
 end
 
@@ -87,7 +85,6 @@ Printing `to` now shows a formatted table showing the number of calls, the total
   sleep                   101   1.34 s  24.2%  46.7%     795KiB  1.82%  77.6%
   throwing                  1    502ms  9.05%  17.5%     192  B  0.00%  0.02%
   test function             1    502ms  9.05%  17.5%     224  B  0.00%  0.02%
-  nested                    1    502ms  9.05%  17.5%     176  B  0.00%  0.02%
   randoms                   1   24.3ms  0.44%  0.85%     229KiB  0.52%  22.3%
  ═════════════════════════════════════════════════════════════════════════════
 ```
