@@ -11,16 +11,16 @@ An example of the output is shown below:
 
 ```
  ══════════════════════════════════════════════════════════════════════════════
-                                         Time                 Allocations
-                                ─────────────────────── ───────────────────────
-  Total/percentage measured:        14.0 s / 92.9%          17.8GiB / 99.8%
-
-  Section              ncalls    time   %tot   %timed     alloc   %tot  %alloc
+                                         Time                 Allocations      
+                               ──────────────────────   ───────────────────────
+  Total/percentage measured:        15.3 s / 93.7%          17.8GiB / 99.8%    
+                                                                
+  Section              ncalls    time   %tot  %timed      alloc   %tot  %alloc
  ──────────────────────────────────────────────────────────────────────────────
-  assemble                  5   8.72 s  57.7%  62.1%     15.8GiB  88.4% 88.5%
-  linear solve              4   4.14 s  27.4%  29.5%     1.54GiB  8.64% 8.65%
-  create sparse mat...      5    754ms  4.99%  5.37%      512MiB  2.81% 2.81%
-  export                    1    428ms  2.83%  3.04%     6.51MiB  0.04% 0.04%
+  assemble                  5   9.06 s  55.6%  59.4%     15.8GiB  88.4%  88.5%
+  linear solve              4   4.81 s  29.6%  31.6%     1.54GiB  8.64%  8.65%
+  create sparse mat...      5    850ms  5.22%  5.57%      512MiB  2.81%  2.81%
+  export                    1    537ms  3.30%  3.52%     6.51MiB  0.04%  0.04%
  ══════════════════════════════════════════════════════════════════════════════
 ```
 
