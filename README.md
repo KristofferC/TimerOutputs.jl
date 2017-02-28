@@ -10,16 +10,18 @@ Multiple calls to code sections with the same label will accumulate the time dat
 An example of the output is shown below:
 
 ```
-+--------------------------------+-----------+--------+---------+
-| Wall time elapsed since start  |    16.9 s |        |         |
-|                                |           |        |         |
-| Section              | n calls | wall time | % tot  | % timed |
-+----------------------+---------+-----------+--------+---------+
-| assemble             |       5 |    9.64 s |  57.1% |   61.5% |
-| linear solve         |       4 |    4.85 s |  28.8% |     31% |
-| create sparse mat... |       5 |   0.729 s |  4.32% |   4.65% |
-| export               |       1 |   0.459 s |  2.72% |   2.93% |
-+----------------------+---------+-----------+--------+---------+
+ ══════════════════════════════════════════════════════════════════════════════
+                                         Time                 Allocations      
+                               ──────────────────────   ───────────────────────
+  Total/percentage measured:        15.3 s / 93.7%          17.8GiB / 99.8%    
+                                                                
+  Section              ncalls    time   %tot  %timed      alloc   %tot  %alloc
+ ──────────────────────────────────────────────────────────────────────────────
+  assemble                  5   9.06 s  55.6%  59.4%     15.8GiB  88.4%  88.5%
+  linear solve              4   4.81 s  29.6%  31.6%     1.54GiB  8.64%  8.65%
+  create sparse mat...      5    850ms  5.22%  5.57%      512MiB  2.81%  2.81%
+  export                    1    537ms  3.30%  3.52%     6.51MiB  0.04%  0.04%
+ ══════════════════════════════════════════════════════════════════════════════
 ```
 
 This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/) which works in a similar way.
@@ -50,7 +52,7 @@ function time_test()
     enter_section(to, "nested")
     sleep(0.5)
     exit_section(to) # Using the last entered section by default
-    exit_section(to, "test function") # Can also be given explicitly 
+    exit_section(to, "test function") # Can also be given explicitly
 end
 
 time_test()
@@ -74,18 +76,20 @@ end
 
 Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed:
 
-```julia
-+--------------------------------+-----------+--------+---------+
-| Wall time elapsed since start  |    6.72 s |        |         |
-|                                |           |        |         |
-| Section              | n calls | wall time | % tot  | % timed |
-+----------------------+---------+-----------+--------+---------+
-| sleep                |     101 |    1.34 s |  19.9% |   46.7% |
-| throwing             |       1 |   0.502 s |  7.46% |   17.5% |
-| test function        |       1 |   0.502 s |  7.46% |   17.5% |
-| nested               |       1 |   0.502 s |  7.46% |   17.5% |
-| randoms              |       1 |  0.0231 s | 0.343% |  0.804% |
-+----------------------+---------+-----------+--------+---------+
+```
+ ═════════════════════════════════════════════════════════════════════════════
+                                         Time                 Allocations      
+                               ──────────────────────   ──────────────────────
+  Total/percentage measured:        2.87 s / 51.8%          1.00MiB / 2.34%    
+                                                                
+  Section              ncalls    time   %tot  %timed     alloc   %tot  %alloc
+ ─────────────────────────────────────────────────────────────────────────────
+  sleep                   101   1.34 s  24.2%  46.7%     795KiB  1.82%  77.6%
+  throwing                  1    502ms  9.05%  17.5%     192  B  0.00%  0.02%
+  test function             1    502ms  9.05%  17.5%     224  B  0.00%  0.02%
+  nested                    1    502ms  9.05%  17.5%     176  B  0.00%  0.02%
+  randoms                   1   24.3ms  0.44%  0.85%     229KiB  0.52%  22.3%
+ ═════════════════════════════════════════════════════════════════════════════
 ```
 
 ## Resetting
@@ -94,12 +98,14 @@ It is possible to reset a timer by calling `reset_timer!(to::TimerOutput)`. This
 
 ```julia
 julia> reset_timer!(to)
-+--------------------------------+-----------+--------+---------+
-| Wall time elapsed since start  |6.43e-05 s |        |         |
-|                                |           |        |         |
-| Section              | n calls | wall time | % tot  | % timed |
-+----------------------+---------+-----------+--------+---------+
-+----------------------+---------+-----------+--------+---------+
+ ══════════════════════════════════════════════════════════════════════════════
+                                         Time                 Allocations      
+                               ──────────────────────   ───────────────────────
+  Total/percentage measured:        0.00ns / 0.00%             0  B / 0.00%    
+                                                                
+  Section              ncalls    time   %tot  %timed      alloc   %tot  %alloc
+ ──────────────────────────────────────────────────────────────────────────────
+ ══════════════════════════════════════════════════════════════════════════════
 ```
 
 ## Default Timer
@@ -119,17 +125,66 @@ print_timer()
 
 which prints:
 ```
-+--------------------------------+-----------+--------+---------+
-| Wall time elapsed since start  |    1.17 s |        |         |
-|                                |           |        |         |
-| Section              | n calls | wall time | % tot  | % timed |
-+----------------------+---------+-----------+--------+---------+
-| section              |       1 |    0.23 s |  19.7% |   69.4% |
-| section2             |       1 |   0.101 s |  8.66% |   30.6% |
-+----------------------+---------+-----------+--------+---------+
+ ══════════════════════════════════════════════════════════════════════════════
+                                         Time                 Allocations      
+                               ──────────────────────   ───────────────────────
+  Total/percentage measured:         302ms / 60.9%           384  B / 0.01%    
+                                                                
+  Section              ncalls    time   %tot  %timed      alloc   %tot  %alloc
+ ──────────────────────────────────────────────────────────────────────────────
+  section                   1    201ms  40.5%  66.6%      192  B  0.01%  50.0%
+  section2                  1    101ms  20.4%  33.4%      192  B  0.01%  50.0%
+ ══════════════════════════════════════════════════════════════════════════════
 ```
 
-Note that only the `@timeit` functionality is provided for the default timer. This means that it is not exception safe.
+Note that only the `@timeit` functionality is provided for the default timer.
+This means that it is cannot be used in an exception safe way.
+
+
+## Print settings
+
+The section with allocation can be disabled from printing with `enable_allocations!(::Bool)`:
+
+```julia
+julia> to = TimerOutput();
+
+julia> enable_allocations!(false)
+false
+
+julia> @timeit to "section" rand(10^8);
+
+julia> to
+ ════════════════════════════════════════════════════
+                                         Time         
+                               ──────────────────────
+  Total/percentage measured:         614ms / 11.2%    
+                                                                
+  Section              ncalls    time   %tot  %timed
+ ────────────────────────────────────────────────────
+  section                   1    614ms  11.2%   100%
+ ════════════════════════════════════════════════════
+```
+
+Sorting of the section can be done with `sortmode!(mode::Symbol)` where `mode` can be `:time` or `:allocated`.
+
+The characters used to draw the horizaontal lines are changed with `linemode!(mode::Symbol)` where `mode` can be `:unicode` (default) or `:ascii`.
+The ASCII version looks as:
+
+```julia
+julia> linemode!(:ascii)
+:ascii
+
+julia> to
+ ====================================================
+                                         Time         
+                               ----------------------
+  Total/percentage measured:         614ms / 0.34%    
+                                                                
+  Section              ncalls    time   %tot  %timed
+ ----------------------------------------------------
+  section                   1    614ms  0.34%   100%
+ ====================================================
+```
 
 
 ## Overhead
