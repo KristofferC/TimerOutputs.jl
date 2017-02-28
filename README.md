@@ -74,7 +74,7 @@ for i in 1:100
 end
 ```
 
-Printing `to` now gives a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed. Similar information is given for allocations:
+Printing `to` now shows a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed. Similar information is available for allocations:
 
 ```
  ═════════════════════════════════════════════════════════════════════════════
