@@ -115,5 +115,25 @@ end
 @test "throwing" in keys(to.inner_timers)
 @test "throwing" in keys(DEFAULT_TIMER.inner_timers)
 
+reset_timer!(to)
+
+@timeit to "foo" begin
+    sleep(0.05)
+    @timeit to "bar" begin
+        @timeit to "foo" sleep(0.05)
+        @timeit to "foo" sleep(0.05)
+        @timeit to "baz" sleep(0.05)
+        @timeit to "bar" sleep(0.05)
+    end
+    @timeit to "bur" sleep(0.025)
+end
+@timeit to "bur" sleep(0.025)
+
+tom = Base.flatten(to)
+@test tom["foo"].accumulated_data.ncalls == 3
+@test tom["bar"].accumulated_data.ncalls == 2
+@test tom["bur"].accumulated_data.ncalls == 2
+@test tom["baz"].accumulated_data.ncalls == 1
 
 end # testset
+

@@ -3,11 +3,13 @@
 [![Build Status](https://travis-ci.org/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.org/KristofferC/TimerOutputs.jl) [![codecov](https://codecov.io/gh/KristofferC/TimerOutputs.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/KristofferC/TimerOutputs.jl)
 
 `TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program.
-It's main functionality is the macro `@timeit` that is similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
-It is then possible to print a nicely formatted table presenting how much time was spent, how much allocations were performed and how many calls were made for each section.
-Multiple calls to code sections with the same label will accumulate the data for that label.
+It's main functionality is the `@timeit` macro, similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
+Multiple sections can be timed at the same time and can even be nested.
+After the program has executed, it is possible to print a nicely formatted table presenting how much time was spent, how much allocations were performed and how many calls were
+made in each section.
+Multiple calls to code sections with the same label (and in the same "scope") will accumulate the data for that label.
 
-An example of the output is shown below:
+An example of the output (used to time a finite element simulation) is shown below:
 
 ```
  ────────────────────────────────────────────────────────────────────────────────
@@ -24,11 +26,9 @@ An example of the output is shown below:
  ────────────────────────────────────────────────────────────────────────────────
 ```
 
-This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/).
-
 ## Usage
 
-The easiest way to show how the package work is with a few examples of different way of timing sections.
+The easiest way to show how the package work is with a few examples of timing sections.
 
 ```julia
 using TimerOutputs
@@ -183,3 +183,7 @@ For proper benchmarking you want to use a more suitable tool like [*BenchmarkToo
 ## Author
 
 Kristoffer Carlsson - @KristofferC
+
+## Acknowledgments
+
+This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/).

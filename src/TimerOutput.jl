@@ -3,24 +3,19 @@
 ############
 type TimeData
     ncalls::Int
-    time::UInt64
-    allocs::UInt64
+    time::Int64
+    allocs::Int64
 end
+
+Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
 
 TimeData() = TimeData(0, 0, 0)
 
-function Base.isless(self::TimeData, other::TimeData)
-    if SORT_MODE == :time
-        return self.time < other.time
-    elseif SORT_MODE == :allocated
-        return self.allocs < other.allocs
-    elseif SORT_MODE == :ncalls
-        return self.ncalls < other.ncalls
-    else
-        error("unexpected sort mode")
-    end
+function Base.:+(self::TimeData, other::TimeData)
+    TimeData(self.ncalls + other.ncalls, 
+             self.time + other.time,
+             self.allocs + other.allocs)
 end
-
 
 ###############
 # TimerOutput #
@@ -31,6 +26,8 @@ type TimerOutput
     inner_timers::Dict{String, TimerOutput}
     timer_stack::Vector{TimerOutput}
     name::String
+    flattened::Bool
+    totmeasured::Tuple{Int64, Int64}
 end
 
 function TimerOutput(label::String = "root")
@@ -38,12 +35,13 @@ function TimerOutput(label::String = "root")
     accumulated_data = TimeData()
     inner_timers = Dict{String, TimerOutput}()
     timer_stack = TimerOutput[]
-    return TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, label)
+    return TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0,0))
 end
 
-Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
+Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
+                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured)
 
-Base.isless(self::TimerOutput, other::TimerOutput) = self.accumulated_data < other.accumulated_data
+# Base.isless(self::TimerOutput, other::TimerOutput) = self.accumulated_data < other.accumulated_data
 
 const DEFAULT_TIMER = TimerOutput()
 
@@ -71,6 +69,7 @@ function totmeasured(to::TimerOutput)
     end
     return t, b
 end
+
 
 function longest_name(to::TimerOutput, indent = 0)
     m = length(to.name) + indent
@@ -131,4 +130,33 @@ function timeit(f::Function, to::TimerOutput, label::String)
         pop!(to)
     end
     return val
+end
+
+Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
+
+function Base.flatten(to::TimerOutput)
+    t, b = totmeasured(to)
+    inner_timers = Dict{String, TimerOutput}()
+    for inner_timer in values(to.inner_timers)
+        _flatten!(inner_timer, inner_timers)
+    end
+    toc = copy(to)
+    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b))
+end
+
+
+function _flatten!(to::TimerOutput, inner_timers::Dict{String, TimerOutput})
+    for inner_timer in values(to.inner_timers)
+        _flatten!(inner_timer, inner_timers)
+    end
+
+    if haskey(inner_timers, to.name)
+        timer = inner_timers[to.name]
+        timer.accumulated_data += to.accumulated_data
+    else
+        toc = copy(to)
+        toc.inner_timers = Dict{String, TimerOutput}()
+        inner_timers[toc.name] = toc
+    end
+
 end
