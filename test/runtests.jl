@@ -1,14 +1,13 @@
 using TimerOutputs
 using Base.Test
 
-import TimerOutputs: DEFAULT_TIMER
+import TimerOutputs: DEFAULT_TIMER, ncalls, flatten
 
 reset_timer!()
 
 @testset "TimerOutput" begin
 
 to = TimerOutput()
-
 @timeit to "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 
@@ -36,8 +35,8 @@ end
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 
-@test to["sleep"].accumulated_data.ncalls == 4
-@test DEFAULT_TIMER["sleep"].accumulated_data.ncalls == 4
+@test ncalls(to["sleep"]) == 4
+@test ncalls(DEFAULT_TIMER["sleep"]) == 4
 
 
 # Check reset works
@@ -78,10 +77,10 @@ d = @timeit "nest 1" begin
     5
 end
 
-@test to2["nest 1"].accumulated_data.ncalls == 1
-@test to2["nest 1"]["nest 2"].accumulated_data.ncalls == 2
-@test DEFAULT_TIMER["nest 1"].accumulated_data.ncalls == 1
-@test DEFAULT_TIMER["nest 1"]["nest 2"].accumulated_data.ncalls == 2
+@test ncalls(to2["nest 1"]) == 1
+@test ncalls(to2["nest 1"]["nest 2"]) == 2
+@test ncalls(DEFAULT_TIMER["nest 1"])== 1
+@test ncalls(DEFAULT_TIMER["nest 1"]["nest 2"]) == 2
 @test c === 5
 @test d == 5
 
@@ -129,11 +128,20 @@ reset_timer!(to)
 end
 @timeit to "bur" sleep(0.025)
 
-tom = Base.flatten(to)
-@test tom["foo"].accumulated_data.ncalls == 3
-@test tom["bar"].accumulated_data.ncalls == 2
-@test tom["bur"].accumulated_data.ncalls == 2
-@test tom["baz"].accumulated_data.ncalls == 1
+tom = flatten(to)
+@test ncalls(tom["foo"])== 3
+@test ncalls(tom["bar"]) == 2
+@test ncalls(tom["bur"]) == 2
+@test ncalls(tom["baz"]) == 1
 
+io = IOBuffer()
+show(io, to)
+show(io, to; allocated = false)
+show(io, to; allocated = false, compact = true)
+show(io, to; sortby = :ncalls)
+show(io, to; sortby = :time)
+show(io, to; sortby = :allocations)
+show(io, to; linechars = :ascii)
 end # testset
+
 

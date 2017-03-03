@@ -1,8 +1,7 @@
 module TimerOutputs
 
 import Base: show, time_ns, gc_bytes
-export TimerOutput, @timeit, @timer, reset_timer!, print_timer, timeit,
-       sortmode!, linemode!, enable_allocations!
+export TimerOutput, @timeit, reset_timer!, print_timer, timeit
 
 using Compat
 using Crayons

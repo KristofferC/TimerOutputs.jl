@@ -70,7 +70,6 @@ function totmeasured(to::TimerOutput)
     return t, b
 end
 
-
 function longest_name(to::TimerOutput, indent = 0)
     m = length(to.name) + indent
     for inner_timer in values(to.inner_timers)
@@ -83,12 +82,23 @@ end
 # API #
 #######
 
+# Accessors
+ncalls(to::TimerOutput)    = to.accumulated_data.ncalls
+allocated(to::TimerOutput) = to.accumulated_data.allocs
+time(to::TimerOutput) = to.accumulated_data.time
+
+time() = time(DEFAULT_TIMER)
+ncalls() = ncalls(DEFAULT_TIMER)
+allocated() = allocated(DEFAULT_TIMER)
+
+get_defaultimer() = DEFAULT_TIMER
+
 # Macro
 macro timeit(args...)
     return timer_expr(args...)
 end
 
-#timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit"))
+timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
 
 timer_expr(label::String, ex::Expr) = timer_expr(:(TimerOutputs.DEFAULT_TIMER), label, ex)
 
@@ -134,7 +144,7 @@ end
 
 Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
 
-function Base.flatten(to::TimerOutput)
+function flatten(to::TimerOutput)
     t, b = totmeasured(to)
     inner_timers = Dict{String, TimerOutput}()
     for inner_timer in values(to.inner_timers)

@@ -59,6 +59,8 @@ function prettypercent(nominator, denominator)
     else
         str = string(@sprintf("%.2f", value), "%")
     end
+    # Workaround...
+    str == "100.0%" && (str = "100%")
     return str
 end
 
