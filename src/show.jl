@@ -82,7 +82,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         if compact
             allocation_header       = " Allocations "
         else
-            allocation_header = "      Allocations       "
+            allocation_header = "      Allocations      "
         end
 
 
