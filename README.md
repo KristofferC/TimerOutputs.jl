@@ -107,7 +107,7 @@ The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)` takes a number of 
 
 * `allocations::Bool` ─ show the allocation columns (default true)
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
-* `linechars::Symbol` ─ use either `:unicode` (default) or `ascii` to draw the horizontal lines in the table
+* `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` to draw the horizontal lines in the table
 * `compact::Symbol` ─ remove the `%timed` and `%alloc` column since if all of the program is timed, these are equal to the `%tot` column, default `false`.
 
 ## Flattening
@@ -166,7 +166,7 @@ A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove al
 
 ## Default Timer
 
-It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of all the functions and macros that does not take a `TimerOutput` instance and then uses a global timer defined created in the package.
+It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of all the functions and macros that does not take a `TimerOutput` instance and then uses a global timer defined in the package.
 Note that this global timer is shared among all users of the package.
 For example:
 
@@ -198,7 +198,7 @@ The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
 
 ## Indexing into a table
 
-Any `TimerOutput` can be indexed with a section string which returns a new `TimerOutput` with that section as the "root". For example:
+Any `TimerOutput` can be indexed with the name of a section which returns a new `TimerOutput` with that section as the "root". For example:
 
 
 ```julia
@@ -241,7 +241,7 @@ The percentages showed are now relative to that "root".
 
 ## Querying data
 
-The (unexported) functions `ncalls`, `time`, `allocated` gives the accumulated data for a sections. Time is given in nano seconds and allocations in bytes. For example (using the `to` object from above):
+The (unexported) functions `ncalls`, `time`, `allocated` gives the accumulated data for a section. The returned time has units in nano seconds and allocations in bytes. For example (using the `to` object from above):
 
 ```julia
 julia> TimerOutputs.ncalls(to["nest 1"])
