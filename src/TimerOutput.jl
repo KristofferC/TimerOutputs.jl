@@ -61,7 +61,7 @@ Base.pop!(to::TimerOutput) = pop!(to.timer_stack)
 
 # Only sum the highest parents
 function totmeasured(to::TimerOutput)
-    t, b = UInt64(0), UInt64(0)
+    t, b = Int64(0), Int64(0)
     for section in values(to.inner_timers)
         timedata = section.accumulated_data
         t += timedata.time
@@ -86,10 +86,14 @@ end
 ncalls(to::TimerOutput)    = to.accumulated_data.ncalls
 allocated(to::TimerOutput) = to.accumulated_data.allocs
 time(to::TimerOutput) = to.accumulated_data.time
+totallocated(to::TimerOutput) = totmeasured(to)[2]
+tottime(to::TimerOutput) = totmeasured(to)[1]
 
 time() = time(DEFAULT_TIMER)
 ncalls() = ncalls(DEFAULT_TIMER)
 allocated() = allocated(DEFAULT_TIMER)
+totallocated() = totmeasured(DEFAULT_TIMER)[2]
+tottime() = totmeasured(DEFAULT_TIMER)[1]
 
 get_defaultimer() = DEFAULT_TIMER
 
