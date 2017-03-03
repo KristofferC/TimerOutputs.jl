@@ -141,6 +141,7 @@ show(io, to; allocations = false, compact = true)
 show(io, to; sortby = :ncalls)
 show(io, to; sortby = :time)
 show(io, to; sortby = :allocations)
+show(io, to; sortby = :name)
 show(io, to; linechars = :ascii)
 end # testset
 
