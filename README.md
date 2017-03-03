@@ -12,9 +12,9 @@ An example of the output (used in a finite element simulation) is shown below
 
 ```
  ─────────────────────────────────────────────────────────────────────────────
-                                       Time                  Allocations       
-                              ──────────────────────   ────────────────────────
-       Tot / % measured:          17.6s / 93.7%            17.8GiB / 99.8%     
+                                       Time                  Allocations      
+                              ──────────────────────   ───────────────────────
+       Tot / % measured:          17.6s / 93.7%            17.8GiB / 99.8%    
 
   Section             ncalls    time   %tot  %timed      alloc   %tot  %alloc 
  ─────────────────────────────────────────────────────────────────────────────
@@ -83,9 +83,9 @@ Printing `to` shows a formatted table showing the number of calls, the total tim
 
 ```
  ───────────────────────────────────────────────────────────────────────
-                                 Time                  Allocations       
-                        ──────────────────────   ────────────────────────
-    Tot / % measured:       2.27s / 59.6%            76.4MiB / 97.0%     
+                                 Time                  Allocations      
+                        ──────────────────────   ───────────────────────
+    Tot / % measured:       2.27s / 59.6%            76.4MiB / 97.0%    
 
   Section       ncalls    time   %tot  %timed      alloc   %tot  %alloc 
  ───────────────────────────────────────────────────────────────────────
@@ -183,9 +183,9 @@ which prints:
 ```julia
 julia> print_timer()
  ────────────────────────────────────────────────────────────────────
-                              Time                  Allocations       
-                     ──────────────────────   ────────────────────────
-  Tot / % measured:      122ms / 17.5%            1.47KiB / 0.35%     
+                              Time                  Allocations      
+                     ──────────────────────   ───────────────────────
+  Tot / % measured:      122ms / 17.5%            1.47KiB / 0.35%    
 
   Section    ncalls    time   %tot  %timed      alloc   %tot  %alloc 
  ────────────────────────────────────────────────────────────────────
