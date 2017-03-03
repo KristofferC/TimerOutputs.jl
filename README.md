@@ -106,7 +106,7 @@ Printing `to` shows a formatted table showing the number of calls, the total tim
 The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)` takes a number of keyword arguments to change the output. They are listed here:
 
 * `allocations::Bool` ─ show the allocation columns (default true)
-* `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls` or `:allocations`
+* `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `ascii` to draw the horizontal lines in the table
 * `compact::Symbol` ─ remove the `%timed` and `%alloc` column since if all of the program is timed, these are equal to the `%tot` column, default `false`.
 

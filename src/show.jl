@@ -5,8 +5,8 @@ print_timer(to::TimerOutput; kwargs...) = show(STDOUT, to; kwargs...)
 
 Base.show(to::TimerOutput; kwargs...) = show(STDOUT, to; kwargs...)
 function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false)
-    sortby  in (:time, :ncalls, :allocations) || throw(ArgumentError("sortby should be :time, :allocations or :ncalls, got $sortby"))
-    linechars in (:unicode, :ascii)           || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
+    sortby  in (:time, :ncalls, :allocations, :name) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls or :name, got $sortby"))
+    linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
     t₀, b₀ = to.start_data.time, to.start_data.allocs
     t₁, b₁ = time_ns(), gc_bytes()
@@ -35,7 +35,7 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     name_length = max(9, max_name - max(0, requested_width - available_width))
 
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact)
-    for timer in sort!(collect(values(to.inner_timers)); rev = true, by = x -> sortf(x, sortby))
+    for timer in sort!(collect(values(to.inner_timers)); rev = sortby != :name, by = x -> sortf(x, sortby))
         _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
     end
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact)
@@ -45,6 +45,7 @@ function sortf(x, sortby)
     sortby == :time        && return x.accumulated_data.time
     sortby == :ncalls      && return x.accumulated_data.ncalls
     sortby == :allocations && return x.accumulated_data.allocs
+    sortby == :name        && return x.name
     error("internal error")
 end
 
@@ -146,7 +147,7 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     end
     print(io, "\n")
 
-    for timer in sort!(collect(values(to.inner_timers)), rev = true, by = x -> sortf(x, sortby))
+    for timer in sort!(collect(values(to.inner_timers)), rev = sortby != :name, by = x -> sortf(x, sortby))
         _print_timer(io, timer, ∑t, ∑b, indent + 2, name_length, allocations, sortby, compact)
     end
 end
