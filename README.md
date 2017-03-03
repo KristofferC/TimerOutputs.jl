@@ -162,39 +162,7 @@ julia> show(to_flatten; compact = true, allocations = false)
 
 ## Resetting
 
-A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time / allocation values:
-
-## Default Timer
-
-It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of all the functions and macros that does not take a `TimerOutput` instance and then uses a global timer defined in the package.
-Note that this global timer is shared among all users of the package.
-For example:
-
-```julia
-reset_timer!()
-
-@timeit "section" sleep(0.02)
-@timeit "section2" sleep(0.1)
-
-print_timer()
-```
-
-which prints:
-```julia
-julia> print_timer()
- ────────────────────────────────────────────────────────────────────
-                              Time                  Allocations      
-                     ──────────────────────   ───────────────────────
-  Tot / % measured:      122ms / 17.5%            1.47KiB / 0.35%    
-
-  Section    ncalls    time   %tot  %timed      alloc   %tot  %alloc 
- ────────────────────────────────────────────────────────────────────
-  section2        1    101ms  82.7%  82.7%        464B  30.9%  30.9%
-  section         1   21.1ms  17.3%  17.3%     1.02KiB  69.1%  69.1%
- ────────────────────────────────────────────────────────────────────
-```
-
-The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
+A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time / allocation values.
 
 ## Indexing into a table
 
@@ -253,6 +221,49 @@ julia> TimerOutputs.time(to["nest 1"])
 julia> TimerOutputs.allocated(to["nest 1"])
 1507698
 ```
+
+Furthermore, you can request the total time spent in the "root" timer:
+
+```julia
+julia> TimerOutputs.tottime(to)
+604937208
+
+julia> TimerOutputs.totallocated(to)
+5456
+```
+
+## Default Timer
+
+It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of all the functions and macros that does not take a `TimerOutput` instance and then uses a global timer defined in the package.
+Note that this global timer is shared among all users of the package.
+For example:
+
+```julia
+reset_timer!()
+
+@timeit "section" sleep(0.02)
+@timeit "section2" sleep(0.1)
+
+print_timer()
+```
+
+which prints:
+```julia
+julia> print_timer()
+ ────────────────────────────────────────────────────────────────────
+                              Time                  Allocations      
+                     ──────────────────────   ───────────────────────
+  Tot / % measured:      122ms / 17.5%            1.47KiB / 0.35%    
+
+  Section    ncalls    time   %tot  %timed      alloc   %tot  %alloc 
+ ────────────────────────────────────────────────────────────────────
+  section2        1    101ms  82.7%  82.7%        464B  30.9%  30.9%
+  section         1   21.1ms  17.3%  17.3%     1.02KiB  69.1%  69.1%
+ ────────────────────────────────────────────────────────────────────
+```
+
+The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
+
 
 ## Overhead
 

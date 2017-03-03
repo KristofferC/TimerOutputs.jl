@@ -1,3 +1,5 @@
+__precompile__()
+
 module TimerOutputs
 
 import Base: show, time_ns, gc_bytes
