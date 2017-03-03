@@ -10,7 +10,7 @@ function prettytime(t)
     elseif t < 1e9
         value, units = t / 1e6, "ms"
     else
-        value, units = t / 1e9, " s"
+        value, units = t / 1e9, "s"
     end
 
     if value >= 100
@@ -20,13 +20,13 @@ function prettytime(t)
     else
         str = string(@sprintf("%.2f", value), units)
     end
-    return lpad(str, 6, " ")
+    return str
 end
 
 function prettymemory(b)
     if b < 1000
         value = -1
-        str = string(b, "  B")
+        str = string(b, "B")
     elseif b < 1000^2
         value, units = b / 1024, "KiB"
     elseif b < 1000^3
@@ -43,7 +43,7 @@ function prettymemory(b)
     elseif value >= 0
         str = string(@sprintf("%.2f", value), units)
     end
-    return lpad(str, 7, " ")
+    return str
 end
 
 function prettypercent(nominator, denominator)
@@ -59,6 +59,8 @@ function prettypercent(nominator, denominator)
     else
         str = string(@sprintf("%.2f", value), "%")
     end
-    return lpad(str, 5, " ")
+    # Workaround...
+    str == "100.0%" && (str = "100%")
+    return str
 end
 
