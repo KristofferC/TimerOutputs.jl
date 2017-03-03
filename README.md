@@ -10,18 +10,18 @@ Multiple calls to code sections with the same label will accumulate the data for
 An example of the output is shown below:
 
 ```
- ══════════════════════════════════════════════════════════════════════════════
-                                         Time                 Allocations      
-                               ──────────────────────   ───────────────────────
-  Total/percentage measured:        15.3 s / 93.7%          17.8GiB / 99.8%    
-                                                                
-  Section              ncalls    time   %tot  %timed      alloc   %tot  %alloc
- ──────────────────────────────────────────────────────────────────────────────
-  assemble                  5   9.06 s  55.6%  59.4%     15.8GiB  88.4%  88.5%
-  linear solve              4   4.81 s  29.6%  31.6%     1.54GiB  8.64%  8.65%
-  create sparse mat...      5    850ms  5.22%  5.57%      512MiB  2.81%  2.81%
-  export                    1    537ms  3.30%  3.52%     6.51MiB  0.04%  0.04%
- ══════════════════════════════════════════════════════════════════════════════
+ ────────────────────────────────────────────────────────────────────────────────
+                                          Time                  Allocations      
+                                 ──────────────────────   ───────────────────────
+  Tot / % measured:                  17.5s / 0.01%            17.8GiB / 97.5%    
+
+  Section                ncalls    time   %tot  %timed      alloc   %tot  %alloc 
+ ────────────────────────────────────────────────────────────────────────────────
+  assemble                    5    11.0s  62.6%  62.6%     15.8GiB  88.5%  88.5%
+  linear solve                4    5.39s  30.8%  30.8%     1.54GiB  8.65%  8.65%
+  create sparse matrix        5    588ms  3.36%  3.36%      512MiB  2.81%  2.81%
+  export                      1    559ms  3.20%  3.20%     6.55MiB  0.04%  0.04%
+ ────────────────────────────────────────────────────────────────────────────────
 ```
 
 This package is inspired by the `TimerOutput` class in [deal.ii](https://dealii.org/).
@@ -38,22 +38,13 @@ using TimerOutputs
 const to = TimerOutput()
 
 # Time a section code with the label "sleep" to the `TimerOutput` named "to"
-@timeit to "sleep" sleep(0.2)
+@timeit to "sleep" sleep(0.02)
 
 # Create a function to later time
 rands() = for i in 1:10^7 rand() end
 
 # Time the function, @timeit returns the value being evaluated, just like Base @time
 rand_vals = @timeit to "randoms" rands()
-
-# Explicit enter and exiting sections:8
-function time_test()
-    enter_section(to, "test function")
-    sleep(0.5)
-    exit_section(to, "test function") # Can also be given explicitly
-end
-
-time_test()
 
 # do syntax for exception safe timings
 function i_will_throw()
@@ -85,6 +76,7 @@ Printing `to` now shows a formatted table showing the number of calls, the total
   sleep                   101   1.34 s  24.2%  46.7%     795KiB  1.82%  77.6%
   throwing                  1    502ms  9.05%  17.5%     192  B  0.00%  0.02%
   test function             1    502ms  9.05%  17.5%     224  B  0.00%  0.02%
+  nested                    1    502ms  9.05%  17.5%     176  B  0.00%  0.02%
   randoms                   1   24.3ms  0.44%  0.85%     229KiB  0.52%  22.3%
  ═════════════════════════════════════════════════════════════════════════════
 ```
@@ -114,7 +106,7 @@ For example:
 ```julia
 reset_timer!()
 
-@timeit "section" sleep(0.2)
+@timeit "section" sleep(0.02)
 @timeit "section2" sleep(0.1)
 
 print_timer()

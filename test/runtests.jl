@@ -1,33 +1,51 @@
 using TimerOutputs
 using Base.Test
 
-import TimerOutputs: sections, ncalls
+import TimerOutputs: DEFAULT_TIMER
+
+reset_timer!()
 
 @testset "TimerOutput" begin
 
 to = TimerOutput()
 
 @timeit to "sleep" sleep(0.1)
+@timeit "sleep" sleep(0.1)
 
-@test "sleep" in keys(sections(to))
+@test "sleep" in keys(to.inner_timers)
+@test "sleep" in keys(DEFAULT_TIMER.inner_timers)
 
 @timeit to "multi statement" begin
 1+1
 sleep(0.1)
 end
 
-@test "multi statement" in keys(sections(to))
+@timeit "multi statement" begin
+1+1
+sleep(0.1)
+end
+
+@test "multi statement" in keys(to.inner_timers)
+@test "multi statement" in keys(DEFAULT_TIMER.inner_timers)
 
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
 
-@test ncalls(sections(to)["sleep"]) == 4
+@timeit "sleep" sleep(0.1)
+@timeit "sleep" sleep(0.1)
+@timeit "sleep" sleep(0.1)
+
+@test to["sleep"].accumulated_data.ncalls == 4
+@test DEFAULT_TIMER["sleep"].accumulated_data.ncalls == 4
+
 
 # Check reset works
 reset_timer!(to)
+reset_timer!()
 
-@test length(keys(sections(to))) == 0
+@test length(keys(to.inner_timers)) == 0
+@test length(keys(DEFAULT_TIMER.inner_timers)) == 0
 
 
 # Check return values get propagated
@@ -38,26 +56,45 @@ end
 to2 = TimerOutput()
 
 a = @timeit to2 "foo" foo(5)
+b = @timeit "foo" foo(5)
 
 @test a === 10
-@test "foo" in keys(sections(to2))
+@test b === 10
+@test "foo" in collect(keys(to2.inner_timers))
+@test "foo" in collect(keys(DEFAULT_TIMER.inner_timers))
 
 # Test nested
 c = @timeit to2 "nest 1" begin
-    sleep(0.1)
-    @timeit to2 "nest 2" sleep(0.2)
-    @timeit to2 "nest 1" sleep(0.2)
+    sleep(0.01)
+    @timeit to2 "nest 2" sleep(0.02)
+    @timeit to2 "nest 2" sleep(0.02)
     5
 end
 
-@test ncalls(sections(to2)["nest 1"]) == 2
-@test ncalls(sections(to2)["nest 2"]) == 1
+d = @timeit "nest 1" begin
+    sleep(0.01)
+    @timeit "nest 2" sleep(0.02)
+    @timeit "nest 2" sleep(0.02)
+    5
+end
+
+@test to2["nest 1"].accumulated_data.ncalls == 1
+@test to2["nest 1"]["nest 2"].accumulated_data.ncalls == 2
+@test DEFAULT_TIMER["nest 1"].accumulated_data.ncalls == 1
+@test DEFAULT_TIMER["nest 1"]["nest 2"].accumulated_data.ncalls == 2
 @test c === 5
+@test d == 5
 
 # test throws
-
 function foo2(v)
-    time_section(to, "throwing") do
+    timeit(to, "throwing") do
+        sleep(1)
+        print(v[6]) # OOB
+    end
+end
+
+function foo3(v)
+    timeit("throwing") do
         sleep(1)
         print(v[6]) # OOB
     end
@@ -69,67 +106,14 @@ catch e
     isa(e, BoundsError) || rethrow(e)
 end
 
-@test "throwing" in keys(sections(to))
-
-# The error is from the macro expansion.. not sure how to test
-# @test_throws ArgumentError @timeit to 5 sleep(1)
-
-
-
-function foo3()
-    to = TimerOutput()
-
-    to_tester = TimerOutput()
-    @timeit to "runtime" for i in 1:10^6
-        @timeit to_tester "test" 1+1
-    end
-
-    return to, to_tester
+try
+    foo3(rand(5))
+catch e
+    isa(e, BoundsError) || rethrow(e)
 end
 
-to3, to4 = foo3()
+@test "throwing" in keys(to.inner_timers)
+@test "throwing" in keys(DEFAULT_TIMER.inner_timers)
 
-@test "runtime" in keys(sections(to3))
-@test "test" in keys(sections(to4))
-
-function foo4()
-    to = TimerOutput()
-
-    enter_section(to, "sec1")
-    sleep(0.25)
-    enter_section(to, "sec2")
-    sleep(0.25)
-    exit_section(to)
-
-    exit_section(to, "sec1")
-
-    return to
-end
-
-
-
-to5 = foo4()
-
-@test "sec1" in keys(sections(to5))
-@test "sec2" in keys(sections(to5))
-
-time_section(to5, "sec3") do
-    sleep(0.01)
-end
-
-@test "sec2" in keys(sections(to5))
-
-print(to5)
-end # testset
-
-
-@testset "DefaultTimer" begin
-
-reset_timer!()
-@timeit "default_1" sleep(0.1)
-c = @timeit "default_1" 1+1
-@test c == 2
-print_timer()
-@test "default_1" in TimerOutputs.DEFAULT_TIMER.labels
 
 end # testset
