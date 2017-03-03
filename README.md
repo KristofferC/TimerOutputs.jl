@@ -114,7 +114,7 @@ The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)` takes a number of 
 
 If sections are nested like in the example below:
 
-```
+```julia
 to = TimerOutput()
 
 @timeit to "nest 1" begin
@@ -130,7 +130,7 @@ end
 
 the table is displayed as:
 
-```
+```julia
 julia> show(to, compact = true, allocations = false)
  ──────────────────────────────────────
   Section       ncalls    time   %tot 
@@ -146,7 +146,7 @@ julia> show(to, compact = true, allocations = false)
 
 It is possible to flatten this timer using the `TimerOutputs.flatten` function that accumulates the data for all sections with identical labels:
 
-```
+```julia
 julia> to_flatten = TimerOutputs.flatten(to);
 
 julia> show(to_flatten; compact = true, allocations = false)
@@ -180,7 +180,7 @@ print_timer()
 ```
 
 which prints:
-```
+```julia
 julia> print_timer()
  ────────────────────────────────────────────────────────────────────
                               Time                  Allocations       
@@ -201,7 +201,7 @@ The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
 Any `TimerOutput` can be indexed with a section string which returns a new `TimerOutput` with that section as the "root". For example:
 
 
-```
+```julia
 to = TimerOutput()
 
 @timeit to "nest 1" begin
@@ -214,7 +214,7 @@ to = TimerOutput()
 end
 ```
 
-```
+```julia
 julia> show(to; compact = true, allocations = false, linechars = :ascii)
  ---------------------------------------
   Section        ncalls    time   %tot 
@@ -243,7 +243,7 @@ The percentages showed are now relative to that "root".
 
 The (unexported) functions `ncalls`, `time`, `allocated` gives the accumulated data for a sections. Time is given in nano seconds and allocations in bytes. For example (using the `to` object from above):
 
-```jl
+```julia
 julia> TimerOutputs.ncalls(to["nest 1"])
 1
 
