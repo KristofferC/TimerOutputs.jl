@@ -8,6 +8,10 @@ Multiple calls to code sections with the same label (and in the same "scope") wi
 After the program has executed, it is possible to print a nicely formatted table presenting how much time, allocations and number of calls were made in each section.
 The output can be customized as to only show the things you are interested in.
 
+If you find this package useful please give it a star. I like stars and it also helps me know where my development time is best spent.
+
+## Example output
+
 An example of the output (used in a finite element simulation) is shown below
 
 ```
@@ -103,7 +107,7 @@ Printing `to` shows a formatted table showing the number of calls, the total tim
 
 ## Settings for printing:
 
-The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)` takes a number of keyword arguments to change the output. They are listed here:
+The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
 
 * `allocations::Bool` ─ show the allocation columns (default true)
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
