@@ -51,16 +51,17 @@ rands() = rand(10^7)
 # Time the function, @timeit returns the value being evaluated, just like Base @time
 rand_vals = @timeit to "randoms" rands();
 
-# Nested sections:
+# Nested sections (sections with same name are not accumulated
+# if they have different parents)
 function time_test()
     @timeit to "nest 1" begin
         sleep(0.1)
         @timeit to "level 2.1" sleep(0.1)
-        @timeit to "level 2.2" sleep(0.1)
+        @timeit to "level 2.2" sleep(0.2)
     end
     @timeit to "nest 2" begin
-        @timeit to "level 2.1" sleep(0.1)
-        @timeit to "level 2.2" sleep(0.1)
+        @timeit to "level 2.1" sleep(0.3)
+        @timeit to "level 2.2" sleep(0.4)
     end
 end
 
@@ -89,19 +90,19 @@ Printing `to` shows a formatted table showing the number of calls, the total tim
  ───────────────────────────────────────────────────────────────────────
                                  Time                  Allocations      
                         ──────────────────────   ───────────────────────
-    Tot / % measured:       2.27s / 59.6%            76.4MiB / 97.0%    
+    Tot / % measured:       2.89s / 50.5%            79.0MiB / 65.9%    
 
   Section       ncalls    time   %tot  %timed      alloc   %tot  %alloc 
  ───────────────────────────────────────────────────────────────────────
-  sleep            101    1.14s  50.2%  50.2%     38.0KiB  0.05%  0.05%
-  throwing           1    502ms  22.1%  22.1%        384B  0.00%  0.00%
-  nest 1             1    304ms  13.4%  13.4%     2.73KiB  0.00%  0.00%
-    level 2.1        1    101ms  4.46%  4.46%        368B  0.00%  0.00%
-    level 2.2        1    101ms  4.45%  4.45%        368B  0.00%  0.00%
-  nest 2             1    202ms  8.91%  8.91%     2.38KiB  0.00%  0.00%
-    level 2.1        1    101ms  4.46%  4.46%        368B  0.00%  0.00%
-    level 2.2        1    101ms  4.46%  4.46%        368B  0.00%  0.00%
-  randoms            1    124ms  5.47%  5.47%     76.3MiB  99.9%  99.9%
+  sleep            101    1.16s  40.2%  40.2%     1.40MiB  1.77%  1.77%
+  nest 2             1    703ms  24.3%  24.3%     3.13KiB  0.00%  0.00%
+    level 2.2        1    402ms  13.9%  13.9%        368B  0.00%  0.00%
+    level 2.1        1    301ms  10.4%  10.4%        368B  0.00%  0.00%
+  throwing           1    502ms  17.4%  17.4%        384B  0.00%  0.00%
+  nest 1             1    404ms  14.0%  14.0%     3.48KiB  0.00%  0.00%
+    level 2.2        1    201ms  6.97%  6.97%        368B  0.00%  0.00%
+    level 2.1        1    101ms  3.50%  3.50%        368B  0.00%  0.00%
+  randoms            1    118ms  4.09%  4.09%     77.6MiB  98.2%  98.2%
  ───────────────────────────────────────────────────────────────────────
 ```
 
