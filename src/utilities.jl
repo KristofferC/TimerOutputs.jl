@@ -64,3 +64,24 @@ function prettypercent(nominator, denominator)
     return str
 end
 
+function prettycount(t::Int)
+    if t < 1000
+        return string(t)
+    elseif t < 1000^2
+        value, units = t / 1000, "k"
+    elseif t < 1000^3
+        value, units = t / 1e6, "M"
+    else
+        value, units = t / 1e9, "B"
+    end
+
+
+    if value >= 100
+        str = string(@sprintf("%.0f", value), units)
+    elseif value >= 10
+        str = string(@sprintf("%.1f", value), units)
+    else
+        str = string(@sprintf("%.2f", value), units)
+    end
+    return str
+end
