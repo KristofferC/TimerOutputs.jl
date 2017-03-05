@@ -134,7 +134,7 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     print(io, "  ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2-indent))
-    print(io, " "^(5 - ndigits(nc)), nc)
+    print(io, lpad(prettycount(nc), 5, " "))
 
     print(io, "   ", lpad(prettytime(t),        6, " "))
     print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))

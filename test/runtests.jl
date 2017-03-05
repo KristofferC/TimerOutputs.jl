@@ -134,6 +134,14 @@ tom = flatten(to)
 @test ncalls(tom["bur"]) == 2
 @test ncalls(tom["baz"]) == 1
 
+function many_loops()
+    for i in 1:10^7
+        @timeit to "loop" 1+1
+    end
+end
+
+many_loops()
+
 io = IOBuffer()
 show(io, to)
 show(io, to; allocations = false)
