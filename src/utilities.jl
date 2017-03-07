@@ -20,7 +20,7 @@ function prettytime(t)
     else
         str = string(@sprintf("%.2f", value), units)
     end
-    return str
+    return lpad(str, 6, " ")
 end
 
 function prettymemory(b)
@@ -43,7 +43,7 @@ function prettymemory(b)
     elseif value >= 0
         str = string(@sprintf("%.2f", value), units)
     end
-    return str
+    return lpad(str, 7, " ")
 end
 
 function prettypercent(nominator, denominator)

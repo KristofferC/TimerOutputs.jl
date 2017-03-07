@@ -15,22 +15,27 @@ If you find this package useful please give it a star. I like stars and it also 
 An example of the output (used in a finite element simulation) is shown below
 
 ```
- ─────────────────────────────────────────────────────────────────────────────
-                                       Time                  Allocations      
-                              ──────────────────────   ───────────────────────
-       Tot / % measured:          17.6s / 93.7%            17.8GiB / 99.8%    
+ ────────────────────────────────────────────────────────────────────────────────
+                                          Time                  Allocations      
+                                 ──────────────────────   ───────────────────────
+        Tot / % measured:             7.95s / 85.4%           5.04GiB / 84.2%    
 
-  Section             ncalls    time   %tot  %timed      alloc   %tot  %alloc 
- ─────────────────────────────────────────────────────────────────────────────
-  assemble                 5    10.7s  61.0%  61.0%     15.8GiB  88.5%  88.5%
-  linear solve             4    5.54s  31.5%  31.5%     1.54GiB  8.66%  8.66%
-  create sparse ma...      5    734ms  4.18%  4.18%      512MiB  2.81%  2.81%
-  export                   1    575ms  3.28%  3.28%     6.55MiB  0.04%  0.04%
- ─────────────────────────────────────────────────────────────────────────────
+  Section                ncalls    time   %tot    avg      alloc   %tot     avg  
+ ────────────────────────────────────────────────────────────────────────────────
+  linear solve                5    2.91s  42.9%   583ms    108MiB  2.50%  21.7MiB
+  assemble                    6    2.90s  42.7%   484ms   3.47GiB  81.8%   592MiB
+    inner assemble         240k    2.17s  31.9%  9.02μs   3.14GiB  74.2%  13.7KiB
+  export                      1    491ms  7.22%   491ms   16.9MiB  0.39%  16.9MiB
+  create sparse matrix        6    488ms  7.18%  81.3ms    663MiB  15.3%   111MiB
+ ────────────────────────────────────────────────────────────────────────────────
 ```
 
-The first line presents the total (wall) time passed and allocations made since the start of the timer as well as the percentage of those totals that was spent inside timed sections.
-The following lines shows data for all the timed sections. The section label is shown first followed by the number of calls made to that section. Then, the total time / allocations in that section, as well as percentage with respect to the total measured data (inside timed sections) and the total data since the timer was started is shown.
+The first line shows the total (wall) time passed and allocations made since the start of the timer as well as
+the percentage of those totals spent inside timed sections.
+The following lines shows data for all the timed sections.
+The section label is shown first followed by the number of calls made to that section.
+Finally, the total time elapsed or allocations made in that section are shown together with the
+percentage of the total in that section and the average (time / allocations per call).
 
 ## Usage
 
@@ -56,7 +61,10 @@ rand_vals = @timeit to "randoms" rands();
 function time_test()
     @timeit to "nest 1" begin
         sleep(0.1)
-        @timeit to "level 2.1" sleep(0.1)
+        # 3 calls to the same label
+        @timeit to "level 2.1" sleep(0.03)
+        @timeit to "level 2.1" sleep(0.03)
+        @timeit to "level 2.1" sleep(0.03)
         @timeit to "level 2.2" sleep(0.2)
     end
     @timeit to "nest 2" begin
@@ -84,25 +92,28 @@ for i in 1:100
 end
 ```
 
-Printing `to` shows a formatted table showing the number of calls, the total time spent in each section, and the percentage of the time spent in each section since `to` was created as well as the percentage of the total time timed. Similar information is available for allocations:
+Printing `to` shows a formatted table showing the number of calls,
+the total time spent in each section, and the percentage of the time
+spent in each section since `to` was created as well as averages (per call).
+Similar information is available for allocations:
 
 ```
  ───────────────────────────────────────────────────────────────────────
                                  Time                  Allocations      
                         ──────────────────────   ───────────────────────
-    Tot / % measured:       2.89s / 50.5%            79.0MiB / 65.9%    
+    Tot / % measured:        2.87s / 53.0%           79.0MiB / 64.2%    
 
-  Section       ncalls    time   %tot  %timed      alloc   %tot  %alloc 
+  Section       ncalls    time   %tot    avg      alloc   %tot     avg  
  ───────────────────────────────────────────────────────────────────────
-  sleep            101    1.16s  40.2%  40.2%     1.40MiB  1.77%  1.77%
-  nest 2             1    703ms  24.3%  24.3%     3.13KiB  0.00%  0.00%
-    level 2.2        1    402ms  13.9%  13.9%        368B  0.00%  0.00%
-    level 2.1        1    301ms  10.4%  10.4%        368B  0.00%  0.00%
-  throwing           1    502ms  17.4%  17.4%        384B  0.00%  0.00%
-  nest 1             1    404ms  14.0%  14.0%     3.48KiB  0.00%  0.00%
-    level 2.2        1    201ms  6.97%  6.97%        368B  0.00%  0.00%
-    level 2.1        1    101ms  3.50%  3.50%        368B  0.00%  0.00%
-  randoms            1    118ms  4.09%  4.09%     77.6MiB  98.2%  98.2%
+  sleep            101    1.16s  40.5%  11.5ms   1.40MiB  1.77%  14.2KiB
+  nest 2             1    703ms  24.5%   703ms   3.16KiB  0.00%  3.16KiB
+    level 2.2        1    401ms  14.0%   401ms      368B  0.00%   368.0B
+    level 2.1        1    301ms  10.5%   301ms      368B  0.00%   368.0B
+  throwing           1    502ms  17.5%   502ms      384B  0.00%   384.0B
+  nest 1             1    396ms  13.8%   396ms   4.23KiB  0.01%  4.23KiB
+    level 2.2        1    201ms  7.00%   201ms      368B  0.00%   368.0B
+    level 2.1        3   93.4ms  3.25%  31.1ms   1.08KiB  0.00%   368.0B
+  randoms            1    109ms  3.80%   109ms   77.6MiB  98.2%  77.6MiB
  ───────────────────────────────────────────────────────────────────────
 ```
 
@@ -110,10 +121,10 @@ Printing `to` shows a formatted table showing the number of calls, the total tim
 
 The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
 
-* `allocations::Bool` ─ show the allocation columns (default true)
+* `allocations::Bool` ─ show the allocation columns (default `true`)
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` to draw the horizontal lines in the table
-* `compact::Symbol` ─ remove the `%timed` and `%alloc` column since if all of the program is timed, these are equal to the `%tot` column, default `false`.
+* `compact::Symbol` ─ hide the `avg` column (default `false`)
 
 ## Flattening
 
@@ -136,16 +147,15 @@ end
 the table is displayed as:
 
 ```julia
-julia> show(to, compact = true, allocations = false)
  ──────────────────────────────────────
   Section       ncalls    time   %tot 
  ──────────────────────────────────────
-  nest 1             1    625ms  59.0%
-    level 2.2       20    423ms  39.9%
-    level 2.1        1    101ms  9.54%
-  nest 2             1    435ms  41.0%
-    level 2.1       30    334ms  31.5%
-    level 2.2        1    101ms  9.54%
+  nest 1             1    663ms  60.3%
+    level 2.2       20    423ms  38.5%
+    level 2.1        1    101ms  9.21%
+  nest 2             1    436ms  39.7%
+    level 2.1       30    334ms  30.4%
+    level 2.2        1    101ms  9.21%
  ──────────────────────────────────────
 ```
 
@@ -156,12 +166,12 @@ julia> to_flatten = TimerOutputs.flatten(to);
 
 julia> show(to_flatten; compact = true, allocations = false)
  ────────────────────────────────────
-  Section     ncalls    time   %tot
+  Section     ncalls    time   %tot 
  ────────────────────────────────────
-  nest 1           1    670ms  60.6%
-  level 2.2       21    525ms  47.4%
-  nest 2           1    436ms  39.4%
-  level 2.1       31    436ms  39.4%
+  nest 1           1    663ms  60.3%
+  level 2.2       21    524ms  47.7%
+  nest 2           1    436ms  39.7%
+  level 2.1       31    436ms  39.6%
  ────────────────────────────────────
 ```
 
@@ -194,10 +204,11 @@ julia> show(to; compact = true, allocations = false, linechars = :ascii)
  ---------------------------------------
   nest 1              1    605ms   100%
     nest 2            1    304ms  50.2%
-      nest 3.2        1    101ms  16.7%
-      nest 3.1        1    101ms  16.7%
       nest 3.3        1    101ms  16.7%
+      nest 3.1        1    101ms  16.7%
+      nest 3.2        1    101ms  16.7%
  ---------------------------------------
+
 julia> to_2 = to["nest 1"]["nest 2"];
 
 julia> show(to_2; compact = true, allocations = false, linechars = :ascii)
@@ -214,17 +225,19 @@ The percentages showed are now relative to that "root".
 
 ## Querying data
 
-The (unexported) functions `ncalls`, `time`, `allocated` gives the accumulated data for a section. The returned time has units in nano seconds and allocations in bytes. For example (using the `to` object from above):
+The (unexported) functions `ncalls`, `time`, `allocated` give the accumulated data for a section.
+The returned time has units in nano seconds and allocations in bytes.
+For example (using the `to` object from above):
 
 ```julia
 julia> TimerOutputs.ncalls(to["nest 1"])
 1
 
-julia> TimerOutputs.time(to["nest 1"])
+julia> TimerOutputs.time(to["nest 1"]["nest 2"])
 350441733
 
-julia> TimerOutputs.allocated(to["nest 1"])
-1507698
+julia> TimerOutputs.allocated(to["nest 1"]["nest 2"])
+5280
 ```
 
 Furthermore, you can request the total time spent in the "root" timer:
@@ -234,12 +247,13 @@ julia> TimerOutputs.tottime(to)
 604937208
 
 julia> TimerOutputs.totallocated(to)
-5456
+7632
 ```
 
 ## Default Timer
 
-It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of all the functions and macros that does not take a `TimerOutput` instance and then uses a global timer defined in the package.
+It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of
+all the functions and macros thatdoes not take a `TimerOutput` instance and then uses a global timer defined in the package.
 Note that this global timer is shared among all users of the package.
 For example:
 
@@ -258,12 +272,12 @@ julia> print_timer()
  ────────────────────────────────────────────────────────────────────
                               Time                  Allocations      
                      ──────────────────────   ───────────────────────
-  Tot / % measured:      122ms / 17.5%            1.47KiB / 0.35%    
+  Tot / % measured:       701ms / 17.5%            402KiB / 0.23%    
 
-  Section    ncalls    time   %tot  %timed      alloc   %tot  %alloc 
+  Section    ncalls    time   %tot    avg      alloc   %tot     avg  
  ────────────────────────────────────────────────────────────────────
-  section2        1    101ms  82.7%  82.7%        464B  30.9%  30.9%
-  section         1   21.1ms  17.3%  17.3%     1.02KiB  69.1%  69.1%
+  section2        1    101ms  82.7%   101ms      464B  50.0%   464.0B
+  section         1   21.2ms  17.3%  21.2ms      464B  50.0%   464.0B
  ────────────────────────────────────────────────────────────────────
 ```
 

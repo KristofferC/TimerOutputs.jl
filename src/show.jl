@@ -20,7 +20,7 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
         if allocations
             requested_width += 46
         else
-            requested_width += 27
+            requested_width += 28
         end
     else
         if allocations
@@ -55,14 +55,14 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     midrule       = linechars == :unicode ? "─" : "-"
     topbottomrule = linechars == :unicode ? "─" : "-"
     sec_ncalls = string(" ", rpad("Section", name_length, " "), " ncalls  ")
-    time_headers = "  time   %tot " * (compact ? "" : " %timed ")
-    alloc_headers = allocations ? ("  alloc   %tot " * (compact ? "" : " %alloc ")) : ""
+    time_headers = "  time   %tot " * (compact ? "" : "   avg  ")
+    alloc_headers = allocations ? (" alloc   %tot " * (compact ? "" : "    avg  ")) : ""
     total_table_width = sum(strwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
 
     # Just hardcoded shit to make things look nice
     compact && (total_table_width += 2)
     !allocations && (total_table_width -= 3)
-    !allocations && compact && (total_table_width -= 1)
+    !allocations && compact && (total_table_width -= 2)
 
     function center(str, len)
         x = (len - strwidth(str)) ÷ 2
@@ -86,8 +86,6 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
             allocation_header = "      Allocations      "
         end
 
-
-
         alloc_underline = midrule^strwidth(allocation_header)
         #tot_meas_str = string(" ", rpad("Tot / % measured:", strwidth(sec_ncalls) - 1, " "))
         if compact
@@ -96,9 +94,8 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
             tot_meas_str = center("Tot / % measured:", strwidth(sec_ncalls))
         end
 
-
-        str_time =  center(string(prettytime(∑t)    , compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
-        str_alloc = center(string(prettymemory(∑b)  , compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
+        str_time =  center(string(prettytime(Δt)    , compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
+        str_alloc = center(string(prettymemory(Δb)  , compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
 
         header_str = string(" time   %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
@@ -138,12 +135,12 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
 
     print(io, "   ", lpad(prettytime(t),        6, " "))
     print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))
-    !compact && print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))
+    !compact && print(io, "  ",  rpad(prettytime(t / nc), 6, " "))
 
     if allocations
-    print(io, "     ", lpad(prettymemory(b),      7, " "))
-    print(io, "  ",    lpad(prettypercent(b, ∑b), 5, " "))
-    !compact && print(io, "  ",    lpad(prettypercent(b, ∑b), 5, " "))
+    print(io, "   ", rpad(prettymemory(b),      9, " "))
+    print(io, rpad(prettypercent(b, ∑b), 5, " "))
+    !compact && print(io, "  ",    lpad(prettymemory(b / nc), 5, " "))
     end
     print(io, "\n")
 
