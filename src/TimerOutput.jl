@@ -28,20 +28,27 @@ type TimerOutput
     name::String
     flattened::Bool
     totmeasured::Tuple{Int64, Int64}
-end
+    prev_timer_label::String
+    prev_timer::TimerOutput
 
-function TimerOutput(label::String = "root")
-    start_data = TimeData(0, time_ns(), gc_bytes())
-    accumulated_data = TimeData()
-    inner_timers = Dict{String, TimerOutput}()
-    timer_stack = TimerOutput[]
-    return TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0,0))
+    function TimerOutput(label::String = "root")
+        start_data = TimeData(0, time_ns(), gc_bytes())
+        accumulated_data = TimeData()
+        inner_timers = Dict{String, TimerOutput}()
+        timer_stack = TimerOutput[]
+        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0,0), "")
+        timer.prev_timer = timer
+    end
+
+    # Jeez...
+    TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
+    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
+    prev_timer)
+
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured)
-
-# Base.isless(self::TimerOutput, other::TimerOutput) = self.accumulated_data < other.accumulated_data
+                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to)
 
 const DEFAULT_TIMER = TimerOutput()
 
@@ -52,7 +59,15 @@ function Base.push!(to::TimerOutput, label::String)
     else # Not a root section
         current_timer = to.timer_stack[end]
     end
-    timer = get!(current_timer.inner_timers, label, TimerOutput(label))
+    # Fast path
+    if to.prev_timer_label == label
+        timer = to.prev_timer
+    else
+        timer = get!(() -> TimerOutput(label), current_timer.inner_timers, label)
+    end
+    to.prev_timer_label = label
+    to.prev_timer = timer
+
     push!(to.timer_stack, timer)
     return timer.accumulated_data
 end
@@ -155,7 +170,7 @@ function flatten(to::TimerOutput)
         _flatten!(inner_timer, inner_timers)
     end
     toc = copy(to)
-    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b))
+    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to)
 end
 
 
