@@ -18,15 +18,15 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     requested_width = max_name
     if compact
         if allocations
-            requested_width += 46
+            requested_width += 43
         else
-            requested_width += 27
+            requested_width += 25
         end
     else
         if allocations
-            requested_width += 61
+            requested_width += 59
         else
-            requested_width += 34
+            requested_width += 33
         end
     end
 
@@ -54,15 +54,13 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 
     midrule       = linechars == :unicode ? "─" : "-"
     topbottomrule = linechars == :unicode ? "─" : "-"
-    sec_ncalls = string(" ", rpad("Section", name_length, " "), " ncalls  ")
-    time_headers = "  time   %tot " * (compact ? "" : " %timed ")
-    alloc_headers = allocations ? ("  alloc   %tot " * (compact ? "" : " %alloc ")) : ""
+    sec_ncalls = string(rpad("Section", name_length, " "), " ncalls  ")
+    time_headers = "   time   %tot" * (compact ? "" : "     avg")
+    alloc_headers = allocations ? ("  alloc   %tot" * (compact ? "" : "      avg")) : ""
     total_table_width = sum(strwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
 
     # Just hardcoded shit to make things look nice
-    compact && (total_table_width += 2)
     !allocations && (total_table_width -= 3)
-    !allocations && compact && (total_table_width -= 1)
 
     function center(str, len)
         x = (len - strwidth(str)) ÷ 2
@@ -75,18 +73,16 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         if compact
             time_header       = "     Time     "
         else
-            time_header       = "         Time         "
+            time_header       = "        Time          "
         end
 
         time_underline = midrule^strwidth(time_header)
 
         if compact
-            allocation_header       = " Allocations "
+            allocation_header       = " Allocations  "
         else
             allocation_header = "      Allocations      "
         end
-
-
 
         alloc_underline = midrule^strwidth(allocation_header)
         #tot_meas_str = string(" ", rpad("Tot / % measured:", strwidth(sec_ncalls) - 1, " "))
@@ -96,11 +92,10 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
             tot_meas_str = center("Tot / % measured:", strwidth(sec_ncalls))
         end
 
+        str_time =  center(string(prettytime(Δt)    , compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
+        str_alloc = center(string(prettymemory(Δb)  , compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
 
-        str_time =  center(string(prettytime(∑t)    , compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
-        str_alloc = center(string(prettymemory(∑b)  , compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
-
-        header_str = string(" time   %tot  %timed")
+        header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
         print(io, " ", Crayon(bold = true)(topbottomrule^total_table_width), "\n")
         if ! (allocations == false && compact == true)
@@ -131,19 +126,19 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     if length(name) >= name_length - indent
         name = string(name[1:name_length-3-indent], "...")
     end
-    print(io, "  ")
+    print(io, " ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2-indent))
     print(io, lpad(prettycount(nc), 5, " "))
 
     print(io, "   ", lpad(prettytime(t),        6, " "))
     print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))
-    !compact && print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))
+    !compact && print(io, "  ",  rpad(prettytime(t / nc), 6, " "))
 
     if allocations
-    print(io, "     ", lpad(prettymemory(b),      7, " "))
-    print(io, "  ",    lpad(prettypercent(b, ∑b), 5, " "))
-    !compact && print(io, "  ",    lpad(prettypercent(b, ∑b), 5, " "))
+    print(io, "   ", rpad(prettymemory(b),      9, " "))
+    print(io, rpad(prettypercent(b, ∑b), 5, " "))
+    !compact && print(io, "  ",    lpad(prettymemory(b / nc), 5, " "))
     end
     print(io, "\n")
 

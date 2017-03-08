@@ -20,13 +20,13 @@ function prettytime(t)
     else
         str = string(@sprintf("%.2f", value), units)
     end
-    return str
+    return lpad(str, 6, " ")
 end
 
 function prettymemory(b)
     if b < 1000
         value = -1
-        str = string(b, "B")
+        str = string(round(Int, b), "B")
     elseif b < 1000^2
         value, units = b / 1024, "KiB"
     elseif b < 1000^3
@@ -43,7 +43,7 @@ function prettymemory(b)
     elseif value >= 0
         str = string(@sprintf("%.2f", value), units)
     end
-    return str
+    return lpad(str, 7, " ")
 end
 
 function prettypercent(nominator, denominator)
