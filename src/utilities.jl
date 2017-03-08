@@ -26,7 +26,7 @@ end
 function prettymemory(b)
     if b < 1000
         value = -1
-        str = string(b, "B")
+        str = string(round(Int, b), "B")
     elseif b < 1000^2
         value, units = b / 1024, "KiB"
     elseif b < 1000^3

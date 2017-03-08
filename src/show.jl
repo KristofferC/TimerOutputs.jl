@@ -18,15 +18,15 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     requested_width = max_name
     if compact
         if allocations
-            requested_width += 45
+            requested_width += 43
         else
-            requested_width += 27
+            requested_width += 25
         end
     else
         if allocations
-            requested_width += 61
+            requested_width += 59
         else
-            requested_width += 35
+            requested_width += 33
         end
     end
 
@@ -54,10 +54,10 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 
     midrule       = linechars == :unicode ? "─" : "-"
     topbottomrule = linechars == :unicode ? "─" : "-"
-    sec_ncalls = string(" ", rpad("Section", name_length, " "), " ncalls  ")
+    sec_ncalls = string(rpad("Section", name_length, " "), " ncalls  ")
     time_headers = "   time   %tot" * (compact ? "" : "     avg")
     alloc_headers = allocations ? ("  alloc   %tot" * (compact ? "" : "      avg")) : ""
-    total_table_width = sum(strwidth.((sec_ncalls, time_headers, alloc_headers))) + 4
+    total_table_width = sum(strwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
 
     # Just hardcoded shit to make things look nice
     !allocations && (total_table_width -= 3)
@@ -73,13 +73,13 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         if compact
             time_header       = "     Time     "
         else
-            time_header       = "         Time         "
+            time_header       = "        Time          "
         end
 
         time_underline = midrule^strwidth(time_header)
 
         if compact
-            allocation_header       = " Allocations "
+            allocation_header       = " Allocations  "
         else
             allocation_header = "      Allocations      "
         end
@@ -126,7 +126,7 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     if length(name) >= name_length - indent
         name = string(name[1:name_length-3-indent], "...")
     end
-    print(io, "  ")
+    print(io, " ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2-indent))
     print(io, lpad(prettycount(nc), 5, " "))
