@@ -254,7 +254,7 @@ julia> TimerOutputs.totallocated(to)
 ## Default Timer
 
 It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of
-all the functions and macros thatdoes not take a `TimerOutput` instance and then uses a global timer defined in the package.
+all the functions and macros that do not take a `TimerOutput` instance and then use a global timer defined in the package.
 Note that this global timer is shared among all users of the package.
 For example:
 
@@ -287,7 +287,7 @@ The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
 
 ## Overhead
 
-There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
+There is a small overhead in timing a sections (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
 For proper benchmarking you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
 
 ## Author
