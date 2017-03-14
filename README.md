@@ -287,7 +287,7 @@ The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
 
 ## Overhead
 
-There is a small overhead in timing a sections (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
+There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
 For proper benchmarking you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
 
 ## Author
