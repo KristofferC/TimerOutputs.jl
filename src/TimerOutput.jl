@@ -118,10 +118,9 @@ macro timeit(args...)
 end
 
 timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
+timer_expr(label, ex::Expr) = timer_expr(:(TimerOutputs.DEFAULT_TIMER), label, ex)
 
-timer_expr(label::String, ex::Expr) = timer_expr(:(TimerOutputs.DEFAULT_TIMER), label, ex)
-
-function timer_expr(to::Union{Symbol, Expr}, label::String, ex::Expr)
+function timer_expr(to::Union{Symbol, Expr}, label, ex::Expr)
     quote
         local accumulated_data = push!($(esc(to)), $(esc(label)))
         local b₀ = gc_bytes()
