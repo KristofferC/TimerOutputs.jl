@@ -142,6 +142,15 @@ end
 
 many_loops()
 
+
+a = 3
+@timeit to "a$a"  1+1
+@timeit "a$a" 1+1
+
+@test "a3" in collect(keys(to.inner_timers))
+@test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
+
+
 io = IOBuffer()
 show(io, to)
 show(io, to; allocations = false)
