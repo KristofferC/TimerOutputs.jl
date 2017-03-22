@@ -151,6 +151,12 @@ a = 3
 @test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
 
 
+toz = TimerOutput()
+@timeit toz "foo" 1+1
+reset_timer!(toz)
+@timeit toz "foo" 1+1
+@test "foo" in keys(toz.inner_timers)
+
 io = IOBuffer()
 show(io, to)
 show(io, to; allocations = false)
