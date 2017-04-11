@@ -124,7 +124,7 @@ The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)`, (or `show`) takes
 * `allocations::Bool` ─ show the allocation columns (default `true`)
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` to draw the horizontal lines in the table
-* `compact::Symbol` ─ hide the `avg` column (default `false`)
+* `compact::Bool` ─ hide the `avg` column (default `false`)
 
 ## Flattening
 
