@@ -42,6 +42,8 @@ function prettymemory(b)
         str = string(@sprintf("%.1f", value), units)
     elseif value >= 0
         str = string(@sprintf("%.2f", value), units)
+    else
+        str = "-"
     end
     return lpad(str, 7, " ")
 end
