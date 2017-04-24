@@ -142,7 +142,6 @@ end
 
 many_loops()
 
-
 a = 3
 @timeit to "a$a"  1+1
 @timeit "a$a" 1+1
@@ -157,6 +156,15 @@ reset_timer!(toz)
 @timeit toz "foo" 1+1
 @test "foo" in keys(toz.inner_timers)
 
+function foo()
+    reset_timer!()
+    @timeit "asdf" bar()
+end
+
+bar() = print_timer()
+
+foo()
+
 io = IOBuffer()
 show(io, to)
 show(io, to; allocations = false)
@@ -167,5 +175,3 @@ show(io, to; sortby = :allocations)
 show(io, to; sortby = :name)
 show(io, to; linechars = :ascii)
 end # testset
-
-
