@@ -49,6 +49,18 @@ function sortf(x, sortby)
     error("internal error")
 end
 
+# truncate string and add dots
+function truncdots(str, n)
+    length(str) <= n && return str
+    n <= 3 && return ""
+    io = IOBuffer()
+    for (i, c) in enumerate(str)
+        i == n-2 && (write(io, "..."); break)
+        write(io, c)
+    end
+    return String(take!(io))
+end
+
 function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations, linechars, compact, title)
     global BOX_MODE, ALLOCATIONS_ENABLED
 
@@ -70,10 +82,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     if header
         time_alloc_pading = " "^(strwidth(sec_ncalls))
 
-        if length(title) > strwidth(sec_ncalls)
-            title = string(title[1:strwidth(sec_ncalls)-3], "...")
-        end
-        title = center(title, strwidth(sec_ncalls))
+        title = center(truncdots(title, strwidth(sec_ncalls)), strwidth(sec_ncalls))
 
         if compact
             time_header       = "     Time     "
@@ -127,10 +136,8 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     accum_data = to.accumulated_data
     t = accum_data.time
     b = accum_data.allocs
-    name = to.name
-    if length(name) >= name_length - indent
-        name = string(name[1:name_length-3-indent], "...")
-    end
+
+    name = truncdots(to.name, name_length - indent)
     print(io, " ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2-indent))
