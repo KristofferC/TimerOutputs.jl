@@ -121,6 +121,7 @@ Similar information is available for allocations:
 
 The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
 
+* `title::String` ─ title for the timer
 * `allocations::Bool` ─ show the allocation columns (default `true`)
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` to draw the horizontal lines in the table
