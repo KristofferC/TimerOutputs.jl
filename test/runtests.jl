@@ -174,4 +174,6 @@ show(io, to; sortby = :time)
 show(io, to; sortby = :allocations)
 show(io, to; sortby = :name)
 show(io, to; linechars = :ascii)
+show(io, to; title = "A short title")
+show(io, to; title = "A very long title that will be truncated")
 end # testset

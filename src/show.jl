@@ -4,7 +4,7 @@ print_timer(io::IO, to::TimerOutput; kwargs...) = show(io, to; kwargs...)
 print_timer(to::TimerOutput; kwargs...) = show(STDOUT, to; kwargs...)
 
 Base.show(to::TimerOutput; kwargs...) = show(STDOUT, to; kwargs...)
-function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false)
+function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
     sortby  in (:time, :ncalls, :allocations, :name) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls or :name, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
@@ -34,11 +34,11 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     #requested_width = 34 + (allocations ? 27 : 0) + max_name
     name_length = max(9, max_name - max(0, requested_width - available_width))
 
-    print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact)
+    print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact, title)
     for timer in sort!(collect(values(to.inner_timers)); rev = sortby != :name, by = x -> sortf(x, sortby))
         _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
     end
-    print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact)
+    print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
 end
 
 function sortf(x, sortby)
@@ -49,7 +49,19 @@ function sortf(x, sortby)
     error("internal error")
 end
 
-function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations, linechars, compact)
+# truncate string and add dots
+function truncdots(str, n)
+    length(str) <= n && return str
+    n <= 3 && return ""
+    io = IOBuffer()
+    for (i, c) in enumerate(str)
+        i == n-2 && (write(io, "..."); break)
+        write(io, c)
+    end
+    return String(take!(io))
+end
+
+function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations, linechars, compact, title)
     global BOX_MODE, ALLOCATIONS_ENABLED
 
     midrule       = linechars == :unicode ? "─" : "-"
@@ -69,6 +81,8 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 
     if header
         time_alloc_pading = " "^(strwidth(sec_ncalls))
+
+        title = center(truncdots(title, strwidth(sec_ncalls)), strwidth(sec_ncalls))
 
         if compact
             time_header       = "     Time     "
@@ -99,7 +113,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         tot_midstr = string(sec_ncalls, "  ", header_str)
         print(io, " ", Crayon(bold = true)(topbottomrule^total_table_width), "\n")
         if ! (allocations == false && compact == true)
-            print(io, " ", time_alloc_pading, time_header)
+            print(io, " ", Crayon(bold=true)(title), time_header)
             allocations && print(io, "   ", allocation_header)
             print(io, "\n")
             print(io, " ", time_alloc_pading, time_underline)
@@ -122,10 +136,8 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     accum_data = to.accumulated_data
     t = accum_data.time
     b = accum_data.allocs
-    name = to.name
-    if length(name) >= name_length - indent
-        name = string(name[1:name_length-3-indent], "...")
-    end
+
+    name = truncdots(to.name, name_length - indent)
     print(io, " ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2-indent))
