@@ -1,7 +1,8 @@
 using TimerOutputs
 using Base.Test
 
-import TimerOutputs: DEFAULT_TIMER, ncalls, flatten
+import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
+                     prettytime, prettymemory, prettypercent, prettycount
 
 reset_timer!()
 
@@ -176,4 +177,29 @@ show(io, to; sortby = :name)
 show(io, to; linechars = :ascii)
 show(io, to; title = "A short title")
 show(io, to; title = "A very long title that will be truncated")
+
+# issue 22: edge cases for rounding
+for (t, str) in ((9999,    "10.0μs"), (99999,    " 100μs"),
+                 (9999999, "10.0ms"), (99999999, " 100ms"))
+    @test prettytime(t) == str
+end
+for (b, str) in ((9.999*1024,   "10.0KiB"), (99.999*1024,   " 100KiB"),
+                 (9.999*1024^2, "10.0MiB"), (99.999*1024^2, " 100MiB"),
+                 (9.999*1024^3, "10.0GiB"), (99.999*1024^3, " 100GiB"))
+    @test prettymemory(b)   == str
+end
+for (num, den, str) in ((0.9999, 1, "100%"), (0.09999, 1, "10.0%"))
+    @test prettypercent(num, den) == str
+end
+for (t, str) in ((9.999*1024,   "10.0KiB"), (99.999*1024,   " 100KiB"),
+                 (9.999*1024^2, "10.0MiB"), (99.999*1024^2, " 100MiB"),
+                 (9.999*1024^3, "10.0GiB"), (99.999*1024^3, " 100GiB"))
+    @test prettymemory(t)   == str
+end
+for (c, str) in ((9999, "10.0k"), (99999, "100k"),
+                 (9999999, "10.0M"), (99999999, "100M"),
+                 (9999999999, "10.0B"), (99999999999, "100B"))
+    @test prettycount(c) == str
+end
+
 end # testset
