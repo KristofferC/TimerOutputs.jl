@@ -13,9 +13,9 @@ function prettytime(t)
         value, units = t / 1e9, "s"
     end
 
-    if value >= 100
+    if round(value) >= 100
         str = string(@sprintf("%.0f", value), units)
-    elseif value >= 10
+    elseif round(value*10) >= 100
         str = string(@sprintf("%.1f", value), units)
     else
         str = string(@sprintf("%.2f", value), units)
@@ -35,10 +35,9 @@ function prettymemory(b)
         value, units = b / 1024^3, "GiB"
     end
 
-
-    if value >= 100
+    if round(value) >= 100
         str = string(@sprintf("%.0f", value), units)
-    elseif value >= 10
+    elseif round(value*10) >= 100
         str = string(@sprintf("%.1f", value), units)
     elseif value >= 0
         str = string(@sprintf("%.2f", value), units)
@@ -50,19 +49,18 @@ end
 
 function prettypercent(nominator, denominator)
     value = nominator / denominator * 100
+
     if denominator == 0 && nominator == 0
         str = " - %"
     elseif denominator == 0
         str = "inf %"
-    elseif value >= 100
+    elseif round(value) >= 100
         str = string(@sprintf("%.0f", value), "%")
-    elseif value >= 10
+    elseif round(value*10) >= 100
         str = string(@sprintf("%.1f", value), "%")
     else
         str = string(@sprintf("%.2f", value), "%")
     end
-    # Workaround...
-    str == "100.0%" && (str = "100%")
     return str
 end
 
@@ -77,10 +75,9 @@ function prettycount(t::Int)
         value, units = t / 1e9, "B"
     end
 
-
-    if value >= 100
+    if round(value) >= 100
         str = string(@sprintf("%.0f", value), units)
-    elseif value >= 10
+    elseif round(value*10) >= 100
         str = string(@sprintf("%.1f", value), units)
     else
         str = string(@sprintf("%.2f", value), units)
