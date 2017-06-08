@@ -291,6 +291,24 @@ The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
 There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
 For proper benchmarking you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
 
+It is sometimes desireable to be able "turn on and off" the `@timeit` macro.
+There is, however, no simple way to redefine how `@timeit` should work after precompilation.
+A simple solution is to define your own macro (here `@timeit2`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
+
+```
+DEBUG = false # true
+
+macro timeit2(expr)
+    if DEBUG
+        return :($(esc(expr)))
+    else
+        return :(@timeit($(esc(expr))))
+    end
+end
+```
+
+This will create a macro that "does nothing" (just returns the expression) depending on the value of `DEBUG` when the macro is defined.
+
 ## Author
 
 Kristoffer Carlsson - @KristofferC
