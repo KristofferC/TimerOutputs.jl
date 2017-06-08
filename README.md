@@ -295,7 +295,7 @@ It is sometimes desireable to be able "turn on and off" the `@timeit` macro.
 There is, however, no simple way to redefine how `@timeit` should work after precompilation.
 A simple solution is to define your own macro (here `@timeit2`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
 
-```
+```jl
 DEBUG = false # true
 
 macro timeit2(expr)
