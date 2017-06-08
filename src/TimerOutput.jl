@@ -1,7 +1,7 @@
 ############
 # TimeData #
 ############
-type TimeData
+mutable struct TimeData
     ncalls::Int
     time::Int64
     allocs::Int64
@@ -20,23 +20,23 @@ end
 ###############
 # TimerOutput #
 ###############
-type TimerOutput
+mutable struct TimerOutput
     start_data::TimeData
     accumulated_data::TimeData
-    inner_timers::Dict{String, TimerOutput}
+    inner_timers::Dict{String,TimerOutput}
     timer_stack::Vector{TimerOutput}
     name::String
     flattened::Bool
-    totmeasured::Tuple{Int64, Int64}
+    totmeasured::Tuple{Int64,Int64}
     prev_timer_label::String
     prev_timer::TimerOutput
 
     function TimerOutput(label::String = "root")
         start_data = TimeData(0, time_ns(), gc_bytes())
         accumulated_data = TimeData()
-        inner_timers = Dict{String, TimerOutput}()
+        inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0,0), "")
+        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
         timer.prev_timer = timer
     end
 
@@ -120,7 +120,7 @@ end
 timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
 timer_expr(label, ex::Expr) = timer_expr(:(TimerOutputs.DEFAULT_TIMER), label, ex)
 
-function timer_expr(to::Union{Symbol, Expr}, label, ex::Expr)
+function timer_expr(to::Union{Symbol,Expr}, label, ex::Expr)
     quote
         local accumulated_data = push!($(esc(to)), $(esc(label)))
         local b₀ = gc_bytes()
@@ -136,7 +136,7 @@ end
 
 reset_timer!() = reset_timer!(DEFAULT_TIMER)
 function reset_timer!(to::TimerOutput)
-    to.inner_timers = Dict{String, TimerOutput}()
+    to.inner_timers = Dict{String,TimerOutput}()
     to.start_data = TimeData(0, time_ns(), gc_bytes())
     to.accumulated_data = TimeData()
     to.prev_timer_label = ""
@@ -165,7 +165,7 @@ Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
 
 function flatten(to::TimerOutput)
     t, b = totmeasured(to)
-    inner_timers = Dict{String, TimerOutput}()
+    inner_timers = Dict{String,TimerOutput}()
     for inner_timer in values(to.inner_timers)
         _flatten!(inner_timer, inner_timers)
     end
@@ -174,7 +174,7 @@ function flatten(to::TimerOutput)
 end
 
 
-function _flatten!(to::TimerOutput, inner_timers::Dict{String, TimerOutput})
+function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
     for inner_timer in values(to.inner_timers)
         _flatten!(inner_timer, inner_timers)
     end
@@ -184,7 +184,7 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String, TimerOutput})
         timer.accumulated_data += to.accumulated_data
     else
         toc = copy(to)
-        toc.inner_timers = Dict{String, TimerOutput}()
+        toc.inner_timers = Dict{String,TimerOutput}()
         inner_timers[toc.name] = toc
     end
 
