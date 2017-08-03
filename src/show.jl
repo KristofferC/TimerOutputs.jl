@@ -55,7 +55,7 @@ function truncdots(str, n)
     n <= 3 && return ""
     io = IOBuffer()
     for (i, c) in enumerate(str)
-        i == n-2 && (write(io, "..."); break)
+        i == n - 2 && (write(io, "..."); break)
         write(io, c)
     end
     return String(take!(io))
@@ -106,8 +106,8 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
             tot_meas_str = center("Tot / % measured:", strwidth(sec_ncalls))
         end
 
-        str_time =  center(string(prettytime(Δt)    , compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
-        str_alloc = center(string(prettymemory(Δb)  , compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
+        str_time =  center(string(prettytime(Δt),   compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
+        str_alloc = center(string(prettymemory(Δb), compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
 
         header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
@@ -140,7 +140,7 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     name = truncdots(to.name, name_length - indent)
     print(io, " ")
     nc = accum_data.ncalls
-    print(io, " "^indent, rpad(name, name_length + 2-indent))
+    print(io, " "^indent, rpad(name, name_length + 2 - indent))
     print(io, lpad(prettycount(nc), 5, " "))
 
     print(io, "   ", lpad(prettytime(t),        6, " "))
