@@ -69,20 +69,20 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     sec_ncalls = string(rpad("Section", name_length, " "), " ncalls  ")
     time_headers = "   time   %tot" * (compact ? "" : "     avg")
     alloc_headers = allocations ? ("  alloc   %tot" * (compact ? "" : "      avg")) : ""
-    total_table_width = sum(strwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
+    total_table_width = sum(textwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
 
     # Just hardcoded shit to make things look nice
     !allocations && (total_table_width -= 3)
 
     function center(str, len)
-        x = (len - strwidth(str)) ÷ 2
-        return string(" "^x, str, " "^(len - strwidth(str) - x))
+        x = (len - textwidth(str)) ÷ 2
+        return string(" "^x, str, " "^(len - textwidth(str) - x))
     end
 
     if header
-        time_alloc_pading = " "^(strwidth(sec_ncalls))
+        time_alloc_pading = " "^(textwidth(sec_ncalls))
 
-        title = center(truncdots(title, strwidth(sec_ncalls)), strwidth(sec_ncalls))
+        title = center(truncdots(title, textwidth(sec_ncalls)), textwidth(sec_ncalls))
 
         if compact
             time_header       = "     Time     "
@@ -90,7 +90,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
             time_header       = "        Time          "
         end
 
-        time_underline = midrule^strwidth(time_header)
+        time_underline = midrule^textwidth(time_header)
 
         if compact
             allocation_header       = " Allocations  "
@@ -98,16 +98,16 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
             allocation_header = "      Allocations      "
         end
 
-        alloc_underline = midrule^strwidth(allocation_header)
-        #tot_meas_str = string(" ", rpad("Tot / % measured:", strwidth(sec_ncalls) - 1, " "))
+        alloc_underline = midrule^textwidth(allocation_header)
+        #tot_meas_str = string(" ", rpad("Tot / % measured:", textwidth(sec_ncalls) - 1, " "))
         if compact
-            tot_meas_str = center("Total measured:", strwidth(sec_ncalls))
+            tot_meas_str = center("Total measured:", textwidth(sec_ncalls))
         else
-            tot_meas_str = center("Tot / % measured:", strwidth(sec_ncalls))
+            tot_meas_str = center("Tot / % measured:", textwidth(sec_ncalls))
         end
 
-        str_time =  center(string(prettytime(Δt),   compact ? "" : string(" / ", prettypercent(∑t, Δt))), strwidth(time_header))
-        str_alloc = center(string(prettymemory(Δb), compact ? "" : string(" / ", prettypercent(∑b, Δb))), strwidth(allocation_header))
+        str_time =  center(string(prettytime(Δt),   compact ? "" : string(" / ", prettypercent(∑t, Δt))), textwidth(time_header))
+        str_alloc = center(string(prettymemory(Δb), compact ? "" : string(" / ", prettypercent(∑b, Δb))), textwidth(allocation_header))
 
         header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)

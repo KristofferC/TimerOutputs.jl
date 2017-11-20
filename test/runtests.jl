@@ -1,5 +1,5 @@
 using TimerOutputs
-using Base.Test
+using Compat.Test
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
                      prettytime, prettymemory, prettypercent, prettycount
