@@ -130,7 +130,7 @@ end
 @timeit to "bur" sleep(0.025)
 
 tom = flatten(to)
-@test ncalls(tom["foo"])== 3
+@test ncalls(tom["foo"]) == 3
 @test ncalls(tom["bar"]) == 2
 @test ncalls(tom["bur"]) == 2
 @test ncalls(tom["baz"]) == 1
@@ -156,6 +156,43 @@ toz = TimerOutput()
 reset_timer!(toz)
 @timeit toz "foo" 1+1
 @test "foo" in keys(toz.inner_timers)
+
+@timeit to ff1(x) = x
+@timeit to ff2(x)::Float64 = x
+@timeit to function ff3(x) x end
+@timeit to function ff4(x)::Float64 x end
+
+@timeit ff5(x) = x
+@timeit ff6(x)::Float64 = x
+@timeit function ff7(x) x end
+@timeit function ff8(x)::Float64 x end
+
+for i in 1:2
+    ff1(1)
+    ff2(1)
+    ff3(1)
+    ff4(1)
+    ff5(1)
+    ff6(1)
+    ff7(1)
+    ff8(1)
+end
+
+@test ncalls(to["ff1"]) == 2
+@test ncalls(to["ff2"]) == 2
+@test ncalls(to["ff3"]) == 2
+@test ncalls(to["ff4"]) == 2
+
+@test ncalls(DEFAULT_TIMER["ff5"]) == 2
+@test ncalls(DEFAULT_TIMER["ff6"]) == 2
+@test ncalls(DEFAULT_TIMER["ff7"]) == 2
+@test ncalls(DEFAULT_TIMER["ff8"]) == 2
+
+
+
+
+@test "a3" in collect(keys(to.inner_timers))
+@test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
 
 function foo()
     reset_timer!()
