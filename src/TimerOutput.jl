@@ -8,7 +8,6 @@ mutable struct TimeData
 end
 
 Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
-
 TimeData() = TimeData(0, 0, 0)
 
 function Base.:+(self::TimeData, other::TimeData)
@@ -118,7 +117,57 @@ macro timeit(args...)
 end
 
 timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
-timer_expr(label, ex::Expr) = timer_expr(:(TimerOutputs.DEFAULT_TIMER), label, ex)
+
+function is_func_def(f)
+    if isa(f, Expr) && (f.head === :function || Base.is_short_function_def(f))
+        return true
+    else
+        return false
+    end
+end
+
+function timer_expr(ex::Expr)
+    is_func_def(ex) && return timer_expr_func(:(TimerOutputs.DEFAULT_TIMER), ex)
+    return timer_expr(:(TimerOutputs.DEFAULT_TIMER), ex)
+end
+
+function timer_expr(label_or_to, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(label_or_to, ex)
+    return timer_expr(:(TimerOutputs.DEFAULT_TIMER), label_or_to, ex)
+end
+
+function timer_expr_func(to, expr::Expr)
+    if length(expr.args[1].args) == 2 && expr.args[1].head == :(::)
+        T        = expr.args[1].args[2]
+        funcname = expr.args[1].args[1].args[1]
+        args     = expr.args[1].args[1].args[2:end]
+    else
+        T        = Any
+        funcname = expr.args[1].args[1]
+        args     = expr.args[1].args[2:end]
+    end
+    body = expr.args[2]
+    return quote
+        function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T))
+            timeit($(esc(to)), $(string(funcname))) do
+                $(esc(body))
+            end
+        end
+    end
+end
+
+function timer_expr_funcdd(to, expr::Expr)
+    funcname = expr.args[1].args[1]
+    args = expr.args[1].args[2:end]
+    body = expr.args[2]
+    return quote
+        function $(esc(funcname))($([esc(arg) for arg in args]...))
+            timeit($(esc(to)), $(string(funcname))) do
+                $(esc(body))
+            end
+        end
+    end
+end
 
 function timer_expr(to::Union{Symbol,Expr}, label, ex::Expr)
     quote
@@ -187,5 +236,7 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
         toc.inner_timers = Dict{String,TimerOutput}()
         inner_timers[toc.name] = toc
     end
-
 end
+
+
+

@@ -90,6 +90,11 @@ i_will_throw()
 for i in 1:100
     @timeit to "sleep" sleep(0.01)
 end
+
+# Can also annotate function definitions
+@timeit to funcdef(x) = x
+
+funcdef(2)
 ```
 
 Printing `to` shows a formatted table showing the number of calls,
@@ -114,6 +119,7 @@ Similar information is available for allocations:
    level 2.2        1    201ms  7.06%   201ms      368B  0.00%   368.0B
    level 2.1        3   93.5ms  3.28%  31.2ms   1.08KiB  0.00%   368.0B
  randoms            1   77.5ms  2.72%  77.5ms   77.3MiB  98.1%  77.3MiB
+ funcdef            1   2.66μs  0.00%  2.66μs         -  0.00%        -
  ──────────────────────────────────────────────────────────────────────
 ```
 
