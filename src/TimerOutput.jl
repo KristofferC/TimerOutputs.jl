@@ -109,7 +109,8 @@ allocated() = allocated(DEFAULT_TIMER)
 totallocated() = totmeasured(DEFAULT_TIMER)[2]
 tottime() = totmeasured(DEFAULT_TIMER)[1]
 
-get_defaultimer() = DEFAULT_TIMER
+get_defaulttimer() = DEFAULT_TIMER
+Base.@deprecate get_defaultimer get_defaulttimer
 
 # Macro
 macro timeit(args...)

@@ -289,7 +289,7 @@ julia> print_timer()
  ───────────────────────────────────────────────────────────────────
 ```
 
-The default timer object can be retrieved with `TimerOutputs.get_defaultimer()`.
+The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`.
 
 
 ## Overhead
