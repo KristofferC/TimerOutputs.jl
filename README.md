@@ -302,10 +302,10 @@ There is, however, no simple way to redefine how `@timeit` should work after pre
 A simple solution is to define your own macro (here `@timeit2`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
 
 ```jl
-ENABLE_TIMING = false
+ENABLE_TIMINGS = false
 
 macro timeit2(exprs...)
-    if ENABLE_TIMING
+    if ENABLE_TIMINGS
         return :(@timeit($(esc.(exprs)...)))
     else
         return esc(exprs[end])
@@ -313,7 +313,7 @@ macro timeit2(exprs...)
 end
 ```
 
-This will create a macro that "does nothing" (just returns the expression) depending on the value of `ENABLE_TIMING` when the macro is expanded.
+This will create a macro that "does nothing" (just returns the expression) depending on the value of `ENABLE_TIMINGS` when the macro is expanded.
 
 ## Author
 
