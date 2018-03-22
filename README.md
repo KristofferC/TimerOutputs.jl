@@ -302,18 +302,18 @@ There is, however, no simple way to redefine how `@timeit` should work after pre
 A simple solution is to define your own macro (here `@timeit2`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
 
 ```jl
-DEBUG = false # true
+timestuff = false
 
-macro timeit2(expr)
-    if DEBUG
-        return :($(esc(expr)))
+macro timeit2(exprs...)
+    if timestuff
+        return :(@timeit($(esc.(exprs)...)))
     else
-        return :(@timeit($(esc(expr))))
+        return esc(exprs[end])
     end
 end
 ```
 
-This will create a macro that "does nothing" (just returns the expression) depending on the value of `DEBUG` when the macro is defined.
+This will create a macro that "does nothing" (just returns the expression) depending on the value of `timestuff` when the macro is called.
 
 ## Author
 
