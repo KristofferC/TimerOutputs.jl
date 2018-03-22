@@ -299,12 +299,12 @@ For proper benchmarking you want to use a more suitable tool like [*BenchmarkToo
 
 It is sometimes desireable to be able "turn on and off" the `@timeit` macro.
 There is, however, no simple way to redefine how `@timeit` should work after precompilation.
-A simple solution is to define your own macro (here `@timeit2`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
+A simple solution is to define your own macro (here `@mytimeit`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
 
 ```jl
 ENABLE_TIMINGS = false
 
-macro timeit2(exprs...)
+macro mytimeit(exprs...)
     if ENABLE_TIMINGS
         return :(@timeit($(esc.(exprs)...)))
     else
