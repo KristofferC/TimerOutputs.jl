@@ -6,7 +6,16 @@ import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
 
 reset_timer!()
 
+# Timing from modules that don't import much
+baremodule NoImports
+    using TimerOutputs
+    using Base: sleep
+    @timeit "baresleep" sleep(0.1)
+end
+
 @testset "TimerOutput" begin
+
+@test "baresleep" in keys(DEFAULT_TIMER.inner_timers)
 
 to = TimerOutput()
 @timeit to "sleep" sleep(0.1)
