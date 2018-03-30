@@ -11,7 +11,7 @@ Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
 TimeData() = TimeData(0, 0, 0)
 
 function Base.:+(self::TimeData, other::TimeData)
-    TimeData(self.ncalls + other.ncalls, 
+    TimeData(self.ncalls + other.ncalls,
              self.time + other.time,
              self.allocs + other.allocs)
 end
@@ -150,7 +150,7 @@ function timer_expr_func(to, expr::Expr)
     body = expr.args[2]
     return quote
         function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T))
-            timeit($(esc(to)), $(string(funcname))) do
+            $(timeit)($(esc(to)), $(string(funcname))) do
                 $(esc(body))
             end
         end
@@ -163,23 +163,28 @@ function timer_expr_funcdd(to, expr::Expr)
     body = expr.args[2]
     return quote
         function $(esc(funcname))($([esc(arg) for arg in args]...))
-            timeit($(esc(to)), $(string(funcname))) do
+            $(timeit)($(esc(to)), $(string(funcname))) do
                 $(esc(body))
             end
         end
     end
 end
 
+function do_accumulate!(accumulated_data, t₀, b₀)
+    accumulated_data.time += time_ns() - t₀
+    accumulated_data.allocs += gc_bytes() - b₀
+    accumulated_data.ncalls += 1
+end
+
+
 function timer_expr(to::Union{Symbol,Expr}, label, ex::Expr)
     quote
-        local accumulated_data = push!($(esc(to)), $(esc(label)))
-        local b₀ = gc_bytes()
-        local t₀ = time_ns()
+        local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
+        local b₀ = $(gc_bytes)()
+        local t₀ = $(time_ns)()
         local val = $(esc(ex))
-        accumulated_data.time += time_ns() - t₀
-        accumulated_data.allocs += gc_bytes() - b₀
-        accumulated_data.ncalls += 1
-        pop!($(esc(to)))
+        $(do_accumulate!)(accumulated_data, t₀, b₀)
+        $(pop!)($(esc(to)))
         val
     end
 end
