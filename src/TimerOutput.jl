@@ -182,9 +182,13 @@ function timer_expr(to::Union{Symbol,Expr}, label, ex::Expr)
         local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
         local b₀ = $(gc_bytes)()
         local t₀ = $(time_ns)()
-        local val = $(esc(ex))
-        $(do_accumulate!)(accumulated_data, t₀, b₀)
-        $(pop!)($(esc(to)))
+        local val
+        $(Expr(:tryfinally,
+            :(val = $(esc(ex))),
+            quote
+                $(do_accumulate!)(accumulated_data, t₀, b₀)
+                $(pop!)($(esc(to)))
+            end))
         val
     end
 end

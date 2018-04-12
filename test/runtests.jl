@@ -248,4 +248,16 @@ for (c, str) in ((9999, "10.0k"), (99999, "100k"),
     @test prettycount(c) == str
 end
 
+# `continue` inside a timeit section
+to_continue = TimerOutput()
+function continue_test()
+   for i = 1:10
+       @timeit to_continue "x" @timeit to_continue "test" begin
+           continue
+       end
+   end
+end
+continue_test()
+@test isempty(to_continue.inner_timers["x"].inner_timers["test"].inner_timers)
+
 end # testset
