@@ -64,7 +64,7 @@ function prettypercent(nominator, denominator)
     return str
 end
 
-function prettycount(t::Int)
+function prettycount(t::Integer)
     if t < 1000
         return string(t)
     elseif t < 1000^2
