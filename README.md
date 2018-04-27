@@ -75,9 +75,9 @@ end
 
 time_test()
 
-# a function version with `do` syntax for exception safety
+# exception safe
 function i_will_throw()
-    timeit(to, "throwing") do
+    @timeit to "throwing" do
         sleep(0.5)
         throw(error("this is fine..."))
         print("nope")
@@ -104,9 +104,9 @@ Similar information is available for allocations:
 
 ```
  ──────────────────────────────────────────────────────────────────────
-                               Time                   Allocations      
+                               Time                   Allocations
                        ──────────────────────   ───────────────────────
-   Tot / % measured:        5.09s / 56.0%            106MiB / 74.6%    
+   Tot / % measured:        5.09s / 56.0%            106MiB / 74.6%
 
  Section       ncalls     time   %tot     avg     alloc   %tot      avg
  ──────────────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ Similar information is available for allocations:
 
 ## Settings for printing:
 
-The `print_timer([io::IO = STDOUT], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
+The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
 
 * `title::String` ─ title for the timer
 * `allocations::Bool` ─ show the allocation columns (default `true`)
@@ -278,9 +278,9 @@ which prints:
 ```julia
 julia> print_timer()
  ───────────────────────────────────────────────────────────────────
-                            Time                   Allocations      
+                            Time                   Allocations
                     ──────────────────────   ───────────────────────
-  Tot / % measured:      276ms / 44.3%            422KiB / 0.21%    
+  Tot / % measured:      276ms / 44.3%            422KiB / 0.21%
 
  Section    ncalls     time   %tot     avg     alloc   %tot      avg
  ───────────────────────────────────────────────────────────────────
