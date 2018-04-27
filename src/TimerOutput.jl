@@ -203,6 +203,8 @@ function reset_timer!(to::TimerOutput)
     return to
 end
 
+# We can remove this now that the @timeit macro is exception safe.
+# Doesn't hurt to keep it for a while though
 timeit(f::Function, label::String) = timeit(f, DEFAULT_TIMER, label)
 function timeit(f::Function, to::TimerOutput, label::String)
     accumulated_data = push!(to, label)

@@ -1,5 +1,5 @@
 using TimerOutputs
-using Compat.Test
+using Test
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
                      prettytime, prettymemory, prettypercent, prettycount
@@ -96,15 +96,15 @@ end
 
 # test throws
 function foo2(v)
-    timeit(to, "throwing") do
-        sleep(1)
+    @timeit to "throwing" begin
+        sleep(0.01)
         print(v[6]) # OOB
     end
 end
 
 function foo3(v)
-    timeit("throwing") do
-        sleep(1)
+    @timeit "throwing" begin
+        sleep(0.01)
         print(v[6]) # OOB
     end
 end
