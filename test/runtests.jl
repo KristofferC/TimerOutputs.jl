@@ -45,6 +45,8 @@ end
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 
+@test haskey(to, "sleep")
+@test !haskey(to, "slep")
 @test ncalls(to["sleep"]) == 4
 @test ncalls(DEFAULT_TIMER["sleep"]) == 4
 
