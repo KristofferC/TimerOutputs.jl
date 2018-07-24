@@ -222,6 +222,7 @@ function timeit(f::Function, to::TimerOutput, label::String)
     return val
 end
 
+Base.haskey(to::TimerOutput, name::String) = haskey(to.inner_timers, name)
 Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
 
 function flatten(to::TimerOutput)
