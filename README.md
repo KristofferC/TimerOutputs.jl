@@ -300,6 +300,46 @@ julia> print_timer()
 
 The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`.
 
+## Measuring time consumed outside `@timeit` blocks
+
+Often, operations that we do not consider time consuming turn out to be relevant.
+However, adding additional timming blocks just to time initializations and other
+less important calls is annoying.
+
+The `TimerOutputs.complement!()` function can be used to modify a timer and add
+values for complement of timed sections. For instance:
+
+```julia
+to = TimerOutput()
+
+@timeit to "section1" sleep(0.02)
+@timeit to "section2" begin
+    @timeit to "section2.1" sleep(0.1)
+    sleep(0.01)
+end
+
+TimerOutputs.complement!(to)
+```
+
+We can print the result:
+
+```julia
+julia> print_timer(to)
+ ───────────────────────────────────────────────────────────────────────
+                                Time                   Allocations
+                        ──────────────────────   ───────────────────────
+    Tot / % measured:        144ms / 100%            6.11KiB / 22.0%
+
+ Section        ncalls     time   %tot     avg     alloc   %tot      avg
+ ───────────────────────────────────────────────────────────────────────
+ section2            1    120ms  83.6%   120ms   1.17KiB  87.2%  1.17KiB
+   section2.1        1    106ms  73.9%   106ms      176B  12.8%     176B
+   ~section2~        1   13.9ms  9.69%  13.9ms   1.00KiB  74.4%  1.00KiB
+ section1            1   23.4ms  16.4%  23.4ms      176B  12.8%     176B
+ ───────────────────────────────────────────────────────────────────────
+```
+
+In order to complement the default timer simply call `TimerOuputs.complement!()`.
 
 ## Overhead
 
