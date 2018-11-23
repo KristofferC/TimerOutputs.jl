@@ -251,5 +251,24 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
     end
 end
 
-
+function complement(to::TimerOutput)
+    if length(to.inner_timers) == 0
+        return nothing
+    end
+    tot_time = to.accumulated_data.time
+    tot_allocs = to.accumulated_data.allocs
+    for timer in values(to.inner_timers)
+        tot_time -= timer.accumulated_data.time
+        tot_allocs -= timer.accumulated_data.allocs
+        complement(timer)
+    end
+    tot_time = max(tot_time, 0)
+    tot_allocs = max(tot_allocs, 0)
+    if !(to.name in ["root", "Flattened"])
+        name = "Extra "*to.name
+        timer = TimerOutput(to.start_data, TimeData(max(1,to.accumulated_data.ncalls), tot_time, tot_allocs), Dict{String,TimerOutput}(), TimerOutput[], name, false, (tot_time, tot_allocs), to.name, to)
+        to.inner_timers[name] = timer
+    end
+    return nothing
+end
 
