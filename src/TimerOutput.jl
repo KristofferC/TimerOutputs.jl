@@ -138,31 +138,25 @@ function timer_expr(label_or_to, ex::Expr)
 end
 
 function timer_expr_func(to, expr::Expr)
-    if length(expr.args[1].args) == 2 && expr.args[1].head == :(::)
-        T        = expr.args[1].args[2]
-        funcname = expr.args[1].args[1].args[1]
-        args     = expr.args[1].args[1].args[2:end]
+    if expr.args[1].head == :where
+        wheres = expr.args[1].args[2:end]
+        declaration = expr.args[1].args[1]
+    else
+        wheres = []
+        declaration = expr.args[1]
+    end
+    if length(declaration.args) == 2 && declaration.head == :(::)
+        T        = declaration.args[2]
+        funcname = declaration.args[1].args[1]
+        args     = declaration.args[1].args[2:end]
     else
         T        = Any
-        funcname = expr.args[1].args[1]
-        args     = expr.args[1].args[2:end]
+        funcname = declaration.args[1]
+        args     = declaration.args[2:end]
     end
     body = expr.args[2]
     return quote
-        function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T))
-            $(timeit)($(esc(to)), $(string(funcname))) do
-                $(esc(body))
-            end
-        end
-    end
-end
-
-function timer_expr_funcdd(to, expr::Expr)
-    funcname = expr.args[1].args[1]
-    args = expr.args[1].args[2:end]
-    body = expr.args[2]
-    return quote
-        function $(esc(funcname))($([esc(arg) for arg in args]...))
+        function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T)) where {$([esc(wher) for wher in wheres]...)}
             $(timeit)($(esc(to)), $(string(funcname))) do
                 $(esc(body))
             end
@@ -250,6 +244,3 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
         inner_timers[toc.name] = toc
     end
 end
-
-
-
