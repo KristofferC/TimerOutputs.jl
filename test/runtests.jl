@@ -272,4 +272,18 @@ end
 continue_test()
 @test isempty(to_continue.inner_timers["x"].inner_timers["test"].inner_timers)
 
+
+# Test @timeit_debug
+to_debug = TimerOutput()
+function debug_test()
+    @timeit_debug to_debug "sleep" sleep(0.001)
+end
+
+TimerOutputs.disable_debug_timings(Main)
+debug_test()
+@test !("sleep" in keys(to_debug.inner_timers))
+TimerOutputs.enable_debug_timings(Main)
+debug_test()
+@test "sleep" in keys(to_debug.inner_timers)
+
 end # testset

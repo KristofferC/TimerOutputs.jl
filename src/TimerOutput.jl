@@ -117,6 +117,27 @@ macro timeit(args...)
     return timer_expr(args...)
 end
 
+macro timeit_debug(args...)
+    if !isdefined(__module__, :timeit_debug_enabled)
+        Core.eval(__module__, :(timeit_debug_enabled() = false))
+    end
+
+    quote
+        if $(__module__).timeit_debug_enabled()
+            $(timer_expr(args...))
+        else
+            $(esc(args[end]))
+        end
+    end
+end
+
+function enable_debug_timings(m::Module)
+    Core.eval(m, :(timeit_debug_enabled() = true))
+end
+function disable_debug_timings(m::Module)
+    Core.eval(m, :(timeit_debug_enabled() = false))
+end
+
 timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
 
 function is_func_def(f)
