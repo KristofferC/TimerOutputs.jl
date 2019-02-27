@@ -178,15 +178,24 @@ reset_timer!(toz)
 @timeit function ff7(x) x end
 @timeit function ff8(x)::Float64 x end
 
+@timeit ff9(x::T) where {T} = x
+@timeit (ff10(x::T)::Float64) where {T} = x
+@timeit function ff11(x::T) where {T} x end
+@timeit function ff12(x::T)::Float64 where {T} x end
+
 for i in 1:2
-    ff1(1)
-    ff2(1)
-    ff3(1)
-    ff4(1)
-    ff5(1)
-    ff6(1)
-    ff7(1)
-    ff8(1)
+    @test ff1(1) === 1
+    @test ff2(1) === 1.0
+    @test ff3(1) === 1
+    @test ff4(1) === 1.0
+    @test ff5(1) === 1
+    @test ff6(1) === 1.0
+    @test ff7(1) === 1
+    @test ff8(1) === 1.0
+    @test ff9(1) === 1
+    @test ff10(1) === 1.0
+    @test ff11(1) === 1
+    @test ff12(1) === 1.0
 end
 
 @test ncalls(to["ff1"]) == 2
@@ -198,9 +207,10 @@ end
 @test ncalls(DEFAULT_TIMER["ff6"]) == 2
 @test ncalls(DEFAULT_TIMER["ff7"]) == 2
 @test ncalls(DEFAULT_TIMER["ff8"]) == 2
-
-
-
+@test ncalls(DEFAULT_TIMER["ff9"]) == 2
+@test ncalls(DEFAULT_TIMER["ff10"]) == 2
+@test ncalls(DEFAULT_TIMER["ff11"]) == 2
+@test ncalls(DEFAULT_TIMER["ff12"]) == 2
 
 @test "a3" in collect(keys(to.inner_timers))
 @test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
