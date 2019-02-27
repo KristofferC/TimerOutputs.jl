@@ -126,10 +126,14 @@ macro timeit_debug(args...)
 end
 
 function enable_debug_timings(m::Module)
-    Core.eval(m, :(timeit_debug_enabled() = true))
+    if !getfield(m, :timeit_debug_enabled)()
+        Core.eval(m, :(timeit_debug_enabled() = true))
+    end
 end
 function disable_debug_timings(m::Module)
-    Core.eval(m, :(timeit_debug_enabled() = false))
+    if getfield(m, :timeit_debug_enabled)()
+        Core.eval(m, :(timeit_debug_enabled() = false))
+    end
 end
 
 timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
