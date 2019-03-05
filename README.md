@@ -297,23 +297,12 @@ The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`
 There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
 For proper benchmarking you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
 
-It is sometimes desireable to be able "turn on and off" the `@timeit` macro.
-There is, however, no simple way to redefine how `@timeit` should work after precompilation.
-A simple solution is to define your own macro (here `@mytimeit`) that works exactly the same as `@timeit` except it can be enabled / disabled at will:
-
-```jl
-ENABLE_TIMINGS = false
-
-macro mytimeit(exprs...)
-    if ENABLE_TIMINGS
-        return :(@timeit($(esc.(exprs)...)))
-    else
-        return esc(exprs[end])
-    end
-end
-```
-
-This will create a macro that "does nothing" (just returns the expression) depending on the value of `ENABLE_TIMINGS` when the macro is expanded.
+It is sometimes desireable to be able "turn on and off" the `@timeit` macro, for instance you may wish to instrument a package with `@timeit` macros, but then not deal with the overhead of the timings during normal package operation.
+To enable this, we provide the `@timeit_debug` macro, which wraps the `@timeit` macro with a conditional, checking if debug timings have been enabled.
+Because you may wish to turn on only certain portions of your instrumented code base (or multiple codebases may have instrumented their code), debug timings are enabled on a module-by-module basis.
+By default, debug timings are disabled, and this conditional should be optimized away, allowing for truly zero-overhead.
+If a user calls `TimerOutputs.enable_debug_timings(<module>)`, the `<module>.timeit_debug_enabled()` method will be redefined, causing all dependent methods to be recompiled within that module.
+This may take a while, and hence is intended only for debugging usage, however all calls to `@timeit_debug` (within that Module) will thereafter be enabled.
 
 ## Author
 

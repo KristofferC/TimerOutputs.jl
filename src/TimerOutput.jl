@@ -114,7 +114,26 @@ Base.@deprecate get_defaultimer get_defaulttimer
 
 # Macro
 macro timeit(args...)
-    return timer_expr(args...)
+    return timer_expr(__module__, false, args...)
+end
+
+macro timeit_debug(args...)
+    if !isdefined(__module__, :timeit_debug_enabled)
+        Core.eval(__module__, :(timeit_debug_enabled() = false))
+    end
+
+    return timer_expr(__module__, true, args...)
+end
+
+function enable_debug_timings(m::Module)
+    if !getfield(m, :timeit_debug_enabled)()
+        Core.eval(m, :(timeit_debug_enabled() = true))
+    end
+end
+function disable_debug_timings(m::Module)
+    if getfield(m, :timeit_debug_enabled)()
+        Core.eval(m, :(timeit_debug_enabled() = false))
+    end
 end
 
 timer_expr(args...) = throw(ArgumentError("invalid macro usage for @timeit, use as @timeit [to] label codeblock"))
@@ -127,17 +146,17 @@ function is_func_def(f)
     end
 end
 
-function timer_expr(ex::Expr)
-    is_func_def(ex) && return timer_expr_func(:(TimerOutputs.DEFAULT_TIMER), ex)
-    return timer_expr(:(TimerOutputs.DEFAULT_TIMER), ex)
+function timer_expr(m::Module, is_debug::Bool, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), ex)
+    return timer_expr(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), ex)
 end
 
-function timer_expr(label_or_to, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(label_or_to, ex)
-    return timer_expr(:(TimerOutputs.DEFAULT_TIMER), label_or_to, ex)
+function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
+    return timer_expr(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), label_or_to, ex)
 end
 
-function timer_expr_func(to, expr::Expr)
+function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
     if expr.args[1].head == :where
         wheres = expr.args[1].args[2:end]
         declaration = expr.args[1].args[1]
@@ -155,11 +174,28 @@ function timer_expr_func(to, expr::Expr)
         args     = declaration.args[2:end]
     end
     body = expr.args[2]
-    return quote
-        function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T)) where {$([esc(wher) for wher in wheres]...)}
-            $(timeit)($(esc(to)), $(string(funcname))) do
+
+    timeit_block = quote
+        $(timeit)($(esc(to)), $(string(funcname))) do
+            $(esc(body))
+        end
+    end
+
+    # If this is a `@timeit_debug`, then we insert the bypass conditional into our timeit_block
+    if is_debug
+        timeit_block = quote
+            if $(esc(m)).timeit_debug_enabled()
+                $(timeit_block)
+            else
                 $(esc(body))
             end
+        end
+    end
+
+
+    return quote
+        function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T)) where {$([esc(wher) for wher in wheres]...)}
+            $(timeit_block)
         end
     end
 end
@@ -171,8 +207,8 @@ function do_accumulate!(accumulated_data, t₀, b₀)
 end
 
 
-function timer_expr(to::Union{Symbol,Expr}, label, ex::Expr)
-    quote
+function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr)
+    timeit_block = quote
         local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
         local b₀ = $(gc_bytes)()
         local t₀ = $(time_ns)()
@@ -184,6 +220,18 @@ function timer_expr(to::Union{Symbol,Expr}, label, ex::Expr)
                 $(pop!)($(esc(to)))
             end))
         val
+    end
+
+    if is_debug
+        return quote
+            if $(esc(m)).timeit_debug_enabled()
+                $(timeit_block)
+            else
+                $(esc(ex))
+            end
+        end
+    else
+        return timeit_block
     end
 end
 

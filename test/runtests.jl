@@ -272,4 +272,36 @@ end
 continue_test()
 @test isempty(to_continue.inner_timers["x"].inner_timers["test"].inner_timers)
 
+
+# Test @timeit_debug
+to_debug = TimerOutput()
+function debug_test()
+    @timeit_debug to_debug "sleep" sleep(0.001)
+end
+
+TimerOutputs.disable_debug_timings(Main)
+debug_test()
+@test !("sleep" in keys(to_debug.inner_timers))
+TimerOutputs.enable_debug_timings(Main)
+debug_test()
+@test "sleep" in keys(to_debug.inner_timers)
+
+
+# Test functional-form @timeit_debug with @eval'ed functions
+to_debug = TimerOutput()
+
+@timeit_debug to_debug function baz(x, y)
+    @timeit_debug to_debug "sleep" sleep(0.001)
+    return x + y * x
+end
+
+TimerOutputs.disable_debug_timings(Main)
+baz(1, 2.0)
+@test isempty(to_debug.inner_timers)
+
+TimerOutputs.enable_debug_timings(Main)
+baz(1, 2.0)
+@test "baz" in keys(to_debug.inner_timers)
+@test "sleep" in keys(to_debug.inner_timers["baz"].inner_timers)
+
 end # testset
