@@ -314,4 +314,16 @@ TimerOutputs.complement!(to)
 tom = flatten(to)
 @test ncalls(tom["Extra section2"]) == 1
 
+to = TimerOutput()
+@timeit to "section1" sleep(0.02)
+@timeit to "section2" begin
+    @timeit to "section2.1" sleep(0.1)
+    sleep(0.01)
+end
+TimerOutputs.complement!(to)
+
+tom = flatten(to, only_leaves = true)
+@test ncalls(tom["Extra section2"]) == 1
+@test !haskey(tom, "section2")
+
 end # testset

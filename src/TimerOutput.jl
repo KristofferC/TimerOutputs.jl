@@ -267,29 +267,29 @@ end
 Base.haskey(to::TimerOutput, name::String) = haskey(to.inner_timers, name)
 Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
 
-function flatten(to::TimerOutput)
+function flatten(to::TimerOutput; only_leaves::Bool = false)
     t, b = totmeasured(to)
     inner_timers = Dict{String,TimerOutput}()
     for inner_timer in values(to.inner_timers)
-        _flatten!(inner_timer, inner_timers)
+        _flatten!(inner_timer, inner_timers, only_leaves)
     end
     toc = copy(to)
     return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to)
 end
 
-
-function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
+function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput}, only_leaves::Bool)
     for inner_timer in values(to.inner_timers)
-        _flatten!(inner_timer, inner_timers)
+        _flatten!(inner_timer, inner_timers, only_leaves)
     end
-
-    if haskey(inner_timers, to.name)
-        timer = inner_timers[to.name]
-        timer.accumulated_data += to.accumulated_data
-    else
-        toc = copy(to)
-        toc.inner_timers = Dict{String,TimerOutput}()
-        inner_timers[toc.name] = toc
+    if !only_leaves || isempty(to.inner_timers)
+        if haskey(inner_timers, to.name)
+            timer = inner_timers[to.name]
+            timer.accumulated_data += to.accumulated_data
+        else
+            toc = copy(to)
+            toc.inner_timers = Dict{String,TimerOutput}()
+            inner_timers[toc.name] = toc
+        end
     end
 end
 

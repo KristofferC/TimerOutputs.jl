@@ -183,6 +183,21 @@ julia> show(to_flatten; compact = true, allocations = false)
  ──────────────────────────────────
 ```
 
+It is also possible to only include leave timer values when flattening.
+That is only timmers in the innermost level will be shown.
+
+```julia
+julia> to_flatten = TimerOutputs.flatten(to, only_leaves);
+
+julia> show(to_flatten; compact = true, allocations = false)
+ ──────────────────────────────────
+ Section     ncalls     time   %tot
+ ──────────────────────────────────
+ level 2.2       21    525ms  47.5%
+ level 2.1       31    436ms  39.5%
+ ──────────────────────────────────
+```
+
 ## Resetting
 
 A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time / allocation values.
