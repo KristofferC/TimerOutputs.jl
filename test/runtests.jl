@@ -178,15 +178,24 @@ reset_timer!(toz)
 @timeit function ff7(x) x end
 @timeit function ff8(x)::Float64 x end
 
+@timeit ff9(x::T) where {T} = x
+@timeit (ff10(x::T)::Float64) where {T} = x
+@timeit function ff11(x::T) where {T} x end
+@timeit function ff12(x::T)::Float64 where {T} x end
+
 for i in 1:2
-    ff1(1)
-    ff2(1)
-    ff3(1)
-    ff4(1)
-    ff5(1)
-    ff6(1)
-    ff7(1)
-    ff8(1)
+    @test ff1(1) === 1
+    @test ff2(1) === 1.0
+    @test ff3(1) === 1
+    @test ff4(1) === 1.0
+    @test ff5(1) === 1
+    @test ff6(1) === 1.0
+    @test ff7(1) === 1
+    @test ff8(1) === 1.0
+    @test ff9(1) === 1
+    @test ff10(1) === 1.0
+    @test ff11(1) === 1
+    @test ff12(1) === 1.0
 end
 
 @test ncalls(to["ff1"]) == 2
@@ -198,9 +207,10 @@ end
 @test ncalls(DEFAULT_TIMER["ff6"]) == 2
 @test ncalls(DEFAULT_TIMER["ff7"]) == 2
 @test ncalls(DEFAULT_TIMER["ff8"]) == 2
-
-
-
+@test ncalls(DEFAULT_TIMER["ff9"]) == 2
+@test ncalls(DEFAULT_TIMER["ff10"]) == 2
+@test ncalls(DEFAULT_TIMER["ff11"]) == 2
+@test ncalls(DEFAULT_TIMER["ff12"]) == 2
 
 @test "a3" in collect(keys(to.inner_timers))
 @test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
@@ -262,6 +272,36 @@ end
 continue_test()
 @test isempty(to_continue.inner_timers["x"].inner_timers["test"].inner_timers)
 
+# Test @timeit_debug
+to_debug = TimerOutput()
+function debug_test()
+    @timeit_debug to_debug "sleep" sleep(0.001)
+end
+
+TimerOutputs.disable_debug_timings(Main)
+debug_test()
+@test !("sleep" in keys(to_debug.inner_timers))
+TimerOutputs.enable_debug_timings(Main)
+debug_test()
+@test "sleep" in keys(to_debug.inner_timers)
+
+
+# Test functional-form @timeit_debug with @eval'ed functions
+to_debug = TimerOutput()
+
+@timeit_debug to_debug function baz(x, y)
+    @timeit_debug to_debug "sleep" sleep(0.001)
+    return x + y * x
+end
+
+TimerOutputs.disable_debug_timings(Main)
+baz(1, 2.0)
+@test isempty(to_debug.inner_timers)
+
+TimerOutputs.enable_debug_timings(Main)
+baz(1, 2.0)
+@test "baz" in keys(to_debug.inner_timers)
+@test "sleep" in keys(to_debug.inner_timers["baz"].inner_timers)
 
 to = TimerOutput()
 @timeit to "section1" sleep(0.02)
