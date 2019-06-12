@@ -202,17 +202,18 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
     end
 end
 
-function do_accumulate!(accumulated_data, label, t₀, b₀, logger)
+function log_and_accumulate!(accumulated_data, label, t₀, b₀, logger, metadata)
     timetaken = time_ns() - t₀
     memused = gc_bytes() - b₀
     accumulated_data.time += timetaken
     accumulated_data.allocs += memused
     accumulated_data.ncalls += 1
-    logger(label, timetaken, memused)
+    logger(label, timetaken, memused, metadata...)
 end
 
+timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr) = timer_expr(m, is_debug, to, label, "", ex::Expr)
 
-function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr)
+function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, metadata, ex::Expr)
     timeit_block = quote
         local label = $(esc(label))
         local to = $(esc(to))
@@ -223,7 +224,7 @@ function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex
         $(Expr(:tryfinally,
             :(val = $(esc(ex))),
             quote
-                $(do_accumulate!)(accumulated_data, label, t₀, b₀, to.logger)
+                $(log_and_accumulate!)(accumulated_data, label, t₀, b₀, to.logger, $(esc(metadata)))
                 $(pop!)($(esc(to)))
             end))
         val
@@ -269,7 +270,7 @@ function timeit(f::Function, to::TimerOutput, label::String)
         accumulated_data.allocs += memused
         accumulated_data.ncalls += 1
         pop!(to)
-        to.logger(label, timetaken, memused)
+        to.logger(label, timetaken, memused, "")
     end
     return val
 end
