@@ -285,7 +285,7 @@ function flatten(to::TimerOutput)
         _flatten!(inner_timer, inner_timers)
     end
     toc = copy(to)
-    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to)
+    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to, to.logger)
 end
 
 
