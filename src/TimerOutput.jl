@@ -49,7 +49,7 @@ mutable struct TimerOutput
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to)
+                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to, to.logger)
 
 const DEFAULT_TIMER = TimerOutput()
 
