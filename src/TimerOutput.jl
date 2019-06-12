@@ -29,20 +29,22 @@ mutable struct TimerOutput
     totmeasured::Tuple{Int64,Int64}
     prev_timer_label::String
     prev_timer::TimerOutput
+    logger::Function
 
-    function TimerOutput(label::String = "root")
+    function TimerOutput(label::String = "root", logger::Function = (args...)->begin; end)
         start_data = TimeData(0, time_ns(), gc_bytes())
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
         timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
+        timer.logger = logger
         timer.prev_timer = timer
     end
 
     # Jeez...
     TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer)
+    prev_timer, logger) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
+    prev_timer, logger)
 
 end
 
@@ -200,23 +202,28 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
     end
 end
 
-function do_accumulate!(accumulated_data, t₀, b₀)
-    accumulated_data.time += time_ns() - t₀
-    accumulated_data.allocs += gc_bytes() - b₀
+function do_accumulate!(accumulated_data, label, t₀, b₀, logger)
+    timetaken = time_ns() - t₀
+    memused = gc_bytes() - b₀
+    accumulated_data.time += timetaken
+    accumulated_data.allocs += memused
     accumulated_data.ncalls += 1
+    logger(label, timetaken, memused)
 end
 
 
 function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr)
     timeit_block = quote
-        local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
+        local label = $(esc(label))
+        local to = $(esc(to))
+        local accumulated_data = $(push!)(to, label)
         local b₀ = $(gc_bytes)()
         local t₀ = $(time_ns)()
         local val
         $(Expr(:tryfinally,
             :(val = $(esc(ex))),
             quote
-                $(do_accumulate!)(accumulated_data, t₀, b₀)
+                $(do_accumulate!)(accumulated_data, label, t₀, b₀, to.logger)
                 $(pop!)($(esc(to)))
             end))
         val
@@ -256,10 +263,13 @@ function timeit(f::Function, to::TimerOutput, label::String)
     try
         val = f()
     finally
-        accumulated_data.time += time_ns() - t₀
-        accumulated_data.allocs += gc_bytes() - b₀
+        timetaken = time_ns() - t₀
+        memused = gc_bytes() - b₀
+        accumulated_data.time += timetaken
+        accumulated_data.allocs += memused
         accumulated_data.ncalls += 1
         pop!(to)
+        to.logger(label, timetaken, memused)
     end
     return val
 end
