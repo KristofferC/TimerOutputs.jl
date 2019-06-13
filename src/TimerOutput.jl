@@ -40,7 +40,7 @@ mutable struct TimerOutput
         timer_stack = TimerOutput[]
         timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
         timer.logger = (args...)->begin; end
-        timer.id = label == "root" ? "root" : string(uuid1())
+        timer.id = parentid == "" ? "root" : string(uuid1())
         timer.parentid = parentid
         timer.prev_timer = timer
     end
