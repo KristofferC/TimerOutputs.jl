@@ -33,15 +33,15 @@ mutable struct TimerOutput
     id::String
     parentid::String
 
-    function TimerOutput(label::String = "root", logger::Function = (args...)->begin; end)
+    function TimerOutput(label::String = "root", logger::Function = (args...)->begin; end; id="root")
         start_data = TimeData(0, time_ns(), gc_bytes())
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
         timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
         timer.logger = logger
-        timer.id = string(uuid1())
-        timer.parentid = "root"
+        timer.id = id
+        timer.parentid = ""
         timer.prev_timer = timer
     end
 
@@ -72,7 +72,7 @@ function Base.push!(to::TimerOutput, label::String)
     if to.prev_timer_label == label
         timer = to.prev_timer
     else
-        timer = get!(() -> TimerOutput(label), current_timer.inner_timers, label)
+        timer = get!(() -> TimerOutput(label; id=string(uuid1())), current_timer.inner_timers, label)
     end
     timer.parentid = current_timer.id
     to.prev_timer_label = label
