@@ -8,6 +8,7 @@ export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit
 using Crayons
 using Printf
 using Unicode
+using UUIDs
 
 
 include("TimerOutput.jl")
