@@ -33,15 +33,15 @@ mutable struct TimerOutput
     id::String
     parentid::String
 
-    function TimerOutput(label::String = "root", logger::Function = (args...)->begin; end; id="root")
+    function TimerOutput(label::String = "root"; parentid = "")
         start_data = TimeData(0, time_ns(), gc_bytes())
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
         timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
-        timer.logger = logger
-        timer.id = id
-        timer.parentid = ""
+        timer.logger = (args...)->begin; end
+        timer.id = label == "root" ? "root" : string(uuid1())
+        timer.parentid = parentid
         timer.prev_timer = timer
     end
 
@@ -57,10 +57,6 @@ Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulate
 
 const DEFAULT_TIMER = TimerOutput()
 
-function setdefault(to::TimerOutput)
-    global DEFAULT_TIMER = to
-end
-
 # push! and pop!
 function Base.push!(to::TimerOutput, label::String)
     if length(to.timer_stack) == 0 # Root section
@@ -72,9 +68,8 @@ function Base.push!(to::TimerOutput, label::String)
     if to.prev_timer_label == label
         timer = to.prev_timer
     else
-        timer = get!(() -> TimerOutput(label; id=string(uuid1())), current_timer.inner_timers, label)
+        timer = get!(() -> TimerOutput(label; parentid=current_timer.id), current_timer.inner_timers, label)
     end
-    timer.parentid = current_timer.id
     to.prev_timer_label = label
     to.prev_timer = timer
 
