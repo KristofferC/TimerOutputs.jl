@@ -213,10 +213,10 @@ function log_and_accumulate!(accumulated_data, t₀, b₀, logger, label, metada
     accumulated_data.time += timetaken
     accumulated_data.allocs += memused
     accumulated_data.ncalls += 1
-    logger(label, timetaken, memused, metadata...)
+    logger(label, timetaken, memused, metadata)
 end
 
-timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr) = timer_expr(m, is_debug, to, label, "", ex::Expr)
+timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr) = timer_expr(m, is_debug, to, label, :(nothing), ex::Expr)
 
 function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, metadata, ex::Expr)
     timeit_block = quote
@@ -277,7 +277,7 @@ function timeit(f::Function, to::TimerOutput, label::String)
         accumulated_data.ncalls += 1
         pop!(to)
         top = length(to.timer_stack) == 0 ? to : to.timer_stack[end]
-        to.logger(label, timetaken, memused, "")
+        to.logger(label, timetaken, memused, nothing)
     end
     return val
 end
