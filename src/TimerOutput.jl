@@ -30,30 +30,26 @@ mutable struct TimerOutput
     prev_timer_label::String
     prev_timer::TimerOutput
     logger::Function
-    id::String
-    parentid::String
 
-    function TimerOutput(label::String = "root"; parentid = "")
+    function TimerOutput(label::String = "root")
         start_data = TimeData(0, time_ns(), gc_bytes())
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
         timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
         timer.logger = (args...)->begin; end
-        timer.id = parentid == "" ? "root" : string(uuid1())
-        timer.parentid = parentid
         timer.prev_timer = timer
     end
 
     # Jeez...
     TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer, logger, id, parentid) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer, logger, id, parentid)
+    prev_timer, logger) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
+    prev_timer, logger)
 
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to, to.logger, to.id, to.parentid)
+                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to, to.logger)
 
 const DEFAULT_TIMER = TimerOutput()
 
@@ -68,7 +64,7 @@ function Base.push!(to::TimerOutput, label::String)
     if to.prev_timer_label == label
         timer = to.prev_timer
     else
-        timer = get!(() -> TimerOutput(label; parentid=current_timer.id), current_timer.inner_timers, label)
+        timer = get!(() -> TimerOutput(label), current_timer.inner_timers, label)
     end
     to.prev_timer_label = label
     to.prev_timer = timer
@@ -162,6 +158,11 @@ function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
     return timer_expr(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), label_or_to, ex)
 end
 
+function timer_expr(m::Module, is_debug::Bool, label_or_to, metadata, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)    # Metadata ignored for functions
+    return timer_expr(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), label_or_to, metadata, ex)
+end
+
 function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
     if expr.args[1].head == :where
         wheres = expr.args[1].args[2:end]
@@ -206,13 +207,13 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
     end
 end
 
-function log_and_accumulate!(accumulated_data, t₀, b₀, logger, label, id, parentid, metadata)
+function log_and_accumulate!(accumulated_data, t₀, b₀, logger, label, metadata)
     timetaken = time_ns() - t₀
     memused = gc_bytes() - b₀
     accumulated_data.time += timetaken
     accumulated_data.allocs += memused
     accumulated_data.ncalls += 1
-    logger(id, parentid, label, timetaken, memused, metadata...)
+    logger(label, timetaken, memused, metadata...)
 end
 
 timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr) = timer_expr(m, is_debug, to, label, "", ex::Expr)
@@ -229,7 +230,7 @@ function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, me
         $(Expr(:tryfinally,
             :(val = $(esc(ex))),
             quote
-                $(log_and_accumulate!)(accumulated_data, t₀, b₀, to.logger, label, top.id, top.parentid, $(esc(metadata)))
+                $(log_and_accumulate!)(accumulated_data, t₀, b₀, to.logger, label, $(esc(metadata)))
                 $(pop!)(to)
             end))
         val
@@ -276,7 +277,7 @@ function timeit(f::Function, to::TimerOutput, label::String)
         accumulated_data.ncalls += 1
         pop!(to)
         top = length(to.timer_stack) == 0 ? to : to.timer_stack[end]
-        to.logger(top.id, top.parentid, label, timetaken, memused, "")
+        to.logger(label, timetaken, memused, "")
     end
     return val
 end
@@ -291,7 +292,7 @@ function flatten(to::TimerOutput)
         _flatten!(inner_timer, inner_timers)
     end
     toc = copy(to)
-    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to, to.logger, to.id, to.parentid)
+    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to, to.logger)
 end
 
 
