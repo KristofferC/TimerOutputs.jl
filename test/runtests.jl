@@ -305,3 +305,19 @@ baz(1, 2.0)
 @test "sleep" in keys(to_debug.inner_timers["baz"].inner_timers)
 
 end # testset
+
+@testset "Timer from argument" begin
+    struct Simulation
+        timer::TimerOutput
+        # state
+    end
+    get_timer(sim) = sim.timer
+    @timeit get_timer(sim) function step!(sim::Simulation)
+        # important computation
+    end
+    sim = Simulation(TimerOutputs.TimerOutput())
+    step!(sim)
+    @test TimerOutputs.ncalls(sim.timer["step!"]) == 1
+    step!(sim)
+    @test TimerOutputs.ncalls(sim.timer["step!"]) == 2
+end
