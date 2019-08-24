@@ -306,11 +306,12 @@ baz(1, 2.0)
 
 end # testset
 
+struct Simulation
+   timer::TimerOutput
+   # state
+end
+
 @testset "Timer from argument" begin
-    struct Simulation
-        timer::TimerOutput
-        # state
-    end
     get_timer(sim) = sim.timer
     @timeit get_timer(sim) function step!(sim::Simulation)
         # important computation
@@ -320,4 +321,11 @@ end # testset
     @test TimerOutputs.ncalls(sim.timer["step!"]) == 1
     step!(sim)
     @test TimerOutputs.ncalls(sim.timer["step!"]) == 2
+
+    @timeit get_timer(args...; kw...) step2!(args...; kw...) = nothing
+    step2!(sim)
+    @test TimerOutputs.ncalls(sim.timer["step!"]) == 2
+    @test TimerOutputs.ncalls(sim.timer["step2!"]) == 1
+    step2!(sim)
+    @test TimerOutputs.ncalls(sim.timer["step2!"]) == 2
 end
