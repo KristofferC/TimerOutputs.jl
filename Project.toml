@@ -1,0 +1,16 @@
+name = "TimerOutputs"
+uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+
+[deps]
+Crayons = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
