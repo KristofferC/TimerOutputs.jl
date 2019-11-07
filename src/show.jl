@@ -111,9 +111,10 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 
         header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
-        print(io, " ", Crayon(bold = true)(topbottomrule^total_table_width), "\n")
+        printstyled(io, " ", topbottomrule^total_table_width, "\n"; bold=true)
         if ! (allocations == false && compact == true)
-            print(io, " ", Crayon(bold=true)(title), time_header)
+            printstyled(io, " ", title; bold=true)
+            print(io, time_header)
             allocations && print(io, "   ", allocation_header)
             print(io, "\n")
             print(io, " ", time_alloc_pading, time_underline)
@@ -128,7 +129,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         print(io, "\n")
         print(io, " ", midrule^total_table_width, "\n")
     else
-        print(io, " ", Crayon(bold = true)(topbottomrule^total_table_width))
+        printstyled(io, " ", topbottomrule^total_table_width; bold=true)
     end
 end
 
