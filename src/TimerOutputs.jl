@@ -6,7 +6,6 @@ import Base: show, time_ns, gc_bytes
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit
 
 using Printf
-using Unicode
 
 
 include("TimerOutput.jl")
