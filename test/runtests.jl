@@ -330,7 +330,7 @@ end
     @test TimerOutputs.ncalls(sim.timer["step2!"]) == 2
 end
 
-# Tpye inference with @timeit_debug
+# Type inference with @timeit_debug
 @timeit_debug function make_zeros()
    dims = (3, 4)
    zeros(dims)
