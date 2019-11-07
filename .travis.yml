@@ -17,4 +17,4 @@ notifications:
   email: false
 
 after_success:
-- julia -e 'import Pkg; cd(Pkg.dir("TimerOutputs")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+- julia -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
