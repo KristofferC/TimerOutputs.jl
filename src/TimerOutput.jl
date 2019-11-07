@@ -175,27 +175,9 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
     end
     body = expr.args[2]
 
-    timeit_block = quote
-        $(timeit)($(esc(to)), $(string(funcname))) do
-            $(esc(body))
-        end
-    end
-
-    # If this is a `@timeit_debug`, then we insert the bypass conditional into our timeit_block
-    if is_debug
-        timeit_block = quote
-            if $(esc(m)).timeit_debug_enabled()
-                $(timeit_block)
-            else
-                $(esc(body))
-            end
-        end
-    end
-
-
     return quote
         function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T)) where {$([esc(wher) for wher in wheres]...)}
-            $(timeit_block)
+            $(timer_expr(m, is_debug, to, string(funcname), body))
         end
     end
 end
@@ -205,7 +187,6 @@ function do_accumulate!(accumulated_data, t₀, b₀)
     accumulated_data.allocs += gc_bytes() - b₀
     accumulated_data.ncalls += 1
 end
-
 
 function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr)
     timeit_block = quote
