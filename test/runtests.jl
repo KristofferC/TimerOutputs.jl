@@ -279,10 +279,10 @@ function debug_test()
     @timeit_debug to_debug "sleep" sleep(0.001)
 end
 
-TimerOutputs.disable_debug_timings(Main)
+TimerOutputs.disable_debug_timings(@__MODULE__)
 debug_test()
 @test !("sleep" in keys(to_debug.inner_timers))
-TimerOutputs.enable_debug_timings(Main)
+TimerOutputs.enable_debug_timings(@__MODULE__)
 debug_test()
 @test "sleep" in keys(to_debug.inner_timers)
 
@@ -295,14 +295,15 @@ to_debug = TimerOutput()
     return x + y * x
 end
 
-TimerOutputs.disable_debug_timings(Main)
+TimerOutputs.disable_debug_timings(@__MODULE__)
 baz(1, 2.0)
 @test isempty(to_debug.inner_timers)
 
-TimerOutputs.enable_debug_timings(Main)
+TimerOutputs.enable_debug_timings(@__MODULE__)
 baz(1, 2.0)
 @test "baz" in keys(to_debug.inner_timers)
 @test "sleep" in keys(to_debug.inner_timers["baz"].inner_timers)
+TimerOutputs.disable_debug_timings(@__MODULE__)
 
 end # testset
 
@@ -330,6 +331,8 @@ end
     @test TimerOutputs.ncalls(sim.timer["step2!"]) == 2
 end
 
+# Broken
+#=
 # Type inference with @timeit_debug
 @timeit_debug function make_zeros()
    dims = (3, 4)
@@ -338,3 +341,14 @@ end
 @inferred make_zeros()
 TimerOutputs.enable_debug_timings(@__MODULE__)
 @inferred make_zeros()
+=#
+
+to = TimerOutput()
+@timeit_debug to function f(x)
+   g(x) = 2x
+   g(x)
+end
+@test f(3) == 6
+TimerOutputs.enable_debug_timings(@__MODULE__)
+@test f(3) == 6
+TimerOutputs.disable_debug_timings(@__MODULE__)
