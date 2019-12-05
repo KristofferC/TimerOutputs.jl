@@ -352,3 +352,49 @@ end
 TimerOutputs.enable_debug_timings(@__MODULE__)
 @test f(3) == 6
 TimerOutputs.disable_debug_timings(@__MODULE__)
+
+@testset "Not too many allocations #59" begin
+    function doit(timer, n)
+        ret = 0
+        for i in 1:n
+            @timeit timer "depth0" begin
+                @timeit timer "depth1" begin
+                    @timeit timer "depth2" begin
+                        ret += sin(i)
+                    end
+                    @timeit timer "depth2b" begin
+                        ret += cos(i)
+                    end
+                end
+                @timeit timer "depth1b" begin
+                    
+                end
+            end
+        end
+        ret
+    end
+    
+    to = TimerOutput()
+    doit(to, 1)
+    a0 = TimerOutputs.allocated(to["depth0"])
+    a1 = TimerOutputs.allocated(to["depth0"]["depth1"])
+    a2 = TimerOutputs.allocated(to["depth0"]["depth1"]["depth2"])
+    
+    to = TimerOutput()
+    doit(to, 100000)
+    
+    to0 = to["depth0"]
+    to1 = to0["depth1"]
+    to1b = to0["depth1b"]
+    to2 = to1["depth2"]
+    to2b = to1["depth2b"]
+    
+    # test that leaf timers add zero allocations 
+    # and other timers only add allocations once
+    @test TimerOutputs.allocated(to0) == a0
+    @test TimerOutputs.allocated(to1) == a1
+    @test TimerOutputs.allocated(to2) == a2
+    @test TimerOutputs.allocated(to1b) == 0
+    @test TimerOutputs.allocated(to2) == 0
+    @test TimerOutputs.allocated(to2b) == 0
+end

@@ -61,8 +61,15 @@ function Base.push!(to::TimerOutput, label::String)
     # Fast path
     if to.prev_timer_label == label
         timer = to.prev_timer
+    elseif haskey(current_timer.inner_timers, label)
+        timer = current_timer.inner_timers[label]
     else
-        timer = get!(() -> TimerOutput(label), current_timer.inner_timers, label)
+        # this could be implemented more elegant using
+        # get!(() -> TimerOutput(label), current_timer.inner_timers, label)
+        # however that causes lots of allocations in
+        # julia v1.3
+        timer = TimerOutput(label)
+        current_timer.inner_timers[label] = timer
     end
     to.prev_timer_label = label
     to.prev_timer = timer
