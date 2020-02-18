@@ -157,13 +157,13 @@ function is_func_def(f)
 end
 
 function timer_expr(m::Module, is_debug::Bool, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), ex)
-    return timer_expr(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), ex)
+    is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
+    return timer_expr(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
 end
 
 function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
-    return timer_expr(m, is_debug, :(TimerOutputs.DEFAULT_TIMER), label_or_to, ex)
+    return timer_expr(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), label_or_to, ex)
 end
 
 function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
@@ -215,7 +215,7 @@ function do_accumulate!(accumulated_data, t₀, b₀)
     accumulated_data.ncalls += 1
 end
 
-function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol,Expr}, label, ex::Expr)
+function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
     timeit_block = quote
         local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
         local b₀ = $(gc_bytes)()

@@ -331,6 +331,16 @@ end
     @test TimerOutputs.ncalls(sim.timer["step2!"]) == 2
 end
 
+# default timer without explicitly loading TimerOutputs
+TimerOutputs.reset_timer!()
+module TestModule
+    using TimerOutputs: @timeit
+    foo(x) = x
+    @timeit "foo" foo(1)
+end
+@test "foo" in keys(DEFAULT_TIMER.inner_timers)
+TimerOutputs.reset_timer!()
+
 # Broken
 #=
 # Type inference with @timeit_debug
@@ -367,29 +377,29 @@ TimerOutputs.disable_debug_timings(@__MODULE__)
                     end
                 end
                 @timeit timer "depth1b" begin
-                    
+
                 end
             end
         end
         ret
     end
-    
+
     to = TimerOutput()
     doit(to, 1)
     a0 = TimerOutputs.allocated(to["depth0"])
     a1 = TimerOutputs.allocated(to["depth0"]["depth1"])
     a2 = TimerOutputs.allocated(to["depth0"]["depth1"]["depth2"])
-    
+
     to = TimerOutput()
     doit(to, 100000)
-    
+
     to0 = to["depth0"]
     to1 = to0["depth1"]
     to1b = to0["depth1b"]
     to2 = to1["depth2"]
     to2b = to1["depth2b"]
-    
-    # test that leaf timers add zero allocations 
+
+    # test that leaf timers add zero allocations
     # and other timers only add allocations once
     @test TimerOutputs.allocated(to0) == a0
     @test TimerOutputs.allocated(to1) == a1
