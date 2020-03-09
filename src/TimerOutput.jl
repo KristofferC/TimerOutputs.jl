@@ -84,7 +84,7 @@ function Base.push!(to::TimerOutput, label::String)
     return timer.accumulated_data
 end
 
-Base.pop!(to::TimerOutput) = lock(()->to.timer_stack, to.lock)
+Base.pop!(to::TimerOutput) = lock(()->pop!(to.timer_stack), to.lock)
 
 # Only sum the highest parents
 function totmeasured(to::TimerOutput)
