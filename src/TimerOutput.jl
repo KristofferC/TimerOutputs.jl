@@ -28,6 +28,7 @@ mutable struct TimerOutput
     flattened::Bool
     totmeasured::Tuple{Int64,Int64}
     prev_timer_label::String
+    lock::ReentrantLock
     prev_timer::TimerOutput
 
     function TimerOutput(label::String = "root")
@@ -35,24 +36,25 @@ mutable struct TimerOutput
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
+        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "", ReentrantLock())
         timer.prev_timer = timer
     end
 
     # Jeez...
     TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
     prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer)
+                      ReentrantLock(), prev_timer)
 
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to)
+                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", ReentrantLock(), to)
 
 const DEFAULT_TIMER = TimerOutput()
 
 # push! and pop!
 function Base.push!(to::TimerOutput, label::String)
+    lock(to.lock)
     if length(to.timer_stack) == 0 # Root section
         current_timer = to
     else # Not a root section
@@ -78,10 +80,11 @@ function Base.push!(to::TimerOutput, label::String)
     to.prev_timer = timer
 
     push!(to.timer_stack, timer)
+    unlock(lock)
     return timer.accumulated_data
 end
 
-Base.pop!(to::TimerOutput) = pop!(to.timer_stack)
+Base.pop!(to::TimerOutput) = lock(()->to.timer_stack, to.lock)
 
 # Only sum the highest parents
 function totmeasured(to::TimerOutput)
@@ -210,6 +213,7 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
 end
 
 function do_accumulate!(accumulated_data, t₀, b₀)
+    # TODO: Make threadsafe
     accumulated_data.time += time_ns() - t₀
     accumulated_data.allocs += gc_bytes() - b₀
     accumulated_data.ncalls += 1
@@ -264,9 +268,7 @@ function timeit(f::Function, to::TimerOutput, label::String)
     try
         val = f()
     finally
-        accumulated_data.time += time_ns() - t₀
-        accumulated_data.allocs += gc_bytes() - b₀
-        accumulated_data.ncalls += 1
+        do_accumulate!(accumulated_data, t₀, b₀)
         pop!(to)
     end
     return val
