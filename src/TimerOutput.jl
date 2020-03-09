@@ -80,7 +80,7 @@ function Base.push!(to::TimerOutput, label::String)
     to.prev_timer = timer
 
     push!(to.timer_stack, timer)
-    unlock(lock)
+    unlock(to.lock)
     return timer.accumulated_data
 end
 
