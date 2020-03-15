@@ -86,6 +86,11 @@ end
 
 i_will_throw()
 
+# Use disable! to selectively turn off a timer, enable! turns it on again
+disable!(to)
+@timeit to "no sleep" sleep(0.1)
+enable!(to)
+
 # Call to a previously used label accumulates data
 for i in 1:100
     @timeit to "sleep" sleep(0.01)
