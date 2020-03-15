@@ -26,6 +26,7 @@ mutable struct TimerOutput
     timer_stack::Vector{TimerOutput}
     name::String
     flattened::Bool
+    enabled::Bool
     totmeasured::Tuple{Int64,Int64}
     prev_timer_label::String
     prev_timer::TimerOutput
@@ -35,19 +36,19 @@ mutable struct TimerOutput
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
+        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), "")
         timer.prev_timer = timer
     end
 
     # Jeez...
-    TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
+    TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
+    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
     prev_timer)
 
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to)
+                                         copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", to)
 
 const DEFAULT_TIMER = TimerOutput()
 
@@ -216,6 +217,9 @@ function do_accumulate!(accumulated_data, t₀, b₀)
 end
 
 function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
+    if !to.enabled
+      return quote $(esc(ex)) end
+    end
     timeit_block = quote
         local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
         local b₀ = $(gc_bytes)()
@@ -282,7 +286,7 @@ function flatten(to::TimerOutput)
         _flatten!(inner_timer, inner_timers)
     end
     toc = copy(to)
-    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to)
+    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, true, (t, b), "", to)
 end
 
 
@@ -299,4 +303,14 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
         toc.inner_timers = Dict{String,TimerOutput}()
         inner_timers[toc.name] = toc
     end
+end
+
+
+function enable!(to::TimerOutput)
+  to.enabled = true
+end
+
+
+function disable!(to::TimerOutput)
+  to.enabled = false
 end
