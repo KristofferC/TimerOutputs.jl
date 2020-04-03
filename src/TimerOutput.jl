@@ -222,15 +222,21 @@ function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutp
     #   return quote $(esc(ex)) end
     # end
     timeit_block = quote
-        local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
+        local to = $(esc(to))
+        local enabled = to.enabled
+        if enabled
+            local accumulated_data = $(push!)(to, $(esc(label)))
+        end
         local b₀ = $(gc_bytes)()
         local t₀ = $(time_ns)()
         local val
         $(Expr(:tryfinally,
             :(val = $(esc(ex))),
             quote
-                $(do_accumulate!)(accumulated_data, t₀, b₀)
-                $(pop!)($(esc(to)))
+                if enabled
+                    $(do_accumulate!)(accumulated_data, t₀, b₀)
+                    $(pop!)(to)
+                end
             end))
         val
     end
@@ -307,11 +313,5 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
 end
 
 
-function enable!(to::TimerOutput)
-  to.enabled = true
-end
-
-
-function disable!(to::TimerOutput)
-  to.enabled = false
-end
+enable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = true
+disable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = false

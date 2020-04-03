@@ -408,3 +408,16 @@ TimerOutputs.disable_debug_timings(@__MODULE__)
     @test TimerOutputs.allocated(to2) == 0
     @test TimerOutputs.allocated(to2b) == 0
 end
+
+@testset "disable enable" begin
+    to = TimerOutput()
+    ff1() = @timeit to "ff1" 1+1
+    ff1()
+    @test ncalls(to["ff1"]) == 1
+    disable_timer!(to)
+    ff1()
+    @test ncalls(to["ff1"]) == 1
+    enable_timer!(to)
+    ff1()
+    @test ncalls(to["ff1"]) == 2
+end
