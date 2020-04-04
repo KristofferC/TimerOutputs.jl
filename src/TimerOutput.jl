@@ -217,10 +217,6 @@ function do_accumulate!(accumulated_data, t₀, b₀)
 end
 
 function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
-    # This is clearly wrong, but where should it go?
-    # if !to.enabled
-    #   return quote $(esc(ex)) end
-    # end
     timeit_block = quote
         local to = $(esc(to))
         local enabled = to.enabled
