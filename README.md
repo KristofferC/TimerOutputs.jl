@@ -91,6 +91,10 @@ disable_timer!(to)
 @timeit to "not recorded" sleep(0.1)
 enable_timer!(to)
 
+# Use @notimeit to disable timer and re-enable it afterwards (if it was enabled
+# before)
+@notimeit to time_test()
+
 # Call to a previously used label accumulates data
 for i in 1:100
     @timeit to "sleep" sleep(0.01)

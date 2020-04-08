@@ -420,4 +420,7 @@ end
     enable_timer!(to)
     ff1()
     @test ncalls(to["ff1"]) == 2
+    @notimeit to ff1()
+    ff1()
+    @test ncalls(to["ff1"]) == 3
 end

@@ -311,3 +311,29 @@ end
 
 enable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = true
 disable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = false
+
+
+# Macro to selectively disable timer for expression
+macro notimeit(args...)
+  notimeit_expr(args...)
+end
+
+# Default function throws an error for the benefit of the user
+notimeit_expr(args...) = throw(ArgumentError("invalid macro usage for @notimeit, use as @notimeit [to] codeblock"))
+
+# If @notimeit was called without a TimerOutput instance, use default timer
+notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
+
+# Disable timer, evaluate expression, restore timer to previous value, and return expression result
+function notimeit_expr(to, ex::Expr)
+  return quote
+    local to = $(esc(to))
+    local enabled = to.enabled
+    $(disable_timer!)(to)
+    local val = $(esc(ex))
+    if enabled
+      $(enable_timer!)(to)
+    end
+    val
+  end
+end
