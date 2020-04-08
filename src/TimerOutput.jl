@@ -26,6 +26,7 @@ mutable struct TimerOutput
     timer_stack::Vector{TimerOutput}
     name::String
     flattened::Bool
+    enabled::Bool
     totmeasured::Tuple{Int64,Int64}
     prev_timer_label::String
     prev_timer::TimerOutput
@@ -35,19 +36,19 @@ mutable struct TimerOutput
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, (0, 0), "")
+        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), "")
         timer.prev_timer = timer
     end
 
     # Jeez...
-    TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
-    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, totmeasured, prev_timer_label,
+    TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
+    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
     prev_timer)
 
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.totmeasured, "", to)
+                                         copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", to)
 
 const DEFAULT_TIMER = TimerOutput()
 
@@ -217,15 +218,21 @@ end
 
 function timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
     timeit_block = quote
-        local accumulated_data = $(push!)($(esc(to)), $(esc(label)))
+        local to = $(esc(to))
+        local enabled = to.enabled
+        if enabled
+            local accumulated_data = $(push!)(to, $(esc(label)))
+        end
         local b₀ = $(gc_bytes)()
         local t₀ = $(time_ns)()
         local val
         $(Expr(:tryfinally,
             :(val = $(esc(ex))),
             quote
-                $(do_accumulate!)(accumulated_data, t₀, b₀)
-                $(pop!)($(esc(to)))
+                if enabled
+                    $(do_accumulate!)(accumulated_data, t₀, b₀)
+                    $(pop!)(to)
+                end
             end))
         val
     end
@@ -282,7 +289,7 @@ function flatten(to::TimerOutput)
         _flatten!(inner_timer, inner_timers)
     end
     toc = copy(to)
-    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, (t, b), "", to)
+    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, true, (t, b), "", to)
 end
 
 
@@ -298,5 +305,39 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
         toc = copy(to)
         toc.inner_timers = Dict{String,TimerOutput}()
         inner_timers[toc.name] = toc
+    end
+end
+
+
+enable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = true
+disable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = false
+
+
+# Macro to selectively disable timer for expression
+macro notimeit(args...)
+    notimeit_expr(args...)
+end
+
+# Default function throws an error for the benefit of the user
+notimeit_expr(args...) = throw(ArgumentError("invalid macro usage for @notimeit, use as @notimeit [to] codeblock"))
+
+# If @notimeit was called without a TimerOutput instance, use default timer
+notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
+
+# Disable timer, evaluate expression, restore timer to previous value, and return expression result
+function notimeit_expr(to, ex::Expr)
+    return quote
+        local to = $(esc(to))
+        local enabled = to.enabled
+        $(disable_timer!)(to)
+        local val
+        $(Expr(:tryfinally,
+            :(val = $(esc(ex))),
+            quote
+                if enabled
+                    $(enable_timer!)(to)
+                end
+            end))
+        val
     end
 end
