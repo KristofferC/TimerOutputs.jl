@@ -315,7 +315,7 @@ disable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = false
 
 # Macro to selectively disable timer for expression
 macro notimeit(args...)
-  notimeit_expr(args...)
+    notimeit_expr(args...)
 end
 
 # Default function throws an error for the benefit of the user
@@ -326,18 +326,18 @@ notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
 
 # Disable timer, evaluate expression, restore timer to previous value, and return expression result
 function notimeit_expr(to, ex::Expr)
-  return quote
-    local to = $(esc(to))
-    local enabled = to.enabled
-    $(disable_timer!)(to)
-    local val
-    $(Expr(:tryfinally,
-        :(val = $(esc(ex))),
-        quote
-            if enabled
-                $(enable_timer!)(to)
-            end
-        end))
-    val
-  end
+    return quote
+        local to = $(esc(to))
+        local enabled = to.enabled
+        $(disable_timer!)(to)
+        local val
+        $(Expr(:tryfinally,
+            :(val = $(esc(ex))),
+            quote
+                if enabled
+                    $(enable_timer!)(to)
+                end
+            end))
+        val
+    end
 end
