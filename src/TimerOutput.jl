@@ -159,12 +159,12 @@ end
 
 function timer_expr(m::Module, is_debug::Bool, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
-    return timer_expr(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
+    return timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex)
 end
 
 function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
-    return timer_expr(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), label_or_to, ex)
+    return timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to, ex)
 end
 
 function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr)
