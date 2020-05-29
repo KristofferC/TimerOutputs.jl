@@ -161,17 +161,18 @@ a = 3
 @test "a3" in collect(keys(to.inner_timers))
 @test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
 
-
+reset_timer!(DEFAULT_TIMER)
 toz = TimerOutput()
 @timeit toz "foo" 1+1
 reset_timer!(toz)
 @timeit toz "foo" 1+1
 @test "foo" in keys(toz.inner_timers)
 
-@timeit to ff1(x) = x
-@timeit to ff2(x)::Float64 = x
-@timeit to function ff3(x) x end
-@timeit to function ff4(x)::Float64 x end
+tof = TimerOutput()
+@timeit tof ff1(x) = x
+@timeit tof ff2(x)::Float64 = x
+@timeit tof function ff3(x) x end
+@timeit tof function ff4(x)::Float64 x end
 
 @timeit ff5(x) = x
 @timeit ff6(x)::Float64 = x
@@ -182,6 +183,16 @@ reset_timer!(toz)
 @timeit (ff10(x::T)::Float64) where {T} = x
 @timeit function ff11(x::T) where {T} x end
 @timeit function ff12(x::T)::Float64 where {T} x end
+
+@timeit "foo" ff13(x::T) where {T} = x
+@timeit "bar" (ff14(x::T)::Float64) where {T} = x
+@timeit "baz" function ff15(x::T) where {T} x end
+@timeit "quz" function ff16(x::T)::Float64 where {T} x end
+
+@timeit tof "foo" ff17(x::T) where {T} = x
+@timeit tof "bar" (ff18(x::T)::Float64) where {T} = x
+@timeit tof "baz" function ff19(x::T) where {T} x end
+@timeit tof "quz" function ff20(x::T)::Float64 where {T} x end
 
 for i in 1:2
     @test ff1(1) === 1
@@ -196,12 +207,24 @@ for i in 1:2
     @test ff10(1) === 1.0
     @test ff11(1) === 1
     @test ff12(1) === 1.0
+    @test ff13(1) === 1
+    @test ff14(1) === 1.0
+    @test ff15(1) === 1
+    @test ff16(1) === 1.0
+    @test ff17(1) === 1
+    @test ff18(1) === 1.0
+    @test ff19(1) === 1
+    @test ff20(1) === 1.0
 end
 
-@test ncalls(to["ff1"]) == 2
-@test ncalls(to["ff2"]) == 2
-@test ncalls(to["ff3"]) == 2
-@test ncalls(to["ff4"]) == 2
+@test ncalls(tof["ff1"]) == 2
+@test ncalls(tof["ff2"]) == 2
+@test ncalls(tof["ff3"]) == 2
+@test ncalls(tof["ff4"]) == 2
+@test ncalls(tof["foo"]) == 2
+@test ncalls(tof["bar"]) == 2
+@test ncalls(tof["baz"]) == 2
+@test ncalls(tof["quz"]) == 2
 
 @test ncalls(DEFAULT_TIMER["ff5"]) == 2
 @test ncalls(DEFAULT_TIMER["ff6"]) == 2
@@ -211,9 +234,10 @@ end
 @test ncalls(DEFAULT_TIMER["ff10"]) == 2
 @test ncalls(DEFAULT_TIMER["ff11"]) == 2
 @test ncalls(DEFAULT_TIMER["ff12"]) == 2
-
-@test "a3" in collect(keys(to.inner_timers))
-@test "a3" in collect(keys(DEFAULT_TIMER.inner_timers))
+@test ncalls(DEFAULT_TIMER["foo"]) == 2
+@test ncalls(DEFAULT_TIMER["bar"]) == 2
+@test ncalls(DEFAULT_TIMER["baz"]) == 2
+@test ncalls(DEFAULT_TIMER["quz"]) == 2
 
 function foo()
     reset_timer!()
@@ -424,3 +448,4 @@ end
     ff1()
     @test ncalls(to["ff1"]) == 3
 end
+
