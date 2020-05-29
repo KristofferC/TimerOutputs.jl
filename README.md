@@ -77,7 +77,7 @@ time_test()
 
 # exception safe
 function i_will_throw()
-    @timeit to "throwing" do
+    @timeit to "throwing" begin
         sleep(0.5)
         throw(error("this is fine..."))
         print("nope")
