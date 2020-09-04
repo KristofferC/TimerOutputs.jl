@@ -192,6 +192,21 @@ julia> show(to_flatten; compact = true, allocations = false)
  ──────────────────────────────────
 ```
 
+It is also possible to only include leave timer values when flattening.
+That is only timmers in the innermost level will be shown.
+
+```julia
+julia> to_flatten = TimerOutputs.flatten(to, only_leaves);
+
+julia> show(to_flatten; compact = true, allocations = false)
+ ──────────────────────────────────
+ Section     ncalls     time   %tot
+ ──────────────────────────────────
+ level 2.2       21    525ms  47.5%
+ level 2.1       31    436ms  39.5%
+ ──────────────────────────────────
+```
+
 ## Resetting
 
 A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time / allocation values.
@@ -300,6 +315,46 @@ julia> print_timer()
 
 The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`.
 
+## Measuring time consumed outside `@timeit` blocks
+
+Many times operations that we do not consider time consuming turn to be relevant.
+However, adding additional timming blocks just to time initializations and other
+less important calls is annoying.
+
+The `TimerOutputs.complement!()` function can be used to modify a timer and add
+values for complement of timed sections. For instance:
+
+```julia
+to = TimerOutput()
+
+@timeit to "section1" sleep(0.02)
+@timeit to "section2" begin
+    @timeit to "section2" sleep(0.1)
+    sleep(0.01)
+end
+
+TimerOuputs.complement!(to)
+```
+
+We cna print the result:
+
+```julia
+julia> print_timer(to)
+───────────────────────────────────────────────────────────────────────────
+                                    Time                   Allocations
+                            ──────────────────────   ───────────────────────
+      Tot / % measured:          186ms / 81.3%           3.00MiB / 0.05%
+
+ Section            ncalls     time   %tot     avg     alloc   %tot      avg
+ ───────────────────────────────────────────────────────────────────────────
+ section2                1    127ms  84.0%   127ms   1.28KiB  85.4%  1.28KiB
+   section2.1            1    110ms  72.3%   110ms         -  14.6%        -
+   Extra section2        1   17.7ms  11.7%  17.7ms   1.06KiB  70.8%  1.06KiB
+ section1                1   24.3ms  16.0%  24.3ms         -  14.6%        -
+ ───────────────────────────────────────────────────────────────────────────
+```
+
+In order to complement the default timer simply call `TimerOuputs.complement!()`.
 
 ## Overhead
 
