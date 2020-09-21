@@ -3,8 +3,16 @@ print_timer(to::TimerOutput; kwargs...) = print_timer(stdout, to; kwargs...)
 print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
 print_timer(io::IO, to::TimerOutput; kwargs...) = (show(io, to; kwargs...); println(io))
 
-Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
-function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
+Base.show(io::IO, to::TimerOutput) = print(io, "TimerOutput($(repr(to.name)), ...)")
+
+function Base.show(to::TimerOutput; kwargs...)
+    if length(kwargs) === 0
+        show(stdout, to)
+    else
+        show(stdout, MIME"text/plain"(), to; kwargs...)
+    end
+end
+function Base.show(io::IO, ::MIME"text/plain", to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
     sortby  in (:time, :ncalls, :allocations, :name) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls or :name, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
