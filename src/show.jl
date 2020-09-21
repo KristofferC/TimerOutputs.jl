@@ -41,14 +41,6 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
 end
 
-function sortf(x, sortby)
-    sortby == :time        && return x.accumulated_data.time
-    sortby == :ncalls      && return x.accumulated_data.ncalls
-    sortby == :allocations && return x.accumulated_data.allocs
-    sortby == :name        && return x.name
-    error("internal error")
-end
-
 # truncate string and add dots
 function truncdots(str, n)
     length(str) <= n && return str

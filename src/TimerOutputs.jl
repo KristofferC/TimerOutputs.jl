@@ -19,6 +19,7 @@ using Printf
 
 
 include("TimerOutput.jl")
+include("collect.jl")
 include("show.jl")
 include("utilities.jl")
 
