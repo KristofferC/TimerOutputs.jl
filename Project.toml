@@ -6,12 +6,20 @@ version = "0.5.26"
 ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[weakdeps]
+FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
+
 [compat]
 ExprTools = "0.1.0"
+FlameGraphs = "1"
 julia = "1.10"
 
 [extras]
+FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
+[extensions]
+FlameGraphsExt = "FlameGraphs"
+
 [targets]
-test = ["Test"]
+test = ["Test", "FlameGraphs"]

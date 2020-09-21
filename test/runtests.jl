@@ -4,6 +4,8 @@ using Test
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
                      prettytime, prettymemory, prettypercent, prettycount, todict
 
+using FlameGraphs
+
 reset_timer!()
 
 # Timing from modules that don't import much
@@ -722,9 +724,23 @@ end
             sleep(0.1)
         end_timed_section!(to, section2)
 end
-  
+
 @testset "@timeit works with an empty label" begin
     to = TimerOutput()
     @timeit to "" begin end
     @test ncalls(to.inner_timers[""]) == 1
+end
+
+@testset "FlameGraphsExt" begin
+    to = TimerOutput()
+    @timeit to "1" begin
+        sleep(0.1)
+        @timeit to "2" begin
+            sleep(0.1)
+            @timeit to "3" begin
+                sleep(0.1)
+            end
+        end
+    end
+    flamegraph(to)
 end
