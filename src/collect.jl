@@ -24,11 +24,11 @@ function _collect_timings_root(to::TimerOutput, sortby)
         ncalls = 0,
 
         incl_time = ∑t,
-        #excl_time = 0,
+        excl_time = 0,
         avg_time  = Float64(∑t),
 
         incl_allocs = ∑b,
-        #excl_allocs = 0,
+        excl_allocs = 0,
         avg_allocs  = Float64(∑b),
     )
     out_timings = [stats]
@@ -44,17 +44,23 @@ function _collect_timings(to::TimerOutput, parent::TimerOutput, sortby, out_timi
 
     nc = accum_data.ncalls
 
+    children_time = sum([0, (child.accumulated_data.time for child in values(to.inner_timers))...])
+    children_allocs = sum([0, (child.accumulated_data.time for child in values(to.inner_timers))...])
+
+    exclusive_t = t - children_time
+    exclusive_b = b - children_allocs
+
     stats = (;
         name = to.name,
         parent = parent,
         ncalls = nc,
 
         incl_time = t,
-        #excl_time = t,
+        excl_time = exclusive_t,
         avg_time  = t / nc,
 
         incl_allocs = b,
-        #excl_allocs = b,
+        excl_allocs = exclusive_b,
         avg_allocs  = b / nc,
     )
     push!(out_timings, stats)
