@@ -1,6 +1,6 @@
 # TimerOutputs
 
-[![Build Status](https://travis-ci.org/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.org/KristofferC/TimerOutputs.jl) [![codecov](https://codecov.io/gh/KristofferC/TimerOutputs.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/KristofferC/TimerOutputs.jl)
+[![Build Status](https://travis-ci.com/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.com/KristofferC/TimerOutputs.jl) [![codecov](https://codecov.io/gh/KristofferC/TimerOutputs.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/KristofferC/TimerOutputs.jl)
 
 `TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program.
 It's main functionality is the `@timeit` macro, similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
