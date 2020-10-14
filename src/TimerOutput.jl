@@ -354,3 +354,14 @@ function notimeit_expr(to, ex::Expr)
         val
     end
 end
+
+function merge(timer1::TimerOutput, timers...)
+    new_timer = TimerOutput()
+    for timer in (timer1, timers...)
+        for e in timer.inner_timers
+            push!(new_timer.inner_timers, e)
+        end
+    end
+    return new_timer
+end
+

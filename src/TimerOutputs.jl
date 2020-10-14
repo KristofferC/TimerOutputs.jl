@@ -1,6 +1,6 @@
 module TimerOutputs
 
-import Base: show, time_ns
+import Base: show, time_ns, merge
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
                     enable_timer!, disable_timer!, @notimeit
 
