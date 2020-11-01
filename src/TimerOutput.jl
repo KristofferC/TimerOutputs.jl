@@ -321,7 +321,6 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String,TimerOutput})
     end
 end
 
-
 enable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = true
 disable_timer!(to::TimerOutput=DEFAULT_TIMER) = to.enabled = false
 
@@ -333,6 +332,28 @@ end
 
 # Default function throws an error for the benefit of the user
 notimeit_expr(args...) = throw(ArgumentError("invalid macro usage for @notimeit, use as @notimeit [to] codeblock"))
+
+complement!() = complement!(DEFAULT_TIMER)
+function complement!(to::TimerOutput)
+    if length(to.inner_timers) == 0
+        return nothing
+    end
+    tot_time = to.accumulated_data.time
+    tot_allocs = to.accumulated_data.allocs
+    for timer in values(to.inner_timers)
+        tot_time -= timer.accumulated_data.time
+        tot_allocs -= timer.accumulated_data.allocs
+        complement!(timer)
+    end
+    tot_time = max(tot_time, 0)
+    tot_allocs = max(tot_allocs, 0)
+    if !(to.name in ["root", "Flattened"])
+        name = string("~", to.name, "~")
+        timer = TimerOutput(to.start_data, TimeData(max(1,to.accumulated_data.ncalls), tot_time, tot_allocs), Dict{String,TimerOutput}(), TimerOutput[], name, false, true, (tot_time, tot_allocs), to.name, to)
+        to.inner_timers[name] = timer
+    end
+    return to
+end
 
 # If @notimeit was called without a TimerOutput instance, use default timer
 notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)

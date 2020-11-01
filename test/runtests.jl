@@ -329,6 +329,17 @@ baz(1, 2.0)
 @test "sleep" in keys(to_debug.inner_timers["baz"].inner_timers)
 TimerOutputs.disable_debug_timings(@__MODULE__)
 
+to = TimerOutput()
+@timeit to "section1" sleep(0.02)
+@timeit to "section2" begin
+    @timeit to "section2.1" sleep(0.1)
+    sleep(0.01)
+end
+TimerOutputs.complement!(to)
+
+tom = flatten(to)
+@test ncalls(tom["~section2~"]) == 1
+
 end # testset
 
 struct Simulation
