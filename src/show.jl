@@ -51,7 +51,7 @@ end
 
 # truncate string and add dots
 function truncdots(str, n)
-    length(str) <= n && return str
+    textwidth(str) <= n && return str
     n <= 3 && return ""
     io = IOBuffer()
     for (i, c) in enumerate(str)

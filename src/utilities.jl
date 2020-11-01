@@ -83,3 +83,17 @@ function prettycount(t::Integer)
     end
     return str
 end
+
+function rpad(
+    s::Union{AbstractChar,AbstractString},
+    n::Integer,
+    p::Union{AbstractChar,AbstractString}=' ',
+) :: String
+    n = Int(n)::Int
+    m = signed(n) - Int(textwidth(s))::Int
+    m ≤ 0 && return string(s)
+    l = textwidth(p)
+    q, r = divrem(m, l)
+    r == 0 ? string(s, p^q) : string(s, p^q, first(p, r))
+end
+
