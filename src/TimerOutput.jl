@@ -96,7 +96,7 @@ function totmeasured(to::TimerOutput)
 end
 
 function longest_name(to::TimerOutput, indent = 0)
-    m = length(to.name) + indent
+    m = textwidth(to.name) + indent
     for inner_timer in values(to.inner_timers)
         m = max(m, longest_name(inner_timer, indent + 2))
     end
