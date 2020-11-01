@@ -306,7 +306,7 @@ Often, operations that we do not consider time consuming turn out to be relevant
 However, adding additional timming blocks just to time initializations and other
 less important calls is annoying.
 
-The `TimerOutputs.complement!()` function can be used to modify a timer and add
+The `TimerOutputs.complement!` function can be used to modify a timer and add
 values for complement of timed sections. For instance:
 
 ```julia
