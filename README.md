@@ -104,6 +104,9 @@ end
 @timeit to funcdef(x) = x
 
 funcdef(2)
+
+# Print the timings in the default way
+show(to)
 ```
 
 Printing `to` shows a formatted table showing the number of calls,
