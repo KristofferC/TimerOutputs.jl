@@ -21,5 +21,6 @@ using Printf
 include("TimerOutput.jl")
 include("show.jl")
 include("utilities.jl")
+include("profile.jl")
 
 end # module
