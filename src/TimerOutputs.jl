@@ -22,4 +22,9 @@ include("TimerOutput.jl")
 include("show.jl")
 include("utilities.jl")
 
+if Base.VERSION >= v"1.4.2"
+    include("precompile.jl")
+    _precompile_()
+end
+
 end # module
