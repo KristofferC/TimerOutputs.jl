@@ -19,7 +19,12 @@ end
 ###############
 # TimerOutput #
 ###############
-mutable struct TimerOutput
+
+abstract type AbstractTimerOutput end
+
+isdummy(::AbstractTimerOutput) = false
+
+mutable struct TimerOutput <: AbstractTimerOutput
     start_data::TimeData
     accumulated_data::TimeData
     inner_timers::Dict{String,TimerOutput}
@@ -201,6 +206,9 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
+        if isdummy($local_to)
+            return $(esc(ex))
+        end
         $enabled = $local_to.enabled
         if $enabled
             $accumulated_data = $(push!)($local_to, $label)
