@@ -5,7 +5,7 @@ using ExprTools
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
                     enable_timer!, disable_timer!, @notimeit
-export NoTimerOutput
+export AbtractTimerOutput, NoTimerOutput
 
 # https://github.com/JuliaLang/julia/pull/33717
 if VERSION < v"1.4.0-DEV.475"
