@@ -342,7 +342,7 @@ julia> print_timer(to)
  ───────────────────────────────────────────────────────────────────────
 ```
 
-In order to complement the default timer simply call `TimerOuputs.complement!()`.
+In order to complement the default timer simply call `TimerOutputs.complement!()`.
 
 ## Overhead
 
