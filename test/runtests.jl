@@ -511,3 +511,21 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
         @test ncalls(subto["baz"]) == 2
     end
 end
+
+@testset "dummy timers" begin
+    to = TimerOutput()
+    nt = NoTimerOutput()
+    @test repr(nt) == "Timer \"root\" is a dummy timer"
+
+    @test copy(nt) == nt
+    @test reset_timer!(nt) === nt
+    @test enable_timer!(nt) == true
+    @test disable_timer!(nt) == false
+
+    foo(x) = x + x
+    @timeit tt foo(x, tt) = foo(x)
+    @test foo(4) == foo(4, to)
+    @test foo(4) == foo(4, nt)
+
+    @test @notimeit(nt, foo(3)) == foo(3)
+end
