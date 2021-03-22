@@ -14,6 +14,5 @@ enable_timer!(to::NoTimerOutput) = true
 disable_timer!(to::NoTimerOutput) = false
 
 function Base.show(io::IO, to::NoTimerOutput)
-    # TODO modify this?
     print(io, "Timer \"", to.name, "\" is a dummy timer")
 end
