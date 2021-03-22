@@ -365,6 +365,9 @@ notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
 function notimeit_expr(to, ex::Expr)
     return quote
         local to = $(esc(to))
+        if isdummy(to)
+            return $(esc(ex))
+        end
         local enabled = to.enabled
         $(disable_timer!)(to)
         local val
