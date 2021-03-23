@@ -514,7 +514,7 @@ end
 
 @testset "dummy timers" begin
     to = TimerOutput()
-    nt = NoTimerOutput()
+    nt = NullTimer()
 
     @test repr(nt) == "Timer \"root\" is a dummy timer"
 

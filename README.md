@@ -397,9 +397,9 @@ By default, debug timings are disabled, and this conditional should be optimized
 If a user calls `TimerOutputs.enable_debug_timings(<module>)`, the `<module>.timeit_debug_enabled()` method will be redefined, causing all dependent methods to be recompiled within that module.
 This may take a while, and hence is intended only for debugging usage, however all calls to `@timeit_debug` (within that Module) will thereafter be enabled.
 
-As an alternative to `@timeit_debug`, this package also provides a `NoTimerOutput` type that allows disabling all timings with zero overhead.
+As an alternative to `@timeit_debug`, this package also provides a `NullTimer` type that allows disabling all timings with zero overhead.
 This type represents a dummy timer which acts as a drop-in replacement for regular `TimerOutput`s.
-From a user's perspective, it suffices to replace `to = TimerOutput()` by `to = NoTimerOutput()` at the beginning of their code to fully disable timers.
+From a user's perspective, it suffices to replace `to = TimerOutput()` by `to = NullTimer()` at the beginning of their code to fully disable timers.
 
 ## Author
 
