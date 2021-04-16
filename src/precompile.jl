@@ -7,6 +7,7 @@ function _precompile_()
   @assert Base.precompile(Tuple{typeof(reset_timer!), TimerOutput})
   @assert Base.precompile(Tuple{typeof(disable_timer!), TimerOutput})
   @assert Base.precompile(Tuple{typeof(enable_timer!), TimerOutput})
+  @assert Base.precompile(Tuple{typeof(complement!), TimerOutput})
   @assert Base.precompile(Tuple{typeof(do_accumulate!), TimeData, UInt64, Int64})
   @assert Base.precompile(Tuple{Type{TimerOutput}, String})
 end
