@@ -104,9 +104,13 @@ function longest_name(to::TimerOutput, indent = 0)
 end
 
 # merging timer outputs
-function Base.merge!(self::TimerOutput, other::TimerOutput)
-    self.accumulated_data += other.accumulated_data
-    _merge(self.inner_timers, other.inner_timers)
+Base.merge(others::TimerOutput...) = merge!(TimerOutput(), others...)
+function Base.merge!(self::TimerOutput, others::TimerOutput...)
+    for other in others
+        self.accumulated_data += other.accumulated_data
+        _merge(self.inner_timers, other.inner_timers)
+    end
+    return self
 end
 function _merge(self::Dict{String,TimerOutput}, other::Dict{String,TimerOutput})
     for key in keys(other)
