@@ -468,3 +468,46 @@ end
 @inferred make_zeros()
 TimerOutputs.enable_debug_timings(@__MODULE__)
 @inferred make_zeros()
+
+@testset "merge" begin
+    to1 = TimerOutput()
+    to2 = TimerOutput()
+    to3 = TimerOutput()
+
+    @timeit to1 "foo" identity(nothing)
+    @timeit to1 "baz" identity(nothing)
+    @timeit to1 "foobar" begin
+        @timeit to1 "foo" identity(nothing)
+        @timeit to1 "baz" identity(nothing)
+    end
+
+    @timeit to1 "bar" identity(nothing)
+    @timeit to2 "baz" identity(nothing)
+    @timeit to2 "foobar" begin
+        @timeit to2 "bar" identity(nothing)
+        @timeit to2 "baz" identity(nothing)
+    end
+
+    @timeit to3 "bar" identity(nothing)
+
+    to_merged = merge(to1, to2, to3)
+    merge!(to1, to2, to3)
+
+    for to in [to1, to_merged]
+        @test "foo" in collect(keys(to.inner_timers))
+        @test "bar" in collect(keys(to.inner_timers))
+        @test "foobar" in collect(keys(to.inner_timers))
+
+        subto = to["foobar"]
+        @test "foo" in collect(keys(subto.inner_timers))
+        @test "bar" in collect(keys(subto.inner_timers))
+
+        @test ncalls(to["foo"]) == 1
+        @test ncalls(to["bar"]) == 2
+        @test ncalls(to["baz"]) == 2
+
+        @test ncalls(subto["foo"]) == 1
+        @test ncalls(subto["bar"]) == 1
+        @test ncalls(subto["baz"]) == 2
+    end
+end
