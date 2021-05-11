@@ -195,6 +195,47 @@ julia> show(to_flatten; compact = true, allocations = false)
  ──────────────────────────────────
 ```
 
+## Merging
+
+Two or more timers can be merged using `merge` or `merge!`:
+
+```julia
+julia> to1 = TimerOutput(); to2 = TimerOutput();
+
+julia> @timeit to1 "outer" begin
+           @timeit to1 "inner" begin
+                sleep(1)
+           end
+       end
+
+julia> @timeit to2 "outer" begin
+           sleep(1)
+       end
+
+julia> show(to1; compact=true, allocations=false)
+ ────────────────────────────────
+ Section   ncalls     time   %tot
+ ────────────────────────────────
+ outer          1    1.00s   100%
+   inner        1    1.00s   100%
+ ────────────────────────────────
+
+julia> show(to2; compact=true, allocations=false)
+ ────────────────────────────────
+ Section   ncalls     time   %tot
+ ────────────────────────────────
+ outer          1    1.00s   100%
+ ────────────────────────────────
+
+julia> show(merge(to1, to2); compact=true, allocations=false)
+ ────────────────────────────────
+ Section   ncalls     time   %tot
+ ────────────────────────────────
+ outer          2    2.00s   100%
+   inner        1    1.00s  50.0%
+ ────────────────────────────────
+```
+
 ## Resetting
 
 A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time / allocation values.
