@@ -460,3 +460,11 @@ end
     @test ncalls(to["ff1"]) == 3
 end
 
+# Type inference with @timeit_debug
+@timeit_debug function make_zeros()
+   dims = (3, 4)
+   zeros(dims)
+end
+@inferred make_zeros()
+TimerOutputs.enable_debug_timings(@__MODULE__)
+@inferred make_zeros()

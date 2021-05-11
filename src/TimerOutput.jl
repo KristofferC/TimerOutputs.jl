@@ -159,51 +159,51 @@ end
 
 function timer_expr(m::Module, is_debug::Bool, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
-    return _timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex)
+    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex))
 end
 
 function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
-    return _timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to, ex)
+    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to, ex))
 end
 
 function timer_expr(m::Module, is_debug::Bool, label::String, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
-    return _timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label, ex)
+    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label, ex))
 end
 
 function timer_expr(m::Module, is_debug::Bool, to, label, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, to, ex, label)
-    return _timer_expr(m, is_debug, to, label, ex)
+    return esc(_timer_expr(m, is_debug, to, label, ex))
 end
 
 function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
+    @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
-        local to = $(esc(to))
-        local enabled = to.enabled
-        if enabled
-            local accumulated_data = $(push!)(to, $(esc(label)))
+        $local_to = $to
+        $enabled = $local_to.enabled
+        if $enabled
+            $accumulated_data = $(push!)($local_to, $label)
         end
-        local b₀ = $(gc_bytes)()
-        local t₀ = $(time_ns)()
-        local val
+        $b₀ = $(gc_bytes)()
+        $t₀ = $(time_ns)()
         $(Expr(:tryfinally,
-            :(val = $(esc(ex))),
+            :($val = $ex),
             quote
-                if enabled
-                    $(do_accumulate!)(accumulated_data, t₀, b₀)
-                    $(pop!)(to)
+                if $enabled
+                    $(do_accumulate!)($accumulated_data, $t₀, $b₀)
+                    $(pop!)($local_to)
                 end
             end))
-        val
+        $val
     end
 
     if is_debug
         return quote
-            if $(esc(m)).timeit_debug_enabled()
-                $(timeit_block)
+            if $m.timeit_debug_enabled()
+                $timeit_block
             else
-                $(esc(ex))
+                $ex
             end
         end
     else
@@ -212,48 +212,23 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
 end
 
 function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothing)
-    if expr.args[1].head == :where
-        wheres = expr.args[1].args[2:end]
-        declaration = expr.args[1].args[1]
-    else
-        wheres = []
-        declaration = expr.args[1]
-    end
-    if length(declaration.args) == 2 && declaration.head == :(::)
-        T        = declaration.args[2]
-        funcname = declaration.args[1].args[1]
-        args     = declaration.args[1].args[2:end]
-    else
-        T        = Any
-        funcname = declaration.args[1]
-        args     = declaration.args[2:end]
-    end
-    body = expr.args[2]
+    expr = macroexpand(m, expr)
+    def = splitdef(expr)
 
-    label === nothing && (label = string(funcname))
+    label === nothing && (label = string(def[:name]))
 
-    timeit_block = quote
-        $(timeit)($(esc(to)), $label) do
-            $(esc(body))
-        end
-    end
-
-    # If this is a `@timeit_debug`, then we insert the bypass conditional into our timeit_block
-    if is_debug
-        timeit_block = quote
-            if $(esc(m)).timeit_debug_enabled()
-                $(timeit_block)
-            else
-                $(esc(body))
+    def[:body] = if is_debug
+        quote
+            @inline function inner()
+                $(def[:body])
             end
+            $(_timer_expr(m, is_debug, to, label, :(inner())))
         end
+    else
+        _timer_expr(m, is_debug, to, label, def[:body])
     end
 
-    return quote
-        function $(esc(funcname))($([esc(arg) for arg in args]...))::$(esc(T)) where {$([esc(wher) for wher in wheres]...)}
-            $(timeit_block)
-        end
-    end
+    return esc(combinedef(def))
 end
 
 function do_accumulate!(accumulated_data, t₀, b₀)
