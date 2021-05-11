@@ -468,3 +468,40 @@ end
 @inferred make_zeros()
 TimerOutputs.enable_debug_timings(@__MODULE__)
 @inferred make_zeros()
+
+@testset "merge" begin
+    to = TimerOutput()
+    to2 = TimerOutput()
+
+    @timeit to "foo" identity(nothing)
+    @timeit to "baz" identity(nothing)
+    @timeit to "foobar" begin
+        @timeit to "foo" identity(nothing)
+        @timeit to "baz" identity(nothing)
+    end
+
+    @timeit to "bar" identity(nothing)
+    @timeit to2 "baz" identity(nothing)
+    @timeit to2 "foobar" begin
+        @timeit to2 "bar" identity(nothing)
+        @timeit to2 "baz" identity(nothing)
+    end
+
+    merge!(to, to2)
+
+    @test "foo" in collect(keys(to.inner_timers))
+    @test "bar" in collect(keys(to.inner_timers))
+    @test "foobar" in collect(keys(to.inner_timers))
+
+    subto = to["foobar"]
+    @test "foo" in collect(keys(subto.inner_timers))
+    @test "bar" in collect(keys(subto.inner_timers))
+
+    @test ncalls(to["foo"]) == 1
+    @test ncalls(to["bar"]) == 1
+    @test ncalls(to["baz"]) == 2
+
+    @test ncalls(subto["foo"]) == 1
+    @test ncalls(subto["bar"]) == 1
+    @test ncalls(subto["baz"]) == 2
+end
