@@ -2,6 +2,8 @@ module TimerOutputs
 
 using ExprTools
 
+using FastClosures
+
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
                     enable_timer!, disable_timer!, @notimeit
