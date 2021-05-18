@@ -237,12 +237,14 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothin
 
     label === nothing && (label = string(def[:name]))
 
+    @gensym closure
     def[:body] = if is_debug
+        closure_ex = FastClosures.wrap_closure(m, :(
+            () -> $(def[:body])
+        ))
         quote
-            @inline function inner()
-                $(def[:body])
-            end
-            $(_timer_expr(m, is_debug, to, label, :(inner())))
+            $closure = $closure_ex
+            $(_timer_expr(m, is_debug, to, label, :($closure())))
         end
     else
         _timer_expr(m, is_debug, to, label, def[:body])
