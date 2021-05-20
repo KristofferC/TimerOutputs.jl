@@ -144,6 +144,7 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations` or `:name`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` to draw the horizontal lines in the table
 * `compact::Bool` ─ hide the `avg` column (default `false`)
+* `maxlevel::Integer` ─ maximum level of nested function calls printed (default `100`)
 
 ## Flattening
 
