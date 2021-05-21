@@ -206,8 +206,8 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
-        if isdummy($local_to)
-            return $(esc(ex))
+        if TimerOutputs.isdummy($local_to)
+            return $ex
         end
         $enabled = $local_to.enabled
         if $enabled
