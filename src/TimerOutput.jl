@@ -207,22 +207,23 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
     timeit_block = quote
         $local_to = $to
         if Main.hasfield(typeof($local_to), :enabled) === false
-            return $ex
+            $val = $ex
+        else
+            $enabled = $local_to.enabled
+            if $enabled
+                $accumulated_data = $(push!)($local_to, $label)
+            end
+            $b₀ = $(gc_bytes)()
+            $t₀ = $(time_ns)()
+            $(Expr(:tryfinally,
+                :($val = $ex),
+                quote
+                    if $enabled
+                        $(do_accumulate!)($accumulated_data, $t₀, $b₀)
+                        $(pop!)($local_to)
+                    end
+                end))
         end
-        $enabled = $local_to.enabled
-        if $enabled
-            $accumulated_data = $(push!)($local_to, $label)
-        end
-        $b₀ = $(gc_bytes)()
-        $t₀ = $(time_ns)()
-        $(Expr(:tryfinally,
-            :($val = $ex),
-            quote
-                if $enabled
-                    $(do_accumulate!)($accumulated_data, $t₀, $b₀)
-                    $(pop!)($local_to)
-                end
-            end))
         $val
     end
 
