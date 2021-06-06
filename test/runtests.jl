@@ -511,3 +511,19 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
         @test ncalls(subto["baz"]) == 2
     end
 end
+
+# Issue #118
+let to = TimerOutput()
+    @timeit to "foo" identity(nothing)
+    @timeit to "foobar" begin
+        @timeit to "foo" identity(nothing)
+        @timeit to "baz" identity(nothing)
+    end
+    @timeit to "baz" identity(nothing)
+
+    @test ncalls(to.inner_timers["foo"]) == 1
+    @test ncalls(to.inner_timers["foobar"]) == 1
+    @test ncalls(to.inner_timers["foobar"].inner_timers["foo"]) == 1
+    @test ncalls(to.inner_timers["foobar"].inner_timers["baz"]) == 1
+    @test ncalls(to.inner_timers["baz"]) == 1
+end
