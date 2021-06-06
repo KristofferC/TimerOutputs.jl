@@ -60,8 +60,8 @@ function Base.push!(to::TimerOutput, label::String)
         current_timer = to.timer_stack[end]
     end
     # Fast path
-    if to.prev_timer_label == label
-        timer = to.prev_timer
+    if current_timer.prev_timer_label == label
+        timer = current_timer.prev_timer
     else
         maybe_timer = get(current_timer.inner_timers, label, nothing)
         # this could be implemented more elegant using
@@ -75,8 +75,8 @@ function Base.push!(to::TimerOutput, label::String)
             timer = maybe_timer
         end
     end
-    to.prev_timer_label = label
-    to.prev_timer = timer
+    current_timer.prev_timer_label = label
+    current_timer.prev_timer = timer
 
     push!(to.timer_stack, timer)
     return timer.accumulated_data
