@@ -5,7 +5,7 @@ print_timer(io::IO, to::TimerOutput; kwargs...) = (show(io, to; kwargs...); prin
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
 function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
-    sortby  in (:time, :ncalls, :allocations, :name) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls or :name, got $sortby"))
+    sortby  in (:time, :ncalls, :allocations, :name, :firstexec) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
     t₀, b₀ = to.start_data.time, to.start_data.allocs
@@ -46,6 +46,7 @@ function sortf(x, sortby)
     sortby == :ncalls      && return x.accumulated_data.ncalls
     sortby == :allocations && return x.accumulated_data.allocs
     sortby == :name        && return x.name
+    sortby == :firstexec   && return x.accumulated_data.firstexec
     error("internal error")
 end
 

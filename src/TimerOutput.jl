@@ -5,15 +5,17 @@ mutable struct TimeData
     ncalls::Int
     time::Int64
     allocs::Int64
+    firstexec::Int64
 end
-
+TimeData(ncalls, time, allocs) = TimeData(ncalls, time, allocs, time)
 Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
 TimeData() = TimeData(0, 0, 0)
 
 function Base.:+(self::TimeData, other::TimeData)
     TimeData(self.ncalls + other.ncalls,
              self.time + other.time,
-             self.allocs + other.allocs)
+             self.allocs + other.allocs,
+             min(self.firstexec, other.firstexec))
 end
 
 ###############
