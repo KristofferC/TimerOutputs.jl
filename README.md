@@ -1,5 +1,7 @@
 # TimerOutputs
 
+Test
+
 [![Build Status](https://travis-ci.com/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.com/KristofferC/TimerOutputs.jl) [![codecov](https://codecov.io/gh/KristofferC/TimerOutputs.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/KristofferC/TimerOutputs.jl)
 
 `TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program.
