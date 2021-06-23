@@ -236,6 +236,48 @@ julia> show(merge(to1, to2); compact=true, allocations=false)
  ────────────────────────────────
 ```
 
+Merging can be used to test simple multi-threaded setups, by using thread-local
+`TimerOutput` objects and merging with custom merge points via the `tree_point` arg, which
+should be a vector of string keys to navigate to the merge point. `merge!` is thread-safe
+via a lock, so its use should be minimized for performance.
+
+```julia
+julia> using TimerOutputs
+
+julia> to = TimerOutput()
+
+julia> @timeit to "1" begin
+    @timeit to "1.1" sleep(0.1)
+    @timeit to "1.2" sleep(0.1)
+    @timeit to "1.3" sleep(0.1)
+end
+
+julia> @timeit to "2" Threads.@spawn begin
+    to2 = TimerOutput()
+    @timeit to2 "2.1" sleep(0.1)
+    @timeit to2 "2.2" sleep(0.1)
+    @timeit to2 "2.3" sleep(0.1)
+    merge!(to, to2, tree_point = ["2"])
+end
+
+julia> to
+ ──────────────────────────────────────────────────────────────────
+                           Time                   Allocations
+                   ──────────────────────   ───────────────────────
+ Tot / % measured:      3.23s / 9.79%           13.5MiB / 36.9%
+ Section   ncalls     time   %tot     avg     alloc   %tot      avg
+ ──────────────────────────────────────────────────────────────────
+ 1              1    309ms  98.0%   309ms   4.55MiB  91.5%  4.55MiB
+   1.3          1    106ms  33.6%   106ms      320B  0.01%     320B
+   1.2          1    102ms  32.3%   102ms      320B  0.01%     320B
+   1.1          1    101ms  32.0%   101ms   4.54MiB  91.4%  4.54MiB
+ 2              1   6.47ms  2.05%  6.47ms    435KiB  8.54%   435KiB
+   2.2          1    106ms  33.6%   106ms      480B  0.01%     480B
+   2.3          1    105ms  33.4%   105ms      144B  0.00%     144B
+   2.1          1    103ms  32.5%   103ms   5.03MiB  101%   5.03MiB
+ ──────────────────────────────────────────────────────────────────
+```
+
 ## Resetting
 
 A timer is reset by calling `reset_timer!(to::TimerOutput)`. This will remove all sections and reset the start of the timer to the current time / allocation values.
