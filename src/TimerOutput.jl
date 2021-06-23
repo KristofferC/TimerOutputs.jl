@@ -19,7 +19,12 @@ end
 ###############
 # TimerOutput #
 ###############
-mutable struct TimerOutput
+
+abstract type AbstractTimerOutput end
+
+isdummy(::AbstractTimerOutput) = false
+
+mutable struct TimerOutput <: AbstractTimerOutput
     start_data::TimeData
     accumulated_data::TimeData
     inner_timers::Dict{String,TimerOutput}
@@ -201,20 +206,24 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
-        $enabled = $local_to.enabled
-        if $enabled
-            $accumulated_data = $(push!)($local_to, $label)
+        if Main.hasfield(typeof($local_to), :enabled) === false
+            $val = $ex
+        else
+            $enabled = $local_to.enabled
+            if $enabled
+                $accumulated_data = $(push!)($local_to, $label)
+            end
+            $b₀ = $(gc_bytes)()
+            $t₀ = $(time_ns)()
+            $(Expr(:tryfinally,
+                :($val = $ex),
+                quote
+                    if $enabled
+                        $(do_accumulate!)($accumulated_data, $t₀, $b₀)
+                        $(pop!)($local_to)
+                    end
+                end))
         end
-        $b₀ = $(gc_bytes)()
-        $t₀ = $(time_ns)()
-        $(Expr(:tryfinally,
-            :($val = $ex),
-            quote
-                if $enabled
-                    $(do_accumulate!)($accumulated_data, $t₀, $b₀)
-                    $(pop!)($local_to)
-                end
-            end))
         $val
     end
 
@@ -357,6 +366,9 @@ notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
 function notimeit_expr(to, ex::Expr)
     return quote
         local to = $(esc(to))
+        if isdummy(to)
+            return $(esc(ex))
+        end
         local enabled = to.enabled
         $(disable_timer!)(to)
         local val

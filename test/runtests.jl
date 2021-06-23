@@ -511,3 +511,44 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
         @test ncalls(subto["baz"]) == 2
     end
 end
+
+@testset "dummy timers" begin
+    to = TimerOutput()
+    nt = NullTimer()
+
+    @test repr(nt) == "Timer \"root\" is a dummy timer"
+
+    let io = IOBuffer()
+        print_timer(io, nt)
+        @test String(take!(io)) == "Timer \"root\" is a dummy timer\n"
+    end
+
+    @test copy(nt) == nt
+    @test reset_timer!(nt) === nt
+    @test enable_timer!(nt) == true
+    @test disable_timer!(nt) == false
+    @test flatten(nt) === nt
+
+    foo(x) = x + x
+    @timeit tt foo(x, tt) = foo(x)
+    @test foo(4) == foo(4, to)
+    @test foo(4) == foo(4, nt)
+
+    @test @notimeit(nt, foo(3)) == foo(3)
+
+    @timeit to "sin" sin(3)
+    @timeit nt "sin" sin(3)
+
+    @test haskey(to, "sin")
+    @test !haskey(nt, "sin")
+
+    @test to["sin"] isa TimerOutput
+    @test_throws KeyError("sin") nt["sin"]
+
+    @test ncalls(nt) == 0
+    @test TimerOutputs.time(nt) == 0
+    @test TimerOutputs.allocated(nt) == 0
+    @test TimerOutputs.tottime(nt) == 0
+    @test TimerOutputs.totallocated(nt) == 0
+    @test TimerOutputs.complement!(nt) === nt
+end

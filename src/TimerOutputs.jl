@@ -5,6 +5,7 @@ using ExprTools
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
                     enable_timer!, disable_timer!, @notimeit
+export AbtractTimerOutput, NullTimer
 
 # https://github.com/JuliaLang/julia/pull/33717
 if VERSION < v"1.4.0-DEV.475"
@@ -21,6 +22,7 @@ using Printf
 
 
 include("TimerOutput.jl")
+include("NullTimer.jl")
 include("show.jl")
 include("utilities.jl")
 
