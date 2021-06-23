@@ -105,10 +105,14 @@ end
 
 # merging timer outputs
 Base.merge(others::TimerOutput...) = merge!(TimerOutput(), others...)
-function Base.merge!(self::TimerOutput, others::TimerOutput...)
+function Base.merge!(self::TimerOutput, others::TimerOutput...; tree_point = String[])
     for other in others
         self.accumulated_data += other.accumulated_data
-        _merge(self.inner_timers, other.inner_timers)
+        it = self.inner_timers
+        for point in tree_point
+            it = it[point].inner_timers
+        end
+        _merge(it, other.inner_timers)
     end
     return self
 end
