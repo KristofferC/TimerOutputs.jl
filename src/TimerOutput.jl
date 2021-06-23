@@ -103,18 +103,23 @@ function longest_name(to::TimerOutput, indent = 0)
     return m
 end
 
+
 # merging timer outputs
+const merge_lock = ReentrantLock() # needed for merges of objects on different threads
+
 Base.merge(others::TimerOutput...) = merge!(TimerOutput(), others...)
 function Base.merge!(self::TimerOutput, others::TimerOutput...; tree_point = String[])
-    for other in others
-        self.accumulated_data += other.accumulated_data
-        it = self.inner_timers
-        for point in tree_point
-            it = it[point].inner_timers
+    lock(merge_lock) do
+        for other in others
+            self.accumulated_data += other.accumulated_data
+            it = self.inner_timers
+            for point in tree_point
+                it = it[point].inner_timers
+            end
+            _merge(it, other.inner_timers)
         end
-        _merge(it, other.inner_timers)
+        return self
     end
-    return self
 end
 function _merge(self::Dict{String,TimerOutput}, other::Dict{String,TimerOutput})
     for key in keys(other)
