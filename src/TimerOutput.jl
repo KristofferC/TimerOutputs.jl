@@ -9,7 +9,7 @@ mutable struct TimeData
 end
 TimeData(ncalls, time, allocs) = TimeData(ncalls, time, allocs, time)
 Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
-TimeData() = TimeData(0, 0, 0)
+TimeData() = TimeData(0, 0, 0, time_ns())
 
 function Base.:+(self::TimeData, other::TimeData)
     TimeData(self.ncalls + other.ncalls,
