@@ -512,3 +512,16 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
         @test ncalls(subto["baz"]) == 2
     end
 end
+
+@testset "sortby firstexec" begin
+    to = TimerOutput()
+    @timeit to "cccc" sleep(0.1)
+    @timeit to "cccc" sleep(0.1)
+    @timeit to "bbbb" sleep(0.1)
+    @timeit to "aaaa" sleep(0.1)
+    @timeit to "cccc" sleep(0.1)
+
+    table = sprint((io, to)->show(io, to, sortby = :firstexec), to)
+
+    @test match(r"cccc", table).offset < match(r"bbbb", table).offset < match(r"aaaa", table).offset
+end
