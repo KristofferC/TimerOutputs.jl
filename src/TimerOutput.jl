@@ -112,11 +112,11 @@ function Base.merge!(self::TimerOutput, others::TimerOutput...; tree_point = Str
     lock(merge_lock) do
         for other in others
             self.accumulated_data += other.accumulated_data
-            it = self.inner_timers
+            its = self.inner_timers
             for point in tree_point
-                it = it[point].inner_timers
+                its = its[point].inner_timers
             end
-            _merge(it, other.inner_timers)
+            _merge(its, other.inner_timers)
         end
         return self
     end
