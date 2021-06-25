@@ -17,4 +17,6 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-runtest@latest
+        env:
+          JULIA_NUM_THREADS: 2
       - uses: julia-actions/julia-processcoverage@v1
