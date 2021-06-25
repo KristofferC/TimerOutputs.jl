@@ -527,3 +527,83 @@ let to = TimerOutput()
     @test ncalls(to.inner_timers["foobar"].inner_timers["baz"]) == 1
     @test ncalls(to.inner_timers["baz"]) == 1
 end
+
+@testset "merge at custom points during multithreading" begin
+    to = TimerOutput()
+    @timeit to "1" begin
+        @timeit to "1.1" sleep(0.1)
+        @timeit to "1.2" sleep(0.1)
+        @timeit to "1.3" sleep(0.1)
+    end
+
+    @sync begin
+        @timeit to "2" Threads.@spawn begin
+            to2 = TimerOutput()
+            @timeit to2 "2.1" sleep(0.1)
+            @timeit to2 "2.2" sleep(0.1)
+            @timeit to2 "2.3" sleep(0.1)
+            merge!(to, to2, tree_point = ["2"])
+        end
+
+        @timeit to "3" Threads.@spawn begin
+            to3 = TimerOutput()
+            @sync begin
+                @timeit to3 "3.1" Threads.@spawn begin
+                    to31 = TimerOutput()
+                    @timeit to31 "3.1.1" sleep(0.1)
+                    @timeit to31 "3.1.2" sleep(0.1)
+                    @timeit to31 "3.1.3" sleep(0.1)
+                    merge!(to3, to31, tree_point = ["3.1"])
+                end
+                @timeit to3 "3.2" Threads.@spawn begin
+                    to32 = TimerOutput()
+                    @timeit to32 "3.2.1" sleep(0.1)
+                    @timeit to32 "3.2.2" sleep(0.1)
+                    @timeit to32 "3.2.3" sleep(0.1)
+                    merge!(to3, to32, tree_point = ["3.2"])
+                end
+            end
+            merge!(to, to3, tree_point = ["3"])
+        end
+    end
+
+    @test "1" in collect(keys(to.inner_timers))
+    @test ncalls(to.inner_timers["1"]) == 1
+    @test "2" in collect(keys(to.inner_timers))
+    @test ncalls(to.inner_timers["2"]) == 1
+    @test "3" in collect(keys(to.inner_timers))
+    @test ncalls(to.inner_timers["3"]) == 1
+    @test !in("1.1", collect(keys(to.inner_timers)))
+    @test !in("2.1", collect(keys(to.inner_timers)))
+    @test !in("3.1", collect(keys(to.inner_timers)))
+    @test !in("3.1.1", collect(keys(to.inner_timers)))
+    @test !in("3.2", collect(keys(to.inner_timers)))
+    @test !in("3.2.1", collect(keys(to.inner_timers)))
+
+    to1 = to.inner_timers["1"]
+    @test "1.1" in collect(keys(to1.inner_timers))
+    @test ncalls(to1.inner_timers["1.1"]) == 1
+
+    to2 = to.inner_timers["2"]
+    @test "2.1" in collect(keys(to2.inner_timers))
+    @test ncalls(to2.inner_timers["2.1"]) == 1
+    @test !in("3.1", collect(keys(to2.inner_timers)))
+
+    to3 = to.inner_timers["3"]
+    @test "3.1" in collect(keys(to3.inner_timers))
+    @test ncalls(to3.inner_timers["3.1"]) == 1
+    @test "3.2" in collect(keys(to3.inner_timers))
+    @test ncalls(to3.inner_timers["3.2"]) == 1
+    @test !in("2.1", collect(keys(to3.inner_timers)))
+
+    to31 = to3.inner_timers["3.1"]
+    @test "3.1.1" in collect(keys(to31.inner_timers))
+    @test ncalls(to31.inner_timers["3.1.1"]) == 1
+    @test !in("3.2.1", collect(keys(to31.inner_timers)))
+
+    to32 = to3.inner_timers["3.2"]
+    @test "3.2.1" in collect(keys(to32.inner_timers))
+    @test ncalls(to32.inner_timers["3.2.1"]) == 1
+    @test !in("3.1.1", collect(keys(to32.inner_timers)))
+
+end
