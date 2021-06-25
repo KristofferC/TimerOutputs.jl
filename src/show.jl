@@ -4,7 +4,7 @@ print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
 print_timer(io::IO, to::TimerOutput; kwargs...) = (show(io, to; kwargs...); println(io))
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
-function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
+function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "", maxlevel::Integer = 100)
     sortby  in (:time, :ncalls, :allocations, :name) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls or :name, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
@@ -36,7 +36,7 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
 
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact, title)
     for timer in sort!(collect(values(to.inner_timers)); rev = sortby != :name, by = x -> sortf(x, sortby))
-        _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
+        _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact, maxlevel)
     end
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
 end
@@ -133,11 +133,15 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     end
 end
 
-function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, indent::Integer, name_length, allocations, sortby, compact)
+function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, level::Integer, name_length, allocations, sortby, compact, maxlevel)
+    if level >= maxlevel
+        return
+    end
     accum_data = to.accumulated_data
     t = accum_data.time
     b = accum_data.allocs
 
+    indent = level * 2
     name = truncdots(to.name, name_length - indent)
     print(io, " ")
     nc = accum_data.ncalls
@@ -156,6 +160,6 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     print(io, "\n")
 
     for timer in sort!(collect(values(to.inner_timers)), rev = sortby != :name, by = x -> sortf(x, sortby))
-        _print_timer(io, timer, ∑t, ∑b, indent + 2, name_length, allocations, sortby, compact)
+        _print_timer(io, timer, ∑t, ∑b, level + 1, name_length, allocations, sortby, compact, maxlevel)
     end
 end
