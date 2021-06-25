@@ -236,10 +236,10 @@ julia> show(merge(to1, to2); compact=true, allocations=false)
  ────────────────────────────────
 ```
 
-Merging can be used to test simple multi-threaded setups, by using thread-local
-`TimerOutput` objects and merging with custom merge points via the `tree_point` arg, which
-should be a vector of string keys to navigate to the merge point. `merge!` is thread-safe
-via a lock, so its use should be minimized for performance.
+Merging can be used to facilitate timing coverage throughout simple multi-threaded setups.
+For instance, use thread-local `TimerOutput` objects that are merged at custom merge points
+via the `tree_point` keyword arg, which is a vector of label strings used to navigate to
+the merge point in the timing tree. `merge!` is thread-safe via a lock.
 
 ```julia
 julia> using TimerOutputs
