@@ -256,6 +256,7 @@ show(io, to; sortby = :ncalls)
 show(io, to; sortby = :time)
 show(io, to; sortby = :allocations)
 show(io, to; sortby = :name)
+show(io, to; sortby = :firstexec)
 show(io, to; linechars = :ascii)
 show(io, to; title = "A short title")
 show(io, to; title = "A very long title that will be truncated")
@@ -526,6 +527,19 @@ let to = TimerOutput()
     @test ncalls(to.inner_timers["foobar"].inner_timers["foo"]) == 1
     @test ncalls(to.inner_timers["foobar"].inner_timers["baz"]) == 1
     @test ncalls(to.inner_timers["baz"]) == 1
+end
+
+@testset "sortby firstexec" begin
+    to = TimerOutput()
+    @timeit to "cccc" sleep(0.1)
+    @timeit to "cccc" sleep(0.1)
+    @timeit to "bbbb" sleep(0.1)
+    @timeit to "aaaa" sleep(0.1)
+    @timeit to "cccc" sleep(0.1)
+
+    table = sprint((io, to)->show(io, to, sortby = :firstexec), to)
+
+    @test match(r"cccc", table).offset < match(r"bbbb", table).offset < match(r"aaaa", table).offset
 end
 
 @testset "merge at custom points during multithreading" begin
