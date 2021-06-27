@@ -31,15 +31,14 @@ mutable struct TimerOutput
     enabled::Bool
     totmeasured::Tuple{Int64,Int64}
     prev_timer_label::String
-    prev_timer::TimerOutput
+    prev_timer::Union{TimerOutput,Nothing}
 
     function TimerOutput(label::String = "root")
         start_data = TimeData(0, time_ns(), gc_bytes())
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        timer = new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), "")
-        timer.prev_timer = timer
+        return new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), "", nothing)
     end
 
     # Jeez...
@@ -50,7 +49,7 @@ mutable struct TimerOutput
 end
 
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-                                         copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", to)
+                                         copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", nothing)
 
 const DEFAULT_TIMER = TimerOutput()
 
