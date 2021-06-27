@@ -274,6 +274,7 @@ function reset_timer!(to::TimerOutput)
     to.start_data = TimeData(0, time_ns(), gc_bytes())
     to.accumulated_data = TimeData()
     to.prev_timer_label = ""
+    to.prev_timer = nothing
     resize!(to.timer_stack, 0)
     return to
 end
