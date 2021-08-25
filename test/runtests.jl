@@ -377,6 +377,27 @@ end
 @test "foo" in keys(DEFAULT_TIMER.inner_timers)
 TimerOutputs.reset_timer!()
 
+# Test sharing timers between modules
+@test !haskey(TimerOutputs._timers, "TestModule2")
+@test !haskey(TimerOutputs._timers, "my_timer")
+
+to = get_timer("my_timer")
+@timeit to "foo" sleep(0.1)
+@test ncalls(get_timer("my_timer")["foo"]) == 1
+
+module TestModule2
+    using TimerOutputs: @timeit, get_timer
+    foo(x) = x
+    @timeit get_timer("TestModule2") "foo" foo(1)
+    @timeit get_timer("my_timer") "foo" foo(1)
+end
+
+# Timer from module is accessible to root
+@test haskey(TimerOutputs._timers, "TestModule2")
+@test ncalls(get_timer("TestModule2")["foo"]) == 1
+# Timer from root is accessible to module
+@test ncalls(get_timer("my_timer")["foo"]) == 2
+
 # Broken
 #=
 # Type inference with @timeit_debug
