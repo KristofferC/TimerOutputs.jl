@@ -61,16 +61,12 @@ Returns the `TimerOutput` associated with `name`.
 If no timers are associated with `name`, a new `TimerOutput` will be created.
 """
 function get_timer(name::String)
-    if !haskey(_timers, name)
-        lock(merge_lock) do
-            # Double check key in case of race condition
-            if !haskey(_timers, name)
-                _timers[name] = TimerOutput(name)
-            end
+    lock(_timers_lock) do
+        if !haskey(_timers, name)
+            _timers[name] = TimerOutput(name)
         end
+        return _timers[name]
     end
-
-    return _timers[name]
 end
 
 # push! and pop!
