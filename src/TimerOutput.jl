@@ -53,7 +53,7 @@ Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulate
 
 const DEFAULT_TIMER = TimerOutput()
 const _timers = Dict{String, TimerOutput}("Default" => DEFAULT_TIMER)
-
+const _timers_lock = ReentrantLock() # needed for adding new timers on different threads
 """
     get_timer(name::String)
 
@@ -62,7 +62,12 @@ If no timers are associated with `name`, a new `TimerOutput` will be created.
 """
 function get_timer(name::String)
     if !haskey(_timers, name)
-        _timers[name] = TimerOutput(name)
+        lock(merge_lock) do
+            # Double check key in case of race condition
+            if !haskey(_timers, name)
+                _timers[name] = TimerOutput(name)
+            end
+        end
     end
 
     return _timers[name]
