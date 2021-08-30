@@ -1,5 +1,6 @@
 using TimerOutputs
 using Test
+using Tables
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
                      prettytime, prettymemory, prettypercent, prettycount
@@ -620,4 +621,52 @@ end
     @test ncalls(to32.inner_timers["3.2.1"]) == 1
     @test !in("3.1.1", collect(keys(to32.inner_timers)))
 
+end
+
+@testset "Tables.jl interface" begin
+    to = TimerOutput()
+
+    @timeit to "1" sleep(0.1)
+
+    @timeit to "2" begin
+        @timeit to "2.1" sleep(0.1)
+        @timeit to "2.2" sleep(0.1)
+        @timeit to "2.3" sleep(0.1)
+    end
+
+    @timeit to "3" begin
+        @timeit to "3.1" begin
+            @timeit to "3.1.1" sleep(0.1)
+            @timeit to "3.1.2" sleep(0.1)
+            @timeit to "3.1.3" sleep(0.1)
+        end
+        @timeit to "3.2" begin
+            @timeit to "3.2.1" sleep(0.1)
+            @timeit to "3.2.2" sleep(0.1)
+            @timeit to "3.2.3" sleep(0.1)
+        end
+    end
+
+    table = Tables.columntable(to)
+    @test table.name == [
+        ("1",),
+        ("2",),
+        ("2", "2.1"),
+        ("2", "2.2"),
+        ("2", "2.3"),
+        ("3",),
+        ("3", "3.1"),
+        ("3", "3.1", "3.1.1"),
+        ("3", "3.1", "3.1.2"),
+        ("3", "3.1", "3.1.3"),
+        ("3", "3.2"),
+        ("3", "3.2", "3.2.1"),
+        ("3", "3.2", "3.2.2"),
+        ("3", "3.2", "3.2.3"),
+    ]
+    @test all(==(1), table.ncalls)
+    @test table.isleaf == [
+        match(r"^(1|2\.[0-9]|3\.[0-9]\.[0-9])$", name[end]) !== nothing for name in table.name
+    ]
+    @test Tables.schema(table) == Tables.schema(to)
 end
