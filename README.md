@@ -386,6 +386,49 @@ julia> print_timer()
 
 The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`.
 
+## Shared Timers
+
+It is sometimes desirable for a timer to be shared across all users of the package.
+For this purpose, `get_timer` maintains a collection of named timers defined in the package.
+
+`get_timer(timer_name::String)` retrieves the timer `timer_name` from the collection, creating a new timer if none already exists.
+To avoid errors, these timers should be retrieved in the scope where they are to be used.
+
+Note that this function is not recommended to be used extensively as it is prone to name collisions.
+
+For example:
+```julia
+module UseTimer
+using TimerOutputs: @timeit, get_timer
+
+function foo()
+    to = get_timer("Shared")
+    @timeit to "foo" sleep(0.1)
+end
+end
+
+to = get_timer("Shared")
+@timeit to "section1" begin
+    UseTimer.foo()
+    sleep(0.01)
+end
+```
+
+which prints:
+```julia
+julia> print_timer(get_timer("Shared"))
+ ───────────────────────────────────────────────────────────────────
+                            Time                   Allocations
+                    ──────────────────────   ───────────────────────
+  Tot / % measured:      17.1s / 0.82%           44.0MiB / 2.12%
+
+ Section    ncalls     time   %tot     avg     alloc   %tot      avg
+ ───────────────────────────────────────────────────────────────────
+ section1        1    140ms   100%   140ms    956KiB  100%    956KiB
+   foo           1    102ms  72.7%   102ms      144B  0.01%     144B
+ ───────────────────────────────────────────────────────────────────
+```
+
 ## Measuring time consumed outside `@timeit` blocks
 
 Often, operations that we do not consider time consuming turn out to be relevant.
