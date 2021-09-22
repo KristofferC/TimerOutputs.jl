@@ -427,6 +427,55 @@ julia> print_timer(to)
 
 In order to complement the default timer simply call `TimerOutputs.complement!()`.
 
+## Shared Timers
+
+It is sometimes desirable for a timer to be shared across all users of the
+package.  For this purpose, `get_timer` maintains a collection of named timers
+defined in the package.
+
+`get_timer(timer_name::String)` retrieves the timer `timer_name` from the
+collection, creating a new timer if none already exists.
+
+For example:
+```julia
+module UseTimer
+using TimerOutputs: @timeit, get_timer
+
+function foo()
+    to = get_timer("Shared")
+    @timeit get_timer("Shared") "foo" sleep(0.1)
+end
+end
+
+@timeit get_timer("Shared") "section1" begin
+    UseTimer.foo()
+    sleep(0.01)
+end
+```
+
+which prints:
+```julia
+julia> print_timer(get_timer("Shared"))
+ ───────────────────────────────────────────────────────────────────
+                            Time                   Allocations
+                    ──────────────────────   ───────────────────────
+  Tot / % measured:      17.1s / 0.82%           44.0MiB / 2.12%
+
+ Section    ncalls     time   %tot     avg     alloc   %tot      avg
+ ───────────────────────────────────────────────────────────────────
+ section1        1    140ms   100%   140ms    956KiB  100%    956KiB
+   foo           1    102ms  72.7%   102ms      144B  0.01%     144B
+ ───────────────────────────────────────────────────────────────────
+```
+
+Note that the result of `get_timer` should not be called from top-level in a
+package that is getting precompiled since the retrieved timer will no longer be
+shared with other users getting a timer with the same name. Also, this function
+is not recommended to be used extensively by libraries as the namespace is
+shared and collisions are possible if two libraries happen to use the same timer
+name.
+
+
 ## Overhead
 
 There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.

@@ -52,6 +52,22 @@ Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulate
                                          copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", nothing)
 
 const DEFAULT_TIMER = TimerOutput()
+const _timers = Dict{String, TimerOutput}("Default" => DEFAULT_TIMER)
+const _timers_lock = ReentrantLock() # needed for adding new timers on different threads
+"""
+    get_timer(name::String)
+
+Returns the `TimerOutput` associated with `name`.
+If no timers are associated with `name`, a new `TimerOutput` will be created.
+"""
+function get_timer(name::String)
+    lock(_timers_lock) do
+        if !haskey(_timers, name)
+            _timers[name] = TimerOutput(name)
+        end
+        return _timers[name]
+    end
+end
 
 # push! and pop!
 function Base.push!(to::TimerOutput, label::String)
