@@ -542,7 +542,7 @@ end
     @test match(r"cccc", table).offset < match(r"bbbb", table).offset < match(r"aaaa", table).offset
 end
 
-if isdefined(Threads, Symbol("@spawn"))
+@static if isdefined(Threads, Symbol("@spawn"))
 @testset "merge at custom points during multithreading" begin
     to = TimerOutput()
     @timeit to "1" begin
