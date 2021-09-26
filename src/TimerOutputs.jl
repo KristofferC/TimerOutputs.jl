@@ -1,6 +1,7 @@
 module TimerOutputs
 
 using ExprTools
+import Tables
 
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
@@ -17,12 +18,17 @@ else
     end
 end
 
+if !@isdefined(fieldtypes)
+    fieldtypes(T) = Tuple([fieldtype(T, i) for i in 1:fieldcount(T)])
+end
+
 using Printf
 
 
 include("TimerOutput.jl")
 include("show.jl")
 include("utilities.jl")
+include("tables.jl")
 
 if Base.VERSION >= v"1.4.2"
     include("precompile.jl")

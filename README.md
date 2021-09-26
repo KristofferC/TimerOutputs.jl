@@ -353,6 +353,24 @@ julia> TimerOutputs.totallocated(to)
 7632
 ```
 
+## Exporting data
+
+The `TimerOutput` type implements the [Tables.jl](https://github.com/JuliaData/Tables.jl)
+interface. Thus, it works with various data-processing packages such as DataFrames.jl.
+For example, use `DataFrame(to)` (where `to isa TimerOutput`) to create a data frame 
+containing the timing and GC information.
+
+The output table has the following columns:
+
+* `name`: A tuple of strings. The i-th element is the label of the i-the level.
+* `ncalls`: The number of times `@timeit` is evaluated.
+* `time`: The time (nanoseconds) spent, excluding inner `@timeit` sections if any.
+* `tottime`: The time (nanoseconds) spent, including inner `@timeit` sections if any.
+* `allocated`: The number of bytes allocated, excluding inner `@timeit` sections if any.
+* `totallocated`: The number of bytes allocated, including inner `@timeit` sections if any.
+* `isleaf`: `true` if the corresponding `@timeit` does not have inner `@timeit`;
+   `false` otherwise.
+
 ## Default Timer
 
 It is often the case that it is enough to only use one timer. For convenience, there is therefore a version of
