@@ -1,9 +1,8 @@
 using TimerOutputs
 using Test
-using JSON3
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
-                     prettytime, prettymemory, prettypercent, prettycount
+                     prettytime, prettymemory, prettypercent, prettycount, todict
 
 reset_timer!()
 
@@ -655,18 +654,18 @@ end
     end
     @timeit to "baz" identity(nothing)
 
-    roundtrip = JSON3.read(JSON3.write(to))
 
-    function compare(to, json_object)
-        @test TimerOutputs.tottime(to) == json_object.total_time_ns
-        @test TimerOutputs.ncalls(to) == json_object.n_calls
-        @test TimerOutputs.totallocated(to) == json_object.total_allocated_bytes
-        @test TimerOutputs.allocated(to) == json_object.allocated_bytes
-        @test TimerOutputs.time(to) == json_object.time_ns
-        for ((k1, timer), (k2, obj)) in zip(to.inner_timers, json_object.inner_timers)
-            @test k1 == string(k2)
+    function compare(to, d)
+        @test TimerOutputs.tottime(to) == d["total_time_ns"]
+        @test TimerOutputs.ncalls(to) == d["n_calls"]
+        @test TimerOutputs.totallocated(to) == d["total_allocated_bytes"]
+        @test TimerOutputs.allocated(to) == d["allocated_bytes"]
+        @test TimerOutputs.time(to) == d["time_ns"]
+        for ((k1, timer), (k2, obj)) in zip(to.inner_timers, d["inner_timers"])
+            @test k1 == k2
             compare(timer, obj)
         end
     end
-    compare(to, roundtrip)
+    
+    compare(to, todict(to))
 end

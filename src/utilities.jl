@@ -101,16 +101,25 @@ end
 # Serialization #
 #################
 
-StructTypes.StructType(::Type{TimerOutput}) = StructTypes.DictType()
-StructTypes.keyvaluepairs(to::TimerOutput) = pairs(timer_dict(to))
+"""
+    todict(to::TimerOutput) -> Dict{String, Any}
 
-function timer_dict(to::TimerOutput)
+Converts a `TimerOutput` into a nested set of dictionaries, with keys and value types:
+
+* `"n_calls"`: `Int`
+* `"time_ns"`: `Int`
+* `"allocated_bytes"`: `Int`
+* `"total_allocated_bytes"`: `Int`
+* `"total_time_ns"`: `Int`
+* `"inner_timers"`: `Dict{String, Dict{String, Any}}`
+"""
+function todict(to::TimerOutput)
     return Dict{String,Any}(
         "n_calls" => ncalls(to),
         "time_ns" => time(to),
         "allocated_bytes" => allocated(to),
         "total_allocated_bytes" => totallocated(to),
         "total_time_ns" => tottime(to),
-        "inner_timers" => Dict{String, Any}(k => timer_dict(v) for (k,v) in to.inner_timers)
+        "inner_timers" => Dict{String, Any}(k => todict(v) for (k,v) in to.inner_timers)
     )
 end
