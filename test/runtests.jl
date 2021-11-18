@@ -1,5 +1,6 @@
 using TimerOutputs
 using Test
+using JSON3
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
                      prettytime, prettymemory, prettypercent, prettycount
@@ -642,4 +643,30 @@ end
     @test ncalls(to32.inner_timers["3.2.1"]) == 1
     @test !in("3.1.1", collect(keys(to32.inner_timers)))
 end
+end
+
+@testset "Serialization" begin
+    # Setup a timer
+    to = TimerOutput()
+    @timeit to "foo" identity(nothing)
+    @timeit to "foobar" begin
+        @timeit to "foo" identity(nothing)
+        @timeit to "baz" identity(nothing)
+    end
+    @timeit to "baz" identity(nothing)
+
+    roundtrip = JSON3.read(JSON3.write(to))
+
+    function compare(to, json_object)
+        @test TimerOutputs.tottime(to) == json_object.total_time_ns
+        @test TimerOutputs.ncalls(to) == json_object.n_calls
+        @test TimerOutputs.totallocated(to) == json_object.total_allocated_bytes
+        @test TimerOutputs.allocated(to) == json_object.allocated_bytes
+        @test TimerOutputs.time(to) == json_object.time_ns
+        for ((k1, timer), (k2, obj)) in zip(to.inner_timers, json_object.inner_timers)
+            @test k1 == string(k2)
+            compare(timer, obj)
+        end
+    end
+    compare(to, roundtrip)
 end

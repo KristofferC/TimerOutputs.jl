@@ -97,3 +97,20 @@ function rpad(
     r == 0 ? string(s, p^q) : string(s, p^q, first(p, r))
 end
 
+#################
+# Serialization #
+#################
+
+StructTypes.StructType(::Type{TimerOutput}) = StructTypes.DictType()
+StructTypes.keyvaluepairs(to::TimerOutput) = pairs(timer_dict(to))
+
+function timer_dict(to::TimerOutput)
+    return Dict{String,Any}(
+        "n_calls" => ncalls(to),
+        "time_ns" => time(to),
+        "allocated_bytes" => allocated(to),
+        "total_allocated_bytes" => totallocated(to),
+        "total_time_ns" => tottime(to),
+        "inner_timers" => Dict{String, Any}(k => timer_dict(v) for (k,v) in to.inner_timers)
+    )
+end
