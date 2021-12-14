@@ -7,8 +7,8 @@ ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
-julia = "1"
 ExprTools = "0.1.0"
+julia = "1"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

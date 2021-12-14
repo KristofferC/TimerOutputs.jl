@@ -2,7 +2,7 @@ using TimerOutputs
 using Test
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
-                     prettytime, prettymemory, prettypercent, prettycount
+                     prettytime, prettymemory, prettypercent, prettycount, todict
 
 reset_timer!()
 
@@ -642,4 +642,30 @@ end
     @test ncalls(to32.inner_timers["3.2.1"]) == 1
     @test !in("3.1.1", collect(keys(to32.inner_timers)))
 end
+end
+
+@testset "Serialization" begin
+    # Setup a timer
+    to = TimerOutput()
+    @timeit to "foo" identity(nothing)
+    @timeit to "foobar" begin
+        @timeit to "foo" identity(nothing)
+        @timeit to "baz" identity(nothing)
+    end
+    @timeit to "baz" identity(nothing)
+
+
+    function compare(to, d)
+        @test TimerOutputs.tottime(to) == d["total_time_ns"]
+        @test TimerOutputs.ncalls(to) == d["n_calls"]
+        @test TimerOutputs.totallocated(to) == d["total_allocated_bytes"]
+        @test TimerOutputs.allocated(to) == d["allocated_bytes"]
+        @test TimerOutputs.time(to) == d["time_ns"]
+        for ((k1, timer), (k2, obj)) in zip(to.inner_timers, d["inner_timers"])
+            @test k1 == k2
+            compare(timer, obj)
+        end
+    end
+    
+    compare(to, todict(to))
 end
