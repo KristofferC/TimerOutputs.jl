@@ -53,14 +53,10 @@ function prettypercent(nominator, denominator)
         str = " - %"
     elseif denominator == 0
         str = "inf %"
-    elseif round(value) >= 100
-        str = string(@sprintf("%.0f", value), "%")
-    elseif round(value * 10) >= 100
-        str = string(@sprintf("%.1f", value), "%")
     else
-        str = string(@sprintf("%.2f", value), "%")
+        str = string(@sprintf("%.1f", value), "%")
     end
-    return str
+    return lpad(str, 6, " ")
 end
 
 function prettycount(t::Integer)

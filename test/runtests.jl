@@ -271,7 +271,7 @@ for (b, str) in ((9.999*1024,   "10.0KiB"), (99.999*1024,   " 100KiB"),
                  (9.999*1024^3, "10.0GiB"), (99.999*1024^3, " 100GiB"))
     @test prettymemory(b)   == str
 end
-for (num, den, str) in ((0.9999, 1, "100%"), (0.09999, 1, "10.0%"))
+for (num, den, str) in ((0.9999, 1, "100.0%"), (0.09999, 1, " 10.0%"))
     @test prettypercent(num, den) == str
 end
 for (t, str) in ((9.999*1024,   "10.0KiB"), (99.999*1024,   " 100KiB"),
