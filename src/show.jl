@@ -35,7 +35,9 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     name_length = max(9, max_name - max(0, requested_width - available_width))
 
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact, title)
-    for timer in sort!(collect(values(to.inner_timers)); rev = !in(sortby, [:name, :firstexec]), by = x -> sortf(x, sortby))
+    rev = !in(sortby, [:name, :firstexec])
+    by(x) = sortf(x, sortby)
+    for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
         _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
     end
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
@@ -156,7 +158,9 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     end
     print(io, "\n")
 
-    for timer in sort!(collect(values(to.inner_timers)), rev = sortby != :name, by = x -> sortf(x, sortby))
+    rev = !in(sortby, [:name, :firstexec])
+    by(x) = sortf(x, sortby)
+    for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
         _print_timer(io, timer, ∑t, ∑b, indent + 2, name_length, allocations, sortby, compact)
     end
 end
