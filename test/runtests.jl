@@ -559,20 +559,20 @@ end
     @timeit to "cccc" sleep(0.1)
 
     table = sprint((io, to)->show(io, to, sortby = :firstexec), to)
-
     @test match(r"cccc", table).offset < match(r"bbbb", table).offset < match(r"aaaa", table).offset
 
     to = TimerOutput()
     @timeit to "group" begin
-        @timeit to "cccc" sleep(0.1)
+        @timeit to "aaaa" sleep(0.1)
         @timeit to "bbbb" sleep(0.1)
         @timeit to "nested_group" begin sleep(0.1)
-            @timeit to "aaaa" sleep(0.1)
             @timeit to "cccc" sleep(0.1)
+            @timeit to "dddd" sleep(0.1)
         end
     end
 
-    @test match(r"cccc", table).offset < match(r"bbbb", table).offset < match(r"aaaa", table).offset
+    table = sprint((io, to)->show(io, to, sortby = :firstexec), to)
+    @test match(r"aaaa", table).offset < match(r"bbbb", table).offset < match(r"cccc", table).offset
 end
 
 @static if isdefined(Threads, Symbol("@spawn"))
