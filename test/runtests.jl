@@ -564,10 +564,9 @@ end
     to = TimerOutput()
     @timeit to "group" begin
         @timeit to "aaaa" sleep(0.1)
-        @timeit to "bbbb" sleep(0.1)
         @timeit to "nested_group" begin sleep(0.1)
+            @timeit to "bbbb" sleep(0.1)
             @timeit to "cccc" sleep(0.1)
-            @timeit to "dddd" sleep(0.1)
         end
     end
 
