@@ -9,8 +9,12 @@ function prettytime(t)
         value, units = t / 1e3, "μs"
     elseif t < 1e9
         value, units = t / 1e6, "ms"
-    else
+    elseif t < 60e9
         value, units = t / 1e9, "s"
+    elseif t < 360e9
+        value, units = t / 60e9, "m"
+    else
+        value, units = t / 360e9, "h"
     end
 
     if round(value) >= 100
@@ -30,8 +34,14 @@ function prettymemory(b)
         value, units = b / 1024, "KiB"
     elseif b < 1000^3
         value, units = b / 1024^2, "MiB"
-    else
+    elseif b < 1000^4
         value, units = b / 1024^3, "GiB"
+    elseif b < 1000^5
+        value, units = b / 1024^4, "TiB"
+    elseif b < 1000^6
+        value, units = b / 1024^5, "PiB"
+    else
+        value, units = b / 1024^6, "EiB"
     end
 
     if round(value) >= 100
