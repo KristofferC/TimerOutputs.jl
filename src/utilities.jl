@@ -9,9 +9,9 @@ function prettytime(t)
         value, units = t / 1e3, "μs"
     elseif t < 1e9
         value, units = t / 1e6, "ms"
-    elseif t <60e9
+    elseif t < 60e9
         value, units = t / 1e9, "s"
-    elseif t <360e9
+    elseif t < 360e9
         value, units = t / 60e9, "m"
     else
         value, units = t / 360e9, "h"
