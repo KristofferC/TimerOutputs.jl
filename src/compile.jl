@@ -1,3 +1,8 @@
+# To make it less likely that users measure TimerOutputs compilation time.
+let
+    to = TimerOutput()
+    @timeit to "1" string(1)
+end
 
 function _precompile_()
   ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
