@@ -11,10 +11,10 @@ function prettytime(t)
         value, units = t / 1e6, "ms"
     elseif t < 60e9
         value, units = t / 1e9, "s"
-    elseif t < 360e9
+    elseif t < 3600e9
         value, units = t / 60e9, "m"
     else
-        value, units = t / 360e9, "h"
+        value, units = t / 3600e9, "h"
     end
 
     if round(value) >= 100
