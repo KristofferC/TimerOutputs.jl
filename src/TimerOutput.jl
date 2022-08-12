@@ -92,6 +92,7 @@ function Base.push!(to::TimerOutput, label::String)
             timer = maybe_timer
         end
     end
+    timer = timer::TimerOutput
     current_timer.prev_timer_label = label
     current_timer.prev_timer = timer
 
