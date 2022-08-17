@@ -35,7 +35,9 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     name_length = max(9, max_name - max(0, requested_width - available_width))
 
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact, title)
-    for timer in sort!(collect(values(to.inner_timers)); rev = !in(sortby, [:name, :firstexec]), by = x -> sortf(x, sortby))
+    rev = !in(sortby, [:name, :firstexec])
+    by(x) = sortf(x, sortby)
+    for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
         _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
     end
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
@@ -68,8 +70,8 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     midrule       = linechars == :unicode ? "─" : "-"
     topbottomrule = linechars == :unicode ? "─" : "-"
     sec_ncalls = string(rpad("Section", name_length, " "), " ncalls  ")
-    time_headers = "   time   %tot" * (compact ? "" : "     avg")
-    alloc_headers = allocations ? ("  alloc   %tot" * (compact ? "" : "      avg")) : ""
+    time_headers = "   time    %tot" * (compact ? "" : "     avg")
+    alloc_headers = allocations ? ("  alloc    %tot" * (compact ? "" : "      avg")) : ""
     total_table_width = sum(textwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
 
     # Just hardcoded shit to make things look nice
@@ -86,17 +88,17 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         title = center(truncdots(title, textwidth(sec_ncalls)), textwidth(sec_ncalls))
 
         if compact
-            time_header       = "     Time     "
+            time_header       = "      Time     "
         else
-            time_header       = "        Time          "
+            time_header       = "         Time          "
         end
 
         time_underline = midrule^textwidth(time_header)
 
         if compact
-            allocation_header       = " Allocations  "
+            allocation_header       = "  Allocations  "
         else
-            allocation_header = "      Allocations      "
+            allocation_header = "       Allocations      "
         end
 
         alloc_underline = midrule^textwidth(allocation_header)
@@ -156,7 +158,9 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     end
     print(io, "\n")
 
-    for timer in sort!(collect(values(to.inner_timers)), rev = sortby != :name, by = x -> sortf(x, sortby))
+    rev = !in(sortby, [:name, :firstexec])
+    by(x) = sortf(x, sortby)
+    for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
         _print_timer(io, timer, ∑t, ∑b, indent + 2, name_length, allocations, sortby, compact)
     end
 end

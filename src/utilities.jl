@@ -9,8 +9,11 @@ function prettytime(t)
         value, units = t / 1e3, "μs"
     elseif t < 1e9
         value, units = t / 1e6, "ms"
-    else
+    elseif t < 3600e9
         value, units = t / 1e9, "s"
+    # We intentionally do not show minutes
+    else
+        value, units = t / 3600e9, "h"
     end
 
     if round(value) >= 100
@@ -30,8 +33,14 @@ function prettymemory(b)
         value, units = b / 1024, "KiB"
     elseif b < 1000^3
         value, units = b / 1024^2, "MiB"
-    else
+    elseif b < 1000^4
         value, units = b / 1024^3, "GiB"
+    elseif b < 1000^5
+        value, units = b / 1024^4, "TiB"
+    elseif b < 1000^6
+        value, units = b / 1024^5, "PiB"
+    else
+        value, units = b / 1024^6, "EiB"
     end
 
     if round(value) >= 100
@@ -53,14 +62,10 @@ function prettypercent(nominator, denominator)
         str = " - %"
     elseif denominator == 0
         str = "inf %"
-    elseif round(value) >= 100
-        str = string(@sprintf("%.0f", value), "%")
-    elseif round(value * 10) >= 100
-        str = string(@sprintf("%.1f", value), "%")
     else
-        str = string(@sprintf("%.2f", value), "%")
+        str = string(@sprintf("%.1f", value), "%")
     end
-    return str
+    return lpad(str, 6, " ")
 end
 
 function prettycount(t::Integer)
@@ -97,3 +102,29 @@ function rpad(
     r == 0 ? string(s, p^q) : string(s, p^q, first(p, r))
 end
 
+#################
+# Serialization #
+#################
+
+"""
+    todict(to::TimerOutput) -> Dict{String, Any}
+
+Converts a `TimerOutput` into a nested set of dictionaries, with keys and value types:
+
+* `"n_calls"`: `Int`
+* `"time_ns"`: `Int`
+* `"allocated_bytes"`: `Int`
+* `"total_allocated_bytes"`: `Int`
+* `"total_time_ns"`: `Int`
+* `"inner_timers"`: `Dict{String, Dict{String, Any}}`
+"""
+function todict(to::TimerOutput)
+    return Dict{String,Any}(
+        "n_calls" => ncalls(to),
+        "time_ns" => time(to),
+        "allocated_bytes" => allocated(to),
+        "total_allocated_bytes" => totallocated(to),
+        "total_time_ns" => tottime(to),
+        "inner_timers" => Dict{String, Any}(k => todict(v) for (k,v) in to.inner_timers)
+    )
+end
