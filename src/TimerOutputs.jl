@@ -29,5 +29,9 @@ if Base.VERSION >= v"1.4.2"
     _precompile_()
 end
 
+function __init__()
+    # Reset DEFAULT_TIMER; otherwise starting time is the time of precompile
+    reset_timer!()
+end
 
 end # module
