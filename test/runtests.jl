@@ -680,3 +680,19 @@ end
     
     compare(to, todict(to))
 end
+
+@testset "InstrumentedFunctions" begin
+    to = TimerOutput()
+    f = to(x -> x^2, "f")
+    @test isempty(to.inner_timers)
+    f(1)
+    @test ncalls(to.inner_timers["f"]) == 1
+    h = to(x -> f(x) + 1, "h")
+    h(1)
+    @test ncalls(to.inner_timers["h"]) == 1
+    @test ncalls(to.inner_timers["h"].inner_timers["f"]) == 1
+    s = x -> x+1
+    t = to(s)
+    t(1)
+    ncalls(to.inner_timers[repr(s)]) == 1
+end

@@ -105,6 +105,11 @@ end
 
 funcdef(2)
 
+# Or to instrument an existing function:
+foo(x) = x + 1
+timed_foo = to(foo)
+timed_foo(5)
+
 # Print the timings in the default way
 show(to)
 ```
@@ -115,24 +120,25 @@ spent in each section since `to` was created as well as averages (per call).
 Similar information is available for allocations:
 
 ```
- ──────────────────────────────────────────────────────────────────────
-                               Time                   Allocations
-                       ──────────────────────   ───────────────────────
-   Tot / % measured:        5.09s / 56.0%            106MiB / 74.6%
+ ────────────────────────────────────────────────────────────────────────
+                                Time                    Allocations      
+                       ───────────────────────   ────────────────────────
+   Tot / % measured:        7.99s /  39.1%            207MiB /  46.7%    
 
- Section       ncalls     time   %tot     avg     alloc   %tot      avg
- ──────────────────────────────────────────────────────────────────────
- sleep            101    1.17s  41.2%  11.6ms   1.48MiB  1.88%  15.0KiB
- nest 2             1    703ms  24.6%   703ms   2.38KiB  0.00%  2.38KiB
-   level 2.2        1    402ms  14.1%   402ms      368B  0.00%   368.0B
-   level 2.1        1    301ms  10.6%   301ms      368B  0.00%   368.0B
- throwing           1    502ms  17.6%   502ms      384B  0.00%   384.0B
- nest 1             1    396ms  13.9%   396ms   5.11KiB  0.01%  5.11KiB
-   level 2.2        1    201ms  7.06%   201ms      368B  0.00%   368.0B
-   level 2.1        3   93.5ms  3.28%  31.2ms   1.08KiB  0.00%   368.0B
- randoms            1   77.5ms  2.72%  77.5ms   77.3MiB  98.1%  77.3MiB
- funcdef            1   2.66μs  0.00%  2.66μs         -  0.00%        -
- ──────────────────────────────────────────────────────────────────────
+ Section       ncalls     time    %tot     avg     alloc    %tot      avg
+ ────────────────────────────────────────────────────────────────────────
+ sleep            101    1.36s   43.4%  13.4ms   23.3KiB    0.0%     236B
+ nest 2             1    711ms   22.8%   711ms   2.05KiB    0.0%  2.05KiB
+   level 2.2        1    405ms   13.0%   405ms      144B    0.0%     144B
+   level 2.1        1    306ms    9.8%   306ms      448B    0.0%     448B
+ throwing           1    517ms   16.6%   517ms      912B    0.0%     912B
+ nest 1             1    417ms   13.4%   417ms   2.17KiB    0.0%  2.17KiB
+   level 2.2        1    202ms    6.5%   202ms      144B    0.0%     144B
+   level 2.1        3    108ms    3.5%  36.0ms      432B    0.0%     144B
+ randoms            1    120ms    3.8%   120ms   96.5MiB  100.0%  96.5MiB
+ funcdef            1   94.4μs    0.0%  94.4μs     0.00B    0.0%    0.00B
+ foo                1   1.50μs    0.0%  1.50μs     0.00B    0.0%    0.00B
+ ────────────────────────────────────────────────────────────────────────
 ```
 
 ## Settings for printing:
