@@ -142,7 +142,15 @@ struct InstrumentedFunction{F} <: Function
     name::String
 end
 
-InstrumentedFunction(f, t) = InstrumentedFunction(f, t, string(repr(f)))
+function funcname(f::F) where {F}
+    if @generated
+        string(repr(F.instance))
+    else
+        string(repr(f))
+    end
+end
+
+InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
 
 function (inst::InstrumentedFunction)(args...; kwargs...)
     @timeit inst.t inst.name inst.func(args...; kwargs...)
@@ -155,4 +163,4 @@ Instruments `f` by the [`TimerOutput`](@ref) `t` returning an `InstrumentedFunct
 This function can be used just like `f`, but whenever it is called it stores timing
 results in `t`.
 """
-(t::TimerOutput)(f, name=string(repr(f))) = InstrumentedFunction(f, t, name)
+(t::TimerOutput)(f, name=funcname(f)) = InstrumentedFunction(f, t, name)
