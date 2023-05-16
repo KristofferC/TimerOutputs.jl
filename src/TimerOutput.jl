@@ -246,15 +246,15 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
     end
 
     if is_debug
-        return quote
+        return Base.remove_linenums!(quote
             if $m.timeit_debug_enabled()
                 $timeit_block
             else
                 $ex
             end
-        end
+        end)
     else
-        return timeit_block
+        return Base.remove_linenums!(timeit_block)
     end
 end
 
