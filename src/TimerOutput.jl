@@ -57,22 +57,12 @@ mutable struct TimerOutput
     @atomic children::LList{TimerOutput}
 
 end
-function TimerOutput(name::String = "root", parent=nothing)
+function TimerOutput(name::String = "", parent=nothing)
     return TimerOutput(name, parent, nothing, LList{TimerOutput}())
 end
-
-# function Base.show(io::IO, to::TimerOutput)
-#     print(io, TimerOutput, "(")
-#     show(io, to.name)
-#     print(io, ", ")
-#     show(io, @atomic(to.data))
-#     print(io, ", ")
-#     show(io, @atomic(to.children))
-#     print(io, ")")
-# end
-
 const TIMER = ScopedValue(TimerOutput())
 
+isroot(to::TimerOutput) = to.parent === nothing
 
 function register!(to::TimerOutput)
     # Note: Don't call register twice
@@ -95,17 +85,6 @@ function finish!(to::TimerOutput, t₀, b₀)
     register!(to)
 end
 
-# Only sum the highest parents
-function totmeasured(to::TimerOutput)
-    t, b = Int64(0), Int64(0)
-    for child in to.children
-        timedata = child.data
-        t += timedata.time
-        b += timedata.allocs
-    end
-    return t, b
-end
-
 function longest_name(to::TimerOutput, indent = 0)
     m = textwidth(to.name) + indent
     for child in to.children
@@ -122,17 +101,12 @@ end
 ncalls(to::TimerOutput) = to.data.ncalls
 allocated(to::TimerOutput) = to.data.allocs
 time(to::TimerOutput) = to._data.time
-totallocated(to::TimerOutput) = totmeasured(to)[2]
-tottime(to::TimerOutput) = totmeasured(to)[1]
 
 time() = time(TIMER[])
 ncalls() = ncalls(TIMER[])
 allocated() = allocated(TIMER[])
-totallocated() = totmeasured(TIMER[])[2]
-tottime() = totmeasured(TIMER[])[1]
 
-get_defaulttimer() = TIMER[]
-Base.@deprecate get_defaultimer get_defaulttimer
+current_timer() = TIMER[]
 
 # Macro
 macro timeit(args...)
@@ -238,7 +212,6 @@ end
 
 function merge(self::TimerOutput, other::Union{TimerOutput, Nothing}=nothing)
     if other !== nothing
-        @assert self.parent == other.parent
         @assert self.name == other.name
 
         data = self.data + other.data
