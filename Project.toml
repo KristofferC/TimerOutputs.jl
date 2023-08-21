@@ -1,14 +1,16 @@
 name = "TimerOutputs"
 uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
-version = "0.5.23"
+version = "0.6.0"
 
 [deps]
 ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
 
 [compat]
 ExprTools = "0.1.0"
-julia = "1"
+ScopedValues = "1.0.0"
+julia = "1.8"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

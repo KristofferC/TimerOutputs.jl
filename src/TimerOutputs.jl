@@ -1,6 +1,7 @@
 module TimerOutputs
 
 using ExprTools
+using ScopedValues
 
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
@@ -24,10 +25,10 @@ include("TimerOutput.jl")
 include("show.jl")
 include("utilities.jl")
 
-if Base.VERSION >= v"1.4.2"
-    include("compile.jl")
-    _precompile_()
-end
+# if Base.VERSION >= v"1.4.2"
+#     include("compile.jl")
+#     _precompile_()
+# end
 
 function __init__()
     # Reset DEFAULT_TIMER; otherwise starting time is the time of precompile
