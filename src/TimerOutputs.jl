@@ -1,6 +1,7 @@
 module TimerOutputs
 
 using ExprTools
+using ScopedValues
 
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,

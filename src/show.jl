@@ -4,14 +4,20 @@ print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
 print_timer(io::IO, to::TimerOutput; kwargs...) = (show(io, to; kwargs...); println(io))
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
-function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
-    sortby  in (:time, :ncalls, :allocations, :name, :firstexec) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
+function Base.show(io::IO, to::TimerOutput;
+    allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode,
+    compact::Bool = false, title::String = "")
+
+    sortby  in (:time, :ncalls, :allocations, :name) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
-    t₀, b₀ = to.start_data.time, to.start_data.allocs
-    t₁, b₁ = time_ns(), gc_bytes()
-    Δt, Δb = t₁ - t₀, b₁ - b₀
-    ∑t, ∑b = to.flattened ? to.totmeasured : totmeasured(to)
+    to = merge(to)
+    if !isroot(to)
+        data = to.data
+    else
+        data = sum(child->child.data, to.children, init=TimeData())
+    end
+    ∑t, ∑b = data.time, data.allocs
 
     max_name = longest_name(to)
     available_width = displaysize(io)[2]
@@ -34,21 +40,20 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     #requested_width = 34 + (allocations ? 27 : 0) + max_name
     name_length = max(9, max_name - max(0, requested_width - available_width))
 
-    print_header(io, Δt, Δb, ∑t, ∑b, name_length, true, allocations, linechars, compact, title)
-    rev = !in(sortby, [:name, :firstexec])
+    print_header(io, ∑t, ∑b, name_length, true, allocations, linechars, compact, title)
+    rev = !in(sortby, (:name,))
     by(x) = sortf(x, sortby)
-    for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
+    for timer in sort!(collect(to.children); rev = rev, by = by)
         _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
     end
-    print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
+    print_header(io, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
 end
 
 function sortf(x, sortby)
-    sortby == :time        && return x.accumulated_data.time
-    sortby == :ncalls      && return x.accumulated_data.ncalls
-    sortby == :allocations && return x.accumulated_data.allocs
+    sortby == :time        && return x.data.time
+    sortby == :ncalls      && return x.data.ncalls
+    sortby == :allocations && return x.data.allocs
     sortby == :name        && return x.name
-    sortby == :firstexec   && return x.accumulated_data.firstexec
     error("internal error")
 end
 
@@ -64,7 +69,7 @@ function truncdots(str, n)
     return String(take!(io))
 end
 
-function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations, linechars, compact, title)
+function print_header(io, ∑t, ∑b, name_length, header, allocations, linechars, compact, title)
     global BOX_MODE, ALLOCATIONS_ENABLED
 
     midrule       = linechars == :unicode ? "─" : "-"
@@ -102,15 +107,10 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         end
 
         alloc_underline = midrule^textwidth(allocation_header)
-        #tot_meas_str = string(" ", rpad("Tot / % measured:", textwidth(sec_ncalls) - 1, " "))
-        if compact
-            tot_meas_str = center("Total measured:", textwidth(sec_ncalls))
-        else
-            tot_meas_str = center("Tot / % measured:", textwidth(sec_ncalls))
-        end
+        tot_meas_str = center("Total measured:", textwidth(sec_ncalls))
 
-        str_time =  center(string(prettytime(Δt),   compact ? "" : string(" / ", prettypercent(∑t, Δt))), textwidth(time_header))
-        str_alloc = center(string(prettymemory(Δb), compact ? "" : string(" / ", prettypercent(∑b, Δb))), textwidth(allocation_header))
+        str_time =  center(prettytime(∑t), textwidth(time_header))
+        str_alloc = center(prettymemory(∑b), textwidth(allocation_header))
 
         header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
@@ -137,13 +137,13 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 end
 
 function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, indent::Integer, name_length, allocations, sortby, compact)
-    accum_data = to.accumulated_data
-    t = accum_data.time
-    b = accum_data.allocs
+    data = to.data
+    t = data.time
+    b = data.allocs
+    nc = data.ncalls
 
     name = truncdots(to.name, name_length - indent)
     print(io, " ")
-    nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2 - indent))
     print(io, lpad(prettycount(nc), 5, " "))
 
@@ -158,9 +158,9 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     end
     print(io, "\n")
 
-    rev = !in(sortby, [:name, :firstexec])
+    rev = !in(sortby, (:name,))
     by(x) = sortf(x, sortby)
-    for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
+    for timer in sort!(collect(to.children); rev = rev, by = by)
         _print_timer(io, timer, ∑t, ∑b, indent + 2, name_length, allocations, sortby, compact)
     end
 end

@@ -120,12 +120,11 @@ Converts a `TimerOutput` into a nested set of dictionaries, with keys and value 
 """
 function todict(to::TimerOutput)
     return Dict{String,Any}(
-        "n_calls" => ncalls(to),
         "time_ns" => time(to),
         "allocated_bytes" => allocated(to),
         "total_allocated_bytes" => totallocated(to),
         "total_time_ns" => tottime(to),
-        "inner_timers" => Dict{String, Any}(k => todict(v) for (k,v) in to.inner_timers)
+        # "inner_timers" => Dict{String, Any}(k => todict(v) for (k,v) in to.inner_timers)
     )
 end
 
@@ -138,7 +137,6 @@ end
 # you that `f` is involved).
 struct InstrumentedFunction{F} <: Function
     func::F
-    t::TimerOutput
     name::String
 end
 
@@ -150,17 +148,8 @@ function funcname(f::F) where {F}
     end
 end
 
-InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
+InstrumentedFunction(f) = InstrumentedFunction(f, funcname(f))
 
-function (inst::InstrumentedFunction)(args...; kwargs...)
-    @timeit inst.t inst.name inst.func(args...; kwargs...)
-end
-
-"""
-    (t::TimerOutput)(f, name=string(repr(f))) -> InstrumentedFunction
-
-Instruments `f` by the [`TimerOutput`](@ref) `t` returning an `InstrumentedFunction`.
-This function can be used just like `f`, but whenever it is called it stores timing
-results in `t`.
-"""
-(t::TimerOutput)(f, name=funcname(f)) = InstrumentedFunction(f, t, name)
+# function (inst::InstrumentedFunction)(args...; kwargs...)
+#     @timeit inst.name inst.func(args...; kwargs...)
+# end
