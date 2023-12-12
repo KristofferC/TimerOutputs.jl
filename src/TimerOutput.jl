@@ -5,16 +5,18 @@ mutable struct TimeData
     ncalls::Int
     time::Int64
     allocs::Int64
+    nallocs::Int64
     firstexec::Int64
 end
-TimeData(ncalls, time, allocs) = TimeData(ncalls, time, allocs, time)
-Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
-TimeData() = TimeData(0, 0, 0, time_ns())
+TimeData(ncalls, time, allocs, nallocs) = TimeData(ncalls, time, allocs, nallocs, time)
+Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs, td.nallocs, td.firstexec)
+TimeData() = TimeData(0, 0, Base.gc_num().allocd, 0, time_ns())
 
 function Base.:+(self::TimeData, other::TimeData)
     TimeData(self.ncalls + other.ncalls,
              self.time + other.time,
              self.allocs + other.allocs,
+             self.nallocs + other.nallocs,
              min(self.firstexec, other.firstexec))
 end
 
@@ -34,7 +36,7 @@ mutable struct TimerOutput
     prev_timer::Union{TimerOutput,Nothing}
 
     function TimerOutput(label::String = "root")
-        start_data = TimeData(0, time_ns(), gc_bytes())
+        start_data = TimeData(0, time_ns(), Base.gc_num().allocd, 0) # ???
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
@@ -43,7 +45,8 @@ mutable struct TimerOutput
 
     # Jeez...
     TimerOutput(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
-    prev_timer) = new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
+    prev_timer) =
+            new(start_data, accumulated_data, inner_timers, timer_stack, name, flattened, enabled, totmeasured, prev_timer_label,
     prev_timer)
 
 end
@@ -104,13 +107,14 @@ Base.pop!(to::TimerOutput) = pop!(to.timer_stack)
 
 # Only sum the highest parents
 function totmeasured(to::TimerOutput)
-    t, b = Int64(0), Int64(0)
+    t, b, n = 0, 0, 0
     for section in values(to.inner_timers)
         timedata = section.accumulated_data
         t += timedata.time
         b += timedata.allocs
+        n += timedata.nallocs
     end
-    return t, b
+    return t, b, n
 end
 
 function longest_name(to::TimerOutput, indent = 0)
@@ -225,22 +229,33 @@ function timer_expr(m::Module, is_debug::Bool, to, label, ex::Expr)
 end
 
 function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
-    @gensym local_to enabled accumulated_data b₀ t₀ val
+    @gensym local_to enabled accumulated_data t₀ val stats elapsedtime compile_elapsedtimes diff
     timeit_block = quote
         $local_to = $to
         $enabled = $local_to.enabled
         if $enabled
             $accumulated_data = $(push!)($local_to, $label)
         end
-        $b₀ = $(gc_bytes)()
-        $t₀ = $(time_ns)()
+        Base.cumulative_compile_timing(true)
+        $stats = Base.gc_num()
+        $elapsedtime = Base.time_ns()
+        Base.cumulative_compile_timing(true)
+        $compile_elapsedtimes = Base.cumulative_compile_time_ns()
         $(Expr(:tryfinally,
             :($val = $ex),
             quote
                 if $enabled
-                    $(do_accumulate!)($accumulated_data, $t₀, $b₀)
+                    $diff = Base.GC_Diff(Base.gc_num(), $stats)
+                    $compile_elapsedtimes = Base.cumulative_compile_time_ns() .- $compile_elapsedtimes
+
+                    $accumulated_data.time += Base.time_ns() - $elapsedtime
+                    $accumulated_data.allocs += $diff.allocd
+                    $accumulated_data.nallocs += Base.gc_alloc_count($diff)
+                    $accumulated_data.ncalls += 1
+
                     $(pop!)($local_to)
                 end
+                Base.cumulative_compile_timing(false)
             end))
         $val
     end
@@ -278,17 +293,11 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothin
     return esc(combinedef(def))
 end
 
-function do_accumulate!(accumulated_data, t₀, b₀)
-    accumulated_data.time += time_ns() - t₀
-    accumulated_data.allocs += gc_bytes() - b₀
-    accumulated_data.ncalls += 1
-end
-
 
 reset_timer!() = reset_timer!(DEFAULT_TIMER)
 function reset_timer!(to::TimerOutput)
     to.inner_timers = Dict{String,TimerOutput}()
-    to.start_data = TimeData(0, time_ns(), gc_bytes())
+    to.start_data = TimeData(0, time_ns(), Base.gc_num().allocd, 0) # ???
     to.accumulated_data = TimeData()
     to.prev_timer_label = ""
     to.prev_timer = nothing
@@ -363,16 +372,19 @@ function complement!(to::TimerOutput)
     end
     tot_time = to.accumulated_data.time
     tot_allocs = to.accumulated_data.allocs
+    tot_nallocs = to.accumulated_data.nallocs
     for timer in values(to.inner_timers)
         tot_time -= timer.accumulated_data.time
         tot_allocs -= timer.accumulated_data.allocs
+        tot_nallocs -= timer.accumulated_data.nallocs
         complement!(timer)
     end
     tot_time = max(tot_time, 0)
     tot_allocs = max(tot_allocs, 0)
+    tot_nallocs = max(tot_nallocs, 0)
     if !(to.name in ["root", "Flattened"])
         name = string("~", to.name, "~")
-        timer = TimerOutput(to.start_data, TimeData(max(1,to.accumulated_data.ncalls), tot_time, tot_allocs), Dict{String,TimerOutput}(), TimerOutput[], name, false, true, (tot_time, tot_allocs), to.name, to)
+        timer = TimerOutput(to.start_data, TimeData(max(1,to.accumulated_data.ncalls), tot_time, tot_allocs, tot_nallocs), Dict{String,TimerOutput}(), TimerOutput[], name, false, true, (tot_time, tot_allocs), to.name, to)
         to.inner_timers[name] = timer
     end
     return to

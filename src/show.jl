@@ -9,7 +9,7 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
     t₀, b₀ = to.start_data.time, to.start_data.allocs
-    t₁, b₁ = time_ns(), gc_bytes()
+    t₁, b₁ = time_ns(), Base.gc_num().allocd
     Δt, Δb = t₁ - t₀, b₁ - b₀
     ∑t, ∑b = to.flattened ? to.totmeasured : totmeasured(to)
 
