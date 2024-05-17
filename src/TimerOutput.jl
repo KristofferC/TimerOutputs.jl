@@ -125,7 +125,7 @@ end
 # merging timer outputs
 const merge_lock = ReentrantLock() # needed for merges of objects on different threads
 
-Base.merge(others::TimerOutput...) = merge!(TimerOutput(), others...)
+Base.merge(self::TimerOutput, others::TimerOutput...) = merge!(TimerOutput(), self, others...)
 function Base.merge!(self::TimerOutput, others::TimerOutput...; tree_point = String[])
     lock(merge_lock) do
         for other in others
