@@ -512,7 +512,10 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
 
     @timeit to3 "bar" identity(nothing)
 
+    @test_throws MethodError merge()
+
     to_merged = merge(to1, to2, to3)
+    @test to_merged !== to1
     merge!(to1, to2, to3)
 
     for to in [to1, to_merged]
