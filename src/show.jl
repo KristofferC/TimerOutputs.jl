@@ -114,25 +114,25 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 
         header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
-        printstyled(io, " ", topbottomrule^total_table_width, "\n"; bold=true)
+        printstyled(io, topbottomrule^total_table_width, "\n"; bold=true)
         if ! (allocations == false && compact == true)
-            printstyled(io, " ", title; bold=true)
+            printstyled(io, title; bold=true)
             print(io, time_header)
             allocations && print(io, "   ", allocation_header)
             print(io, "\n")
-            print(io, " ", time_alloc_pading, time_underline)
+            print(io, time_alloc_pading, time_underline)
             allocations && print(io, "   ", alloc_underline)
             print(io, "\n")
-            print(io, " ", tot_meas_str, str_time)
+            print(io, tot_meas_str, str_time)
             allocations && print(io, "   ", str_alloc)
             print(io, "\n\n")
         end
-        print(io, " ", sec_ncalls, time_headers)
+        print(io, sec_ncalls, time_headers)
         allocations && print(io, "   ", alloc_headers)
         print(io, "\n")
-        print(io, " ", midrule^total_table_width, "\n")
+        print(io, midrule^total_table_width, "\n")
     else
-        printstyled(io, " ", topbottomrule^total_table_width; bold=true)
+        printstyled(io, topbottomrule^total_table_width; bold=true)
     end
 end
 
@@ -142,7 +142,6 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     b = accum_data.allocs
 
     name = truncdots(to.name, name_length - indent)
-    print(io, " ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2 - indent))
     print(io, lpad(prettycount(nc), 5, " "))
