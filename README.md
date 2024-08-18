@@ -3,9 +3,9 @@
 [![Build Status](https://travis-ci.com/KristofferC/TimerOutputs.jl.svg?branch=master)](https://travis-ci.com/KristofferC/TimerOutputs.jl) [![codecov](https://codecov.io/gh/KristofferC/TimerOutputs.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/KristofferC/TimerOutputs.jl)
 
 `TimerOutputs` is a small Julia package that is used to generate formatted output from timings made in different sections of a program.
-It's main functionality is the `@timeit` macro, similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
+Its main functionality is the `@timeit` macro, similar to the `@time` macro in Base except one also assigns a label to the code section being timed.
 Multiple calls to code sections with the same label (and in the same "scope") will accumulate the data for that label.
-After the program has executed, it is possible to print a nicely formatted table presenting how much time, allocations and number of calls were made in each section.
+After the program has been executed, it is possible to print a nicely formatted table presenting how much time, allocations and number of calls were made in each section.
 The output can be customized as to only show the things you are interested in.
 
 If you find this package useful please give it a star. I like stars and it also helps me know where my development time is best spent.
@@ -32,14 +32,14 @@ An example of the output (used in a finite element simulation) is shown below
 
 The first line shows the total (wall) time passed and allocations made since the start of the timer as well as
 the percentage of those totals spent inside timed sections.
-The following lines shows data for all the timed sections.
+The following lines show data for all the timed sections.
 The section label is shown first followed by the number of calls made to that section.
 Finally, the total time elapsed or allocations made in that section are shown together with the
 percentage of the total in that section and the average (time / allocations per call).
 
 ## Usage
 
-The easiest way to show how the package work is with a few examples of timing sections.
+The easiest way to show how the package works is with a few examples of timing sections.
 
 ```julia
 using TimerOutputs
@@ -330,12 +330,12 @@ julia> show(to_2; compact = true, allocations = false, linechars = :ascii)
  ---------------------------------
 ```
 
-The percentages showed are now relative to that "root".
+The percentages shown are now relative to that "root".
 
 ## Querying data
 
 The (unexported) functions `ncalls`, `time`, `allocated` give the accumulated data for a section.
-The returned time has units in nano seconds and allocations in bytes.
+The returned time has units in nanoseconds and allocations in bytes.
 For example (using the `to` object from above):
 
 ```julia
@@ -394,8 +394,8 @@ The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`
 
 ## Measuring time consumed outside `@timeit` blocks
 
-Often, operations that we do not consider time consuming turn out to be relevant.
-However, adding additional timming blocks just to time initializations and other
+Often, operations that we do not consider time-consuming turn out to be relevant.
+However, adding additional timing blocks just to time initializations and other
 less important calls is annoying.
 
 The `TimerOutputs.complement!` function can be used to modify a timer and add
@@ -513,9 +513,9 @@ julia> JSON3.write(TimerOutputs.todict(to))
 ## Overhead
 
 There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
-For proper benchmarking you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
+For proper benchmarking, you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
 
-It is sometimes desireable to be able "turn on and off" the `@timeit` macro, for instance you may wish to instrument a package with `@timeit` macros, but then not deal with the overhead of the timings during normal package operation.
+It is sometimes desirable to be able "turn on and off" the `@timeit` macro, for instance you may wish to instrument a package with `@timeit` macros, but then not deal with the overhead of the timings during normal package operation.
 To enable this, we provide the `@timeit_debug` macro, which wraps the `@timeit` macro with a conditional, checking if debug timings have been enabled.
 Because you may wish to turn on only certain portions of your instrumented code base (or multiple codebases may have instrumented their code), debug timings are enabled on a module-by-module basis.
 By default, debug timings are disabled, and this conditional should be optimized away, allowing for truly zero-overhead.
