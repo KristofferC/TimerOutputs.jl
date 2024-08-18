@@ -23,7 +23,7 @@ An example of the output (used in a finite element simulation) is shown below
  Section                ncalls     time   %tot     avg     alloc   %tot      avg
  ───────────────────────────────────────────────────────────────────────────────
  assemble                    6    3.27s  48.6%   545ms   3.65GiB  82.7%   624MiB
-   inner assemble         240k    1.92s  28.4%  7.98μs   3.14GiB  71.1%  13.7KiB
+   inner assemble           240k  1.92s  28.4%  7.98μs   3.14GiB  71.1%  13.7KiB
  linear solve                5    2.73s  40.5%   546ms    108MiB  2.39%  21.6MiB
  create sparse matrix        6    658ms  9.77%   110ms    662MiB  14.6%   110MiB
  export                      1   78.4ms  1.16%  78.4ms   13.1MiB  0.29%  13.1MiB
