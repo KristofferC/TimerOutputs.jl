@@ -14,7 +14,7 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     ∑t, ∑b = to.flattened ? to.totmeasured : totmeasured(to)
 
     max_name = longest_name(to)
-    available_width = displaysize(io)[2]
+    available_width = get(io, :limit, false) ? displaysize(io)[2] : typemax(Int)
     requested_width = max_name
     if compact
         if allocations
