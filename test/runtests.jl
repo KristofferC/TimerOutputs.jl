@@ -699,3 +699,9 @@ end
     t(1)
     ncalls(to.inner_timers[repr(s)]) == 1
 end
+
+@testset "@timeit works with an empty label" begin
+    to = TimerOutput()
+    @timeit to "" begin end
+    @test ncalls(to.inner_timers[""]) == 1
+end
