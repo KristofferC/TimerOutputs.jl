@@ -40,6 +40,9 @@ end
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
+timeit(to, "sleep") do
+    sleep(0.1)
+end
 section = start_timed_section!(to, "sleep")
 sleep(0.1)
 stop_timed_section!(to, section)
@@ -47,14 +50,17 @@ stop_timed_section!(to, section)
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
+timeit("sleep") do
+    sleep(0.1)
+end
 section = start_timed_section!("sleep")
 sleep(0.1)
 stop_timed_section!(section)
 
 @test haskey(to, "sleep")
 @test !haskey(to, "slep")
-@test ncalls(to["sleep"]) == 5
-@test ncalls(DEFAULT_TIMER["sleep"]) == 5
+@test ncalls(to["sleep"]) == 6
+@test ncalls(DEFAULT_TIMER["sleep"]) == 6
 
 
 # Check reset works
