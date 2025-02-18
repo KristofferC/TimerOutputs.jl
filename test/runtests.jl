@@ -705,3 +705,15 @@ end
     t(1)
     ncalls(to.inner_timers[repr(s)]) == 1
 end
+
+@testset "Interleaved sections" begin
+    to = TimerOutput()
+
+    section1 = start_timed_section!(to, "1")
+        sleep(0.1)
+        section2 = start_timed_section!(to, "2")
+            sleep(0.1)
+    stop_timed_section!(to, section1)
+            sleep(0.1)
+        stop_timed_section!(to, section2)
+end
