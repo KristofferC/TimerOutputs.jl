@@ -40,15 +40,21 @@ end
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
+section = start_timed_section!(to, "sleep")
+sleep(0.1)
+stop_timed_section!(to, section)
 
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
+section = start_timed_section!("sleep")
+sleep(0.1)
+stop_timed_section!(section)
 
 @test haskey(to, "sleep")
 @test !haskey(to, "slep")
-@test ncalls(to["sleep"]) == 4
-@test ncalls(DEFAULT_TIMER["sleep"]) == 4
+@test ncalls(to["sleep"]) == 5
+@test ncalls(DEFAULT_TIMER["sleep"]) == 5
 
 
 # Check reset works
@@ -680,7 +686,7 @@ end
             compare(timer, obj)
         end
     end
-    
+
     compare(to, todict(to))
 end
 

@@ -4,7 +4,8 @@ using ExprTools
 
 import Base: show, time_ns
 export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
-                    enable_timer!, disable_timer!, @notimeit, get_timer
+                    enable_timer!, disable_timer!, @notimeit, get_timer,
+                    start_timed_section!, stop_timed_section!
 
 
 function gc_bytes()
