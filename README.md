@@ -517,6 +517,25 @@ julia> JSON3.write(TimerOutputs.todict(to))
 "{\"total_time_ns\":712143250,\"total_allocated_bytes\":5680,\"time_ns\":0,\"n_calls\":0,\"allocated_bytes\":0,\"inner_timers\":{\"nest 1\":{\"total_time_ns\":605922416,\"total_allocated_bytes\":4000,\"time_ns\":712143250,\"n_calls\":1,\"allocated_bytes\":5680,\"inner_timers\":{\"level 2.1\":{\"total_time_ns\":0,\"total_allocated_bytes\":0,\"time_ns\":106111333,\"n_calls\":1,\"allocated_bytes\":176,\"inner_timers\":{}},\"level 2.2\":{\"total_time_ns\":0,\"total_allocated_bytes\":0,\"time_ns\":499811083,\"n_calls\":20,\"allocated_bytes\":3824,\"inner_timers\":{}}}}}}"
 ```
 
+## FlameGraphs
+
+TimerOutputs has a FlameGraph extension that provides an alternative visualization method.
+
+i.e. using ProfileView.jl
+```
+using TimerOutputs, FlameGraphs, ProfileView
+to = TimerOutput()
+@timeit to "foo" begin
+    sleep(0.1)
+    @timeit to "bar" begin
+        sleep(0.1)
+        @timeit to "baz" begin
+            sleep(0.1)
+        end
+    end
+end
+ProfileView.view(flamegraph(to))
+```
 
 ## Overhead
 
