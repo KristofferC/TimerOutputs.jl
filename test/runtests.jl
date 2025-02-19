@@ -43,9 +43,9 @@ end
 timeit(to, "sleep") do
     sleep(0.1)
 end
-section = start_timed_section!(to, "sleep")
+section = begin_timed_section!(to, "sleep")
 sleep(0.1)
-stop_timed_section!(to, section)
+end_timed_section!(to, section)
 
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
@@ -53,9 +53,9 @@ stop_timed_section!(to, section)
 timeit("sleep") do
     sleep(0.1)
 end
-section = start_timed_section!("sleep")
+section = begin_timed_section!("sleep")
 sleep(0.1)
-stop_timed_section!(section)
+end_timed_section!(section)
 
 @test haskey(to, "sleep")
 @test !haskey(to, "slep")
@@ -715,11 +715,11 @@ end
 @testset "Interleaved sections" begin
     to = TimerOutput()
 
-    section1 = start_timed_section!(to, "1")
+    section1 = begin_timed_section!(to, "1")
         sleep(0.1)
-        section2 = start_timed_section!(to, "2")
+        section2 = begin_timed_section!(to, "2")
             sleep(0.1)
-    stop_timed_section!(to, section1)
+    end_timed_section!(to, section1)
             sleep(0.1)
-        stop_timed_section!(to, section2)
+        end_timed_section!(to, section2)
 end

@@ -144,9 +144,9 @@ Similar information is available for allocations:
 It is also possible to manually start and stop a timed section.
 
 ```julia
-section = start_timed_section!(to, "my section")
+section = begin_timed_section!(to, "my section")
 foo()
-stop_timed_section!(to, section)
+end_timed_section!(to, section)
 ```
 
 ## Settings for printing:

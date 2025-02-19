@@ -300,12 +300,12 @@ end
 # Doesn't hurt to keep it for a while though
 timeit(f::Function, label::String) = timeit(f, DEFAULT_TIMER, label)
 function timeit(f::Function, to::TimerOutput, label::String)
-    section = start_timed_section!(to, label)
+    section = begin_timed_section!(to, label)
     local val
     try
         val = f()
     finally
-        stop_timed_section!(to, section)
+        end_timed_section!(to, section)
     end
     return val
 end
@@ -318,13 +318,13 @@ struct SectionTimeData
 end
 
 """
-    start_timed_section!([to::TimerOutput=DEFAULT_TIMER], label::String)
+    begin_timed_section!([to::TimerOutput=DEFAULT_TIMER], label::String)
 
-Start a timed section with the given label. Returns a `SectionTimeData` object that should
-be passed to `stop_timed_section!` when the section is done.
+Start timing a section with the given label. Returns a `SectionTimeData` object that should
+be passed to `end_timed_section!` when the section is done.
 """
-start_timed_section!(label::String) = start_timed_section!(DEFAULT_TIMER, label)
-function start_timed_section!(to::TimerOutput, label::String)
+begin_timed_section!(label::String) = begin_timed_section!(DEFAULT_TIMER, label)
+function begin_timed_section!(to::TimerOutput, label::String)
     data = push!(to, label)
     b₀ = gc_bytes()
     t₀ = time_ns()
@@ -332,12 +332,13 @@ function start_timed_section!(to::TimerOutput, label::String)
 end
 
 """
-    stop_timed_section!([to::TimerOutput=DEFAULT_TIMER], section::SectionTimeData)
+    end_timed_section!([to::TimerOutput=DEFAULT_TIMER], section::SectionTimeData)
 
-Stop a timed section started with `start_timed_section!`.
+Stop timing a section started with `begin_timed_section!`. Should be passed a `SectionTimeData` object
+that was returned by `begin_timed_section!`.
 """
-stop_timed_section!(section::SectionTimeData) = stop_timed_section!(DEFAULT_TIMER, section)
-function stop_timed_section!(to::TimerOutput, section::SectionTimeData)
+end_timed_section!(section::SectionTimeData) = end_timed_section!(DEFAULT_TIMER, section)
+function end_timed_section!(to::TimerOutput, section::SectionTimeData)
     section.data.time += time_ns() - section.time_start
     section.data.allocs += gc_bytes() - section.allocs_start
     section.data.ncalls += 1
