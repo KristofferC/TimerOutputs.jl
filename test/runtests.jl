@@ -714,7 +714,6 @@ end
 
 @testset "Interleaved sections" begin
     to = TimerOutput()
-
     section1 = begin_timed_section!(to, "1")
         sleep(0.1)
         section2 = begin_timed_section!(to, "2")
@@ -722,4 +721,10 @@ end
     end_timed_section!(to, section1)
             sleep(0.1)
         end_timed_section!(to, section2)
+end
+  
+@testset "@timeit works with an empty label" begin
+    to = TimerOutput()
+    @timeit to "" begin end
+    @test ncalls(to.inner_timers[""]) == 1
 end

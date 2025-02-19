@@ -30,7 +30,7 @@ mutable struct TimerOutput
     flattened::Bool
     enabled::Bool
     totmeasured::Tuple{Int64,Int64}
-    prev_timer_label::String
+    prev_timer_label::Union{String,Nothing}
     prev_timer::Union{TimerOutput,Nothing}
 
     function TimerOutput(label::String = "root")
@@ -38,7 +38,7 @@ mutable struct TimerOutput
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        return new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), "", nothing)
+        return new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), nothing, nothing)
     end
 
     # Jeez...
