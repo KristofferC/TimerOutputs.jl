@@ -4,6 +4,8 @@ using Test
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
                      prettytime, prettymemory, prettypercent, prettycount, todict
 
+using FlameGraphs
+
 reset_timer!()
 
 # Timing from modules that don't import much
@@ -40,15 +42,27 @@ end
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
+timeit(to, "sleep") do
+    sleep(0.1)
+end
+section = begin_timed_section!(to, "sleep")
+sleep(0.1)
+end_timed_section!(to, section)
 
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
+timeit("sleep") do
+    sleep(0.1)
+end
+section = begin_timed_section!("sleep")
+sleep(0.1)
+end_timed_section!(section)
 
 @test haskey(to, "sleep")
 @test !haskey(to, "slep")
-@test ncalls(to["sleep"]) == 4
-@test ncalls(DEFAULT_TIMER["sleep"]) == 4
+@test ncalls(to["sleep"]) == 6
+@test ncalls(DEFAULT_TIMER["sleep"]) == 6
 
 
 # Check reset works
@@ -512,7 +526,10 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
 
     @timeit to3 "bar" identity(nothing)
 
+    @test_throws MethodError merge()
+
     to_merged = merge(to1, to2, to3)
+    @test to_merged !== to1
     merge!(to1, to2, to3)
 
     for to in [to1, to_merged]
@@ -677,7 +694,7 @@ end
             compare(timer, obj)
         end
     end
-    
+
     compare(to, todict(to))
 end
 
@@ -695,4 +712,35 @@ end
     t = to(s)
     t(1)
     ncalls(to.inner_timers[repr(s)]) == 1
+end
+
+@testset "Interleaved sections" begin
+    to = TimerOutput()
+    section1 = begin_timed_section!(to, "1")
+        sleep(0.1)
+        section2 = begin_timed_section!(to, "2")
+            sleep(0.1)
+    end_timed_section!(to, section1)
+            sleep(0.1)
+        end_timed_section!(to, section2)
+end
+
+@testset "@timeit works with an empty label" begin
+    to = TimerOutput()
+    @timeit to "" begin end
+    @test ncalls(to.inner_timers[""]) == 1
+end
+
+@testset "FlameGraphsExt" begin
+    to = TimerOutput()
+    @timeit to "1" begin
+        sleep(0.1)
+        @timeit to "2" begin
+            sleep(0.1)
+            @timeit to "3" begin
+                sleep(0.1)
+            end
+        end
+    end
+    flamegraph(to)
 end

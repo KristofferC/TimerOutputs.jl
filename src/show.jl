@@ -8,13 +8,12 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     sortby  in (:time, :ncalls, :allocations, :name, :firstexec) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
-    t₀, b₀ = to.start_data.time, to.start_data.allocs
-    t₁, b₁ = time_ns(), gc_bytes()
-    Δt, Δb = t₁ - t₀, b₁ - b₀
+    # make sure the deltas we report actually match the time elapsed - can cause problems if we go back to look at results at a later time
+    Δt, Δb = totmeasured(to)
     ∑t, ∑b = to.flattened ? to.totmeasured : totmeasured(to)
 
     max_name = longest_name(to)
-    available_width = displaysize(io)[2]
+    available_width = get(io, :limit, false) ? displaysize(io)[2] : typemax(Int)
     requested_width = max_name
     if compact
         if allocations
@@ -114,25 +113,25 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
 
         header_str = string("  time  %tot  %timed")
         tot_midstr = string(sec_ncalls, "  ", header_str)
-        printstyled(io, " ", topbottomrule^total_table_width, "\n"; bold=true)
+        printstyled(io, topbottomrule^total_table_width, "\n"; bold=true)
         if ! (allocations == false && compact == true)
-            printstyled(io, " ", title; bold=true)
+            printstyled(io, title; bold=true)
             print(io, time_header)
             allocations && print(io, "   ", allocation_header)
             print(io, "\n")
-            print(io, " ", time_alloc_pading, time_underline)
+            print(io, time_alloc_pading, time_underline)
             allocations && print(io, "   ", alloc_underline)
             print(io, "\n")
-            print(io, " ", tot_meas_str, str_time)
+            print(io, tot_meas_str, str_time)
             allocations && print(io, "   ", str_alloc)
             print(io, "\n\n")
         end
-        print(io, " ", sec_ncalls, time_headers)
+        print(io, sec_ncalls, time_headers)
         allocations && print(io, "   ", alloc_headers)
         print(io, "\n")
-        print(io, " ", midrule^total_table_width, "\n")
+        print(io, midrule^total_table_width, "\n")
     else
-        printstyled(io, " ", topbottomrule^total_table_width; bold=true)
+        printstyled(io, topbottomrule^total_table_width; bold=true)
     end
 end
 
@@ -142,7 +141,6 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     b = accum_data.allocs
 
     name = truncdots(to.name, name_length - indent)
-    print(io, " ")
     nc = accum_data.ncalls
     print(io, " "^indent, rpad(name, name_length + 2 - indent))
     print(io, lpad(prettycount(nc), 5, " "))

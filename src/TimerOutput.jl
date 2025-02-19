@@ -30,7 +30,7 @@ mutable struct TimerOutput
     flattened::Bool
     enabled::Bool
     totmeasured::Tuple{Int64,Int64}
-    prev_timer_label::String
+    prev_timer_label::Union{String,Nothing}
     prev_timer::Union{TimerOutput,Nothing}
 
     function TimerOutput(label::String = "root")
@@ -38,7 +38,7 @@ mutable struct TimerOutput
         accumulated_data = TimeData()
         inner_timers = Dict{String,TimerOutput}()
         timer_stack = TimerOutput[]
-        return new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), "", nothing)
+        return new(start_data, accumulated_data, inner_timers, timer_stack, label, false, true, (0, 0), nothing, nothing)
     end
 
     # Jeez...
@@ -125,7 +125,7 @@ end
 # merging timer outputs
 const merge_lock = ReentrantLock() # needed for merges of objects on different threads
 
-Base.merge(others::TimerOutput...) = merge!(TimerOutput(), others...)
+Base.merge(self::TimerOutput, others::TimerOutput...) = merge!(TimerOutput(), self, others...)
 function Base.merge!(self::TimerOutput, others::TimerOutput...; tree_point = String[])
     lock(merge_lock) do
         for other in others
@@ -300,19 +300,49 @@ end
 # Doesn't hurt to keep it for a while though
 timeit(f::Function, label::String) = timeit(f, DEFAULT_TIMER, label)
 function timeit(f::Function, to::TimerOutput, label::String)
-    accumulated_data = push!(to, label)
-    b₀ = gc_bytes()
-    t₀ = time_ns()
+    section = begin_timed_section!(to, label)
     local val
     try
         val = f()
     finally
-        accumulated_data.time += time_ns() - t₀
-        accumulated_data.allocs += gc_bytes() - b₀
-        accumulated_data.ncalls += 1
-        pop!(to)
+        end_timed_section!(to, section)
     end
     return val
+end
+
+struct SectionTimeData
+    label::String # not needed for stopping, but useful for debugging passing this object around
+    data::TimeData
+    allocs_start::Int64
+    time_start::Int64
+end
+
+"""
+    begin_timed_section!([to::TimerOutput=DEFAULT_TIMER], label::String)
+
+Start timing a section with the given label. Returns a `SectionTimeData` object that should
+be passed to `end_timed_section!` when the section is done.
+"""
+begin_timed_section!(label::String) = begin_timed_section!(DEFAULT_TIMER, label)
+function begin_timed_section!(to::TimerOutput, label::String)
+    data = push!(to, label)
+    b₀ = gc_bytes()
+    t₀ = time_ns()
+    return SectionTimeData(label, data, b₀, t₀)
+end
+
+"""
+    end_timed_section!([to::TimerOutput=DEFAULT_TIMER], section::SectionTimeData)
+
+Stop timing a section started with `begin_timed_section!`. Should be passed a `SectionTimeData` object
+that was returned by `begin_timed_section!`.
+"""
+end_timed_section!(section::SectionTimeData) = end_timed_section!(DEFAULT_TIMER, section)
+function end_timed_section!(to::TimerOutput, section::SectionTimeData)
+    section.data.time += time_ns() - section.time_start
+    section.data.allocs += gc_bytes() - section.allocs_start
+    section.data.ncalls += 1
+    return pop!(to)
 end
 
 Base.haskey(to::TimerOutput, name::String) = haskey(to.inner_timers, name)
