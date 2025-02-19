@@ -40,15 +40,27 @@ end
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
 @timeit to "sleep" sleep(0.1)
+timeit(to, "sleep") do
+    sleep(0.1)
+end
+section = begin_timed_section!(to, "sleep")
+sleep(0.1)
+end_timed_section!(to, section)
 
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
 @timeit "sleep" sleep(0.1)
+timeit("sleep") do
+    sleep(0.1)
+end
+section = begin_timed_section!("sleep")
+sleep(0.1)
+end_timed_section!(section)
 
 @test haskey(to, "sleep")
 @test !haskey(to, "slep")
-@test ncalls(to["sleep"]) == 4
-@test ncalls(DEFAULT_TIMER["sleep"]) == 4
+@test ncalls(to["sleep"]) == 6
+@test ncalls(DEFAULT_TIMER["sleep"]) == 6
 
 
 # Check reset works
@@ -680,7 +692,7 @@ end
             compare(timer, obj)
         end
     end
-    
+
     compare(to, todict(to))
 end
 
@@ -700,6 +712,17 @@ end
     ncalls(to.inner_timers[repr(s)]) == 1
 end
 
+@testset "Interleaved sections" begin
+    to = TimerOutput()
+    section1 = begin_timed_section!(to, "1")
+        sleep(0.1)
+        section2 = begin_timed_section!(to, "2")
+            sleep(0.1)
+    end_timed_section!(to, section1)
+            sleep(0.1)
+        end_timed_section!(to, section2)
+end
+  
 @testset "@timeit works with an empty label" begin
     to = TimerOutput()
     @timeit to "" begin end

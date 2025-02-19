@@ -121,9 +121,9 @@ Similar information is available for allocations:
 
 ```
  ────────────────────────────────────────────────────────────────────────
-                                Time                    Allocations      
+                                Time                    Allocations
                        ───────────────────────   ────────────────────────
-   Tot / % measured:        7.99s /  39.1%            207MiB /  46.7%    
+   Tot / % measured:        7.99s /  39.1%            207MiB /  46.7%
 
  Section       ncalls     time    %tot     avg     alloc    %tot      avg
  ────────────────────────────────────────────────────────────────────────
@@ -139,6 +139,14 @@ Similar information is available for allocations:
  funcdef            1   94.4μs    0.0%  94.4μs     0.00B    0.0%    0.00B
  foo                1   1.50μs    0.0%  1.50μs     0.00B    0.0%    0.00B
  ────────────────────────────────────────────────────────────────────────
+```
+
+It is also possible to manually start and stop a timed section.
+
+```julia
+section = begin_timed_section!(to, "my section")
+foo()
+end_timed_section!(to, section)
 ```
 
 ## Settings for printing:
