@@ -537,6 +537,12 @@ end
 ProfileView.view(flamegraph(to))
 ```
 
+You may want to crop the span of the graph to the children, not how long `to` has been open.
+To do that use `crop_root=true`
+```
+ProfileView.view(flamegraph(to, crop_root=true))
+```
+
 ## Overhead
 
 There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
