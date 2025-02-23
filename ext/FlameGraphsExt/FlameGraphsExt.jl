@@ -39,13 +39,11 @@ end
 # Make a flat frame for this TimerOutput
 function _flamegraph_frame(to::TimerOutput, start_ns; toplevel = false, crop_root = true)
     # TODO: Use a better conversion to a StackFrame so this contains the right kind of data
-    nc = to.accumulated_data.ncalls
-    tt_str = string(to.name, " (", strip(prettytime(to.accumulated_data.time)))
+    tt_str = string(to.name, " ", strip(prettytime(to.accumulated_data.time)))
     if to.accumulated_data.ncalls > 1
         avg = to.accumulated_data.time / to.accumulated_data.ncalls
-        tt_str *= string(": ", nc, " calls ", strip(prettytime(avg)), " avg")
+        tt_str *= string(" ", to.accumulated_data.ncalls, "×", strip(prettytime(avg)), " μ")
     end
-    tt_str *= ")"
     tt = Symbol(tt_str)
     # Set the pointer to ensure the sf is unique
     sf = StackFrame(tt, Symbol("none"), 0, nothing, false, false, Base.objectid(to))
