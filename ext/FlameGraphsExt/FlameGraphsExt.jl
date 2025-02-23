@@ -54,13 +54,12 @@ function _flamegraph_frame(to::TimerOutput, start_ns; toplevel = false, crop_roo
         # was created, and stop when the last node was finished.
         _start = crop_root ? min_start_time(to) : to.start_data.time
         _end = max_end_time(to)
-        range = (Int(_start) : Int(_end)) .- start_ns
     else
         #range = Int(start) : Int(start + TimerOutputs.tottime(to))
         _start = to.start_data.time
         _end = to.start_data.time + to.accumulated_data.time
-        range = (Int(_start) : Int(_end)) .- start_ns
     end
+    range = (Int(_start) : Int(_end)) .- start_ns
     return FlameGraphs.NodeData(sf, status, range)
 end
 
