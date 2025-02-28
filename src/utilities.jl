@@ -120,12 +120,29 @@ Converts a `TimerOutput` into a nested set of dictionaries, with keys and value 
 """
 function todict(to::TimerOutput)
     return Dict{String,Any}(
+        "name" => to.name,
         "n_calls" => ncalls(to),
         "time_ns" => time(to),
         "allocated_bytes" => allocated(to),
         "total_allocated_bytes" => totallocated(to),
         "total_time_ns" => tottime(to),
-        "inner_timers" => Dict{String, Any}(k => todict(v) for (k,v) in to.inner_timers)
+        "inner_timers" => Dict{String, Any}(k => todict(v) for (k,v) in to.inner_timers),
+        "timer_stack" => todict.(to.timer_stack),
+        "start_time_ns" => firstexec(to),
+        "start_data" => todict(to.start_data),
+        "flattened" => to.flattened,
+        "enabled" => to.enabled,
+        "prev_timer_label" => to.prev_timer_label,
+        "prev_timer" => isnothing(to.prev_timer) ? nothing : todict(to.prev_timer)        
+    )
+end
+
+function todict(td::TimeData)
+    return Dict{String, Any}(
+        "n_calls" => ncalls(td),
+        "time_ns" => time(td),
+        "allocated_bytes" => allocated(td),
+        "start_time_ns" => firstexec(td)
     )
 end
 

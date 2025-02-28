@@ -11,6 +11,15 @@ TimeData(ncalls, time, allocs) = TimeData(ncalls, time, allocs, time)
 Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
 TimeData() = TimeData(0, 0, 0, time_ns())
 
+# convenience function for deserialisation
+function TimeData(dict::Dict{String, Any})
+    return TimeData(dict["n_calls"], dict["time_ns"], dict["allocated_bytes"], dict["start_time_ns"])
+end
+
+function Base.:(==)(self::TimeData, other::TimeData)
+    return (self.ncalls == other.ncalls) && (self.time == other.time) && (self.allocs == other.allocs) && (self.firstexec == other.firstexec)
+end
+
 function Base.:+(self::TimeData, other::TimeData)
     TimeData(self.ncalls + other.ncalls,
              self.time + other.time,
@@ -48,8 +57,41 @@ mutable struct TimerOutput
 
 end
 
+# convenience function for deserialisation
+function TimerOutput(dict::Dict{String, Any})
+    return TimerOutput(
+        TimeData(dict["start_data"]),
+        TimeData(dict["n_calls"], dict["time_ns"], dict["allocated_bytes"], dict["start_time_ns"]),
+        Dict{String, TimerOutput}(
+            k => TimerOutput(v) for (k, v) ∈ dict["inner_timers"]
+        ),
+        Vector{TimerOutput}(TimerOutput.(dict["timer_stack"])),
+        dict["name"],
+        dict["flattened"],
+        dict["enabled"],
+        (0, 0), # we don't appear to be using the internal totmeasured field?
+        dict["prev_timer_label"],
+        isnothing(dict["prev_timer"]) ? nothing : TimerOutput(dict["prev_timer"])
+    )
+end
+
 Base.copy(to::TimerOutput) = TimerOutput(copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
                                          copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", nothing)
+
+function Base.:(==)(self::TimerOutput, other::TimerOutput)
+    return all([
+        self.start_data == other.start_data,
+        self.accumulated_data == other.accumulated_data,
+        self.inner_timers == other.inner_timers,
+        self.timer_stack == other.timer_stack,
+        self.name == other.name,
+        self.flattened == other.flattened,
+        self.enabled == other.enabled,
+        self.totmeasured == other.totmeasured,
+        self.prev_timer_label == other.prev_timer_label,
+        self.prev_timer == other.prev_timer
+    ])
+end
 
 const DEFAULT_TIMER = TimerOutput()
 const _timers = Dict{String, TimerOutput}("Default" => DEFAULT_TIMER)
@@ -158,6 +200,7 @@ end
 ncalls(to::TimerOutput)    = to.accumulated_data.ncalls
 allocated(to::TimerOutput) = to.accumulated_data.allocs
 time(to::TimerOutput) = to.accumulated_data.time
+firstexec(to::TimerOutput) = to.accumulated_data.firstexec
 totallocated(to::TimerOutput) = totmeasured(to)[2]
 tottime(to::TimerOutput) = totmeasured(to)[1]
 
@@ -166,6 +209,11 @@ ncalls() = ncalls(DEFAULT_TIMER)
 allocated() = allocated(DEFAULT_TIMER)
 totallocated() = totmeasured(DEFAULT_TIMER)[2]
 tottime() = totmeasured(DEFAULT_TIMER)[1]
+
+ncalls(td::TimeData) = td.ncalls
+time(td::TimeData) = td.time
+allocated(td::TimeData) = td.allocs
+firstexec(td::TimeData) = td.firstexec
 
 get_defaulttimer() = DEFAULT_TIMER
 Base.@deprecate get_defaultimer get_defaulttimer
