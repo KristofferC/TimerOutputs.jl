@@ -42,7 +42,7 @@ function _flamegraph_frame(to::TimerOutput, start_ns; toplevel = false, crop_roo
     tt_str = string(to.name, " ", strip(prettytime(to.accumulated_data.time)))
     if to.accumulated_data.ncalls > 1
         avg = to.accumulated_data.time / to.accumulated_data.ncalls
-        tt_str *= string(" ", to.accumulated_data.ncalls, "×", strip(prettytime(avg)), " μ")
+        tt_str *= string(" ", to.accumulated_data.ncalls, "×μ", strip(prettytime(avg)))
     end
     tt = Symbol(tt_str)
     # Set the pointer to ensure the sf is unique
