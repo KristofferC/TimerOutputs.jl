@@ -37,7 +37,7 @@ function max_end_time(to::TimerOutput)
 end
 
 # Make a flat frame for this TimerOutput
-function _flamegraph_frame(to::TimerOutput, start_ns; toplevel = false, crop_root = true)
+function _flamegraph_frame(to::TimerOutput, start_ns; toplevel = false, crop_root = false)
     # TODO: Use a better conversion to a StackFrame so this contains the right kind of data
     tt_str = string(to.name, " ", strip(prettytime(to.accumulated_data.time)))
     if to.accumulated_data.ncalls > 1
