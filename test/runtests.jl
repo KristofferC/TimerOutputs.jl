@@ -733,14 +733,29 @@ end
 
 @testset "FlameGraphsExt" begin
     to = TimerOutput()
-    @timeit to "1" begin
-        sleep(0.1)
-        @timeit to "2" begin
+    begin
+        func() = @timeit to "func" sleep(0.1)
+        @timeit to "foo 1" begin
             sleep(0.1)
-            @timeit to "3" begin
+            @timeit to "bar" begin
                 sleep(0.1)
+                @timeit to "baz" begin
+                    sleep(0.1)
+                    func()
+                end
+            end
+        end
+        @timeit to "foo 2" begin
+            sleep(0.1)
+            @timeit to "bar" begin
+                sleep(0.1)
+                @timeit to "baz" begin
+                    sleep(0.1)
+                    func()
+                end
             end
         end
     end
     flamegraph(to)
+    flamegraph(to, crop_root=true)
 end
