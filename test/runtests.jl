@@ -759,3 +759,5 @@ end
     flamegraph(to)
     flamegraph(to, crop_root=true)
 end
+
+include("test_coverage.jl")
