@@ -148,13 +148,15 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, tparent::Integer, 
 
     print(io, "   ", lpad(prettytime(t),        6, " "))
     print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))
-    print(io, "  ",  lpad(prettypercent(t, tparent, decimal=false), 3, " "))
+    t_par_str = indent == 0 ? "    " : prettypercent(t, tparent, decimal=false)
+    print(io, "  ",  lpad(t_par_str, 3, " "))
     !compact && print(io, "  ",  rpad(prettytime(t / nc), 6, " "))
 
     if allocations
     print(io, "   ", rpad(prettymemory(b),      9, " "))
     print(io, rpad(prettypercent(b, ∑b), 5, " "))
-    print(io, "  ", lpad(prettypercent(b, bparent, decimal=false), 3, " "))
+    b_par_str = indent == 0 ? "    " : prettypercent(b, bparent, decimal=false)
+    print(io, "  ", b_par_str)
     !compact && print(io, "  ",    lpad(prettymemory(b / nc), 5, " "))
     end
     print(io, "\n")
