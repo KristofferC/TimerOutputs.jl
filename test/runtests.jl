@@ -760,4 +760,19 @@ end
     flamegraph(to, crop_root=true)
 end
 
+function foo_77(::Float64) end
+
+@testset "Stacktraces (#77)" begin
+    err = try
+        @timeit "foo_77" foo_77(1)
+    catch e
+        sprint(Base.display_error, e, catch_backtrace())
+    end
+
+    @test err isa AbstractString
+
+    # this err shouldn't have any stacktrace pointing into TimerOutputs.jl
+    @test !contains(err, "src/TimerOutput.jl:")
+end
+
 include("test_coverage.jl")
