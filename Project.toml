@@ -15,13 +15,11 @@ FlameGraphsExt = "FlameGraphs"
 [compat]
 ExprTools = "0.1.0"
 FlameGraphs = "1"
-Pkg = "1"
 julia = "1.10"
 
 [extras]
 FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [targets]
-test = ["Test", "FlameGraphs", "Pkg"]
+test = ["Test", "FlameGraphs"]

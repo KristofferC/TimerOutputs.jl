@@ -1,7 +1,11 @@
 # entrypoint to TestPkg to invoke `abc`
-using Pkg, TimerOutputs
+using TimerOutputs
 
-Pkg.develop(; path=joinpath(pkgdir(TimerOutputs), "test", "TestPkg"))
-using TestPkg
+push!(LOAD_PATH, joinpath(pkgdir(TimerOutputs),  "test", "TestPkg"))
+try
+    using TestPkg
 
-TestPkg.abc()
+    TestPkg.abc()
+finally
+    pop!(LOAD_PATH)
+end
