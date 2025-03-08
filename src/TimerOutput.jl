@@ -245,12 +245,8 @@ function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Unio
         $val
     end
 
-    # remove existing line numbers (#77) but add in the source for code coverage (#194)
-    timeit_block = Base.remove_linenums!(timeit_block)
-    pushfirst!(timeit_block.args, source)
-
-    if is_debug
-        return quote
+    result_expr = if is_debug
+        quote
             if $m.timeit_debug_enabled()
                 $timeit_block
             else
@@ -258,8 +254,14 @@ function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Unio
             end
         end
     else
-        return timeit_block
+        timeit_block
     end
+
+    # remove existing line numbers (#77) but add in the source for code coverage (#194)
+    result_expr = Base.remove_linenums!(result_expr)
+    pushfirst!(result_expr.args, source)
+
+    return result_expr
 end
 
 function timer_expr_func(source::LineNumberNode, m::Module, is_debug::Bool, to, expr::Expr, label=nothing)
