@@ -172,7 +172,7 @@ Base.@deprecate get_defaultimer get_defaulttimer
 
 # Macro
 macro timeit(args...)
-    return timer_expr(__module__, false, args...)
+    return timer_expr(__source__, __module__, false, args...)
 end
 
 macro timeit_debug(args...)
@@ -180,7 +180,7 @@ macro timeit_debug(args...)
         Core.eval(__module__, :(timeit_debug_enabled() = false))
     end
 
-    return timer_expr(__module__, true, args...)
+    return timer_expr(__source__, __module__, true, args...)
 end
 
 function enable_debug_timings(m::Module)
@@ -204,27 +204,27 @@ function is_func_def(f)
     end
 end
 
-function timer_expr(m::Module, is_debug::Bool, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
-    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
+    return esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex))
 end
 
-function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
-    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to, ex))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label_or_to, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, label_or_to, ex)
+    return esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to, ex))
 end
 
-function timer_expr(m::Module, is_debug::Bool, label::String, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
-    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label, ex))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label::String, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
+    return esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label, ex))
 end
 
-function timer_expr(m::Module, is_debug::Bool, to, label, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, to, ex, label)
-    return esc(_timer_expr(m, is_debug, to, label, ex))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to, label, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, to, ex, label)
+    return esc(_timer_expr(source, m, is_debug, to, label, ex))
 end
 
-function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
+function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
@@ -245,6 +245,10 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
         $val
     end
 
+    # remove existing line numbers (#77) but add in the source for code coverage (#194)
+    timeit_block = Base.remove_linenums!(timeit_block)
+    pushfirst!(timeit_block.args, source)
+
     if is_debug
         return quote
             if $m.timeit_debug_enabled()
@@ -258,7 +262,7 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
     end
 end
 
-function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothing)
+function timer_expr_func(source::LineNumberNode, m::Module, is_debug::Bool, to, expr::Expr, label=nothing)
     expr = macroexpand(m, expr)
     def = splitdef(expr)
 
@@ -269,10 +273,10 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothin
             @inline function inner()
                 $(def[:body])
             end
-            $(_timer_expr(m, is_debug, to, label, :(inner())))
+            $(_timer_expr(source, m, is_debug, to, label, :(inner())))
         end
     else
-        _timer_expr(m, is_debug, to, label, def[:body])
+        _timer_expr(source, m, is_debug, to, label, def[:body])
     end
 
     return esc(combinedef(def))
