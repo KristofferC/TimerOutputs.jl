@@ -172,7 +172,18 @@ Base.@deprecate get_defaultimer get_defaulttimer
 
 # Macro
 macro timeit(args...)
-    return timer_expr(__module__, false, args...)
+    blocks = timer_expr(__module__, false, args...)
+    if blocks isa Expr
+        blocks
+    else
+        Expr(:block,
+            blocks[1],                  # the timing setup
+            Expr(:tryfinally,
+                :($(esc(args[end]))),   # the user expr
+                :($(blocks[2]))         # the timing finally
+            )
+        )
+    end
 end
 
 macro timeit_debug(args...)
@@ -180,7 +191,18 @@ macro timeit_debug(args...)
         Core.eval(__module__, :(timeit_debug_enabled() = false))
     end
 
-    return timer_expr(__module__, true, args...)
+    blocks = timer_expr(__module__, true, args...)
+    if blocks isa Expr
+        blocks
+    else
+        Expr(:block,
+            blocks[1],                  # the timing setup
+            Expr(:tryfinally,
+                :($(esc(args[end]))),   # the user expr
+                :($(blocks[2]))         # the timing finally
+            )
+        )
+    end
 end
 
 function enable_debug_timings(m::Module)
@@ -204,26 +226,69 @@ function is_func_def(f)
     end
 end
 
+function _esc(ex)
+    if isa(ex, Expr)
+        esc(ex)
+    else
+        esc(ex[1]), esc(ex[2])
+    end
+end
+
 function timer_expr(m::Module, is_debug::Bool, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
-    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex))
+    return _esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER)))
 end
 
 function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
-    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to, ex))
+    return _esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to))
 end
 
 function timer_expr(m::Module, is_debug::Bool, label::String, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
-    return esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label, ex))
+    return _esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label))
 end
 
 function timer_expr(m::Module, is_debug::Bool, to, label, ex::Expr)
     is_func_def(ex) && return timer_expr_func(m, is_debug, to, ex, label)
-    return esc(_timer_expr(m, is_debug, to, label, ex))
+    return _esc(_timer_expr(m, is_debug, to, label))
 end
 
+# no ex given, so just return before and after for construction in the macro
+function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label)
+    @gensym local_to enabled accumulated_data b₀ t₀ val
+    timeit_block = quote
+        $local_to = $to
+        $enabled = $local_to.enabled
+        if $enabled
+            $accumulated_data = $(push!)($local_to, $label)
+        end
+        $b₀ = $(gc_bytes)()
+        $t₀ = $(time_ns)()
+    end
+    finally_block = quote
+        if $enabled
+            $(do_accumulate!)($accumulated_data, $t₀, $b₀)
+            $(pop!)($local_to)
+        end
+    end
+
+    if is_debug
+        return quote
+            if $m.timeit_debug_enabled()
+                $timeit_block
+            end
+        end, quote
+            if $m.timeit_debug_enabled()
+                $finally_block
+            end
+        end
+    else
+        return timeit_block, finally_block
+    end
+end
+
+# ex given, so return the whole thing
 function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
