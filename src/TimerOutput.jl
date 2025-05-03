@@ -172,7 +172,7 @@ Base.@deprecate get_defaultimer get_defaulttimer
 
 # Macro
 macro timeit(args...)
-    blocks = timer_expr(__module__, false, args...)
+    blocks = timer_expr(__source__, __module__, false, args...)
     if blocks isa Expr
         blocks
     else
@@ -191,7 +191,7 @@ macro timeit_debug(args...)
         Core.eval(__module__, :(timeit_debug_enabled() = false))
     end
 
-    blocks = timer_expr(__module__, true, args...)
+    blocks = timer_expr(__source__, __module__, true, args...)
     if blocks isa Expr
         blocks
     else
@@ -234,28 +234,28 @@ function _esc(ex)
     end
 end
 
-function timer_expr(m::Module, is_debug::Bool, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
-    return _esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER)))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
+    return _esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER)))
 end
 
-function timer_expr(m::Module, is_debug::Bool, label_or_to, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, label_or_to, ex)
-    return _esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label_or_to, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, label_or_to, ex)
+    return _esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to))
 end
 
-function timer_expr(m::Module, is_debug::Bool, label::String, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
-    return _esc(_timer_expr(m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label::String, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
+    return _esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label))
 end
 
-function timer_expr(m::Module, is_debug::Bool, to, label, ex::Expr)
-    is_func_def(ex) && return timer_expr_func(m, is_debug, to, ex, label)
-    return _esc(_timer_expr(m, is_debug, to, label))
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to, label, ex::Expr)
+    is_func_def(ex) && return timer_expr_func(source, m, is_debug, to, ex, label)
+    return _esc(_timer_expr(source, m, is_debug, to, label))
 end
 
 # no ex given, so just return before and after for construction in the macro
-function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label)
+function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label)
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
@@ -289,7 +289,7 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
 end
 
 # ex given, so return the whole thing
-function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
+function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOutput}, label, ex::Expr)
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
@@ -310,20 +310,26 @@ function _timer_expr(m::Module, is_debug::Bool, to::Union{Symbol, Expr, TimerOut
         $val
     end
 
-    if is_debug
-        return Base.remove_linenums!(quote
+    result_expr = if is_debug
+        quote
             if $m.timeit_debug_enabled()
                 $timeit_block
             else
                 $ex
             end
-        end)
+        end
     else
-        return Base.remove_linenums!(timeit_block)
+        timeit_block
     end
+
+    # remove existing line numbers (#77) but add in the source for code coverage (#194)
+    result_expr = Base.remove_linenums!(result_expr)
+    pushfirst!(result_expr.args, source)
+
+    return result_expr
 end
 
-function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothing)
+function timer_expr_func(source::LineNumberNode, m::Module, is_debug::Bool, to, expr::Expr, label=nothing)
     expr = macroexpand(m, expr)
     def = splitdef(expr)
 
@@ -334,10 +340,10 @@ function timer_expr_func(m::Module, is_debug::Bool, to, expr::Expr, label=nothin
             @inline function inner()
                 $(def[:body])
             end
-            $(_timer_expr(m, is_debug, to, label, :(inner())))
+            $(_timer_expr(source, m, is_debug, to, label, :(inner())))
         end
     else
-        _timer_expr(m, is_debug, to, label, def[:body])
+        _timer_expr(source, m, is_debug, to, label, def[:body])
     end
 
     return esc(combinedef(def))
