@@ -8,9 +8,8 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     sortby  in (:time, :ncalls, :allocations, :name, :firstexec) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii)                  || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
 
-    t₀, b₀ = to.start_data.time, to.start_data.allocs
-    t₁, b₁ = time_ns(), gc_bytes()
-    Δt, Δb = t₁ - t₀, b₁ - b₀
+    # make sure the deltas we report actually match the time elapsed - can cause problems if we go back to look at results at a later time
+    Δt, Δb = totmeasured(to)
     ∑t, ∑b = to.flattened ? to.totmeasured : totmeasured(to)
 
     max_name = longest_name(to)
