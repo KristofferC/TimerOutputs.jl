@@ -38,7 +38,7 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
     rev = !in(sortby, [:name, :firstexec])
     by(x) = sortf(x, sortby)
     for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
-        _print_timer(io, timer, ∑t, ∑b, 0, name_length, allocations, sortby, compact)
+        _print_timer(io, timer, ∑t, ∑t, ∑b, ∑b, 0, name_length, allocations, sortby, compact)
     end
     print_header(io, Δt, Δb, ∑t, ∑b, name_length, false, allocations, linechars, compact, title)
 end
@@ -70,8 +70,8 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     midrule       = linechars == :unicode ? "─" : "-"
     topbottomrule = linechars == :unicode ? "─" : "-"
     sec_ncalls = string(rpad("Section", name_length, " "), " ncalls  ")
-    time_headers = "   time    %tot" * (compact ? "" : "     avg")
-    alloc_headers = allocations ? ("  alloc    %tot" * (compact ? "" : "      avg")) : ""
+    time_headers = "   time    %tot" * (compact ? "" : "  %par     avg")
+    alloc_headers = allocations ? ("  alloc    %tot" * (compact ? "" : "  %par      avg")) : ""
     total_table_width = sum(textwidth.((sec_ncalls, time_headers, alloc_headers))) + 3
 
     # Just hardcoded shit to make things look nice
@@ -90,7 +90,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         if compact
             time_header       = "      Time     "
         else
-            time_header       = "         Time          "
+            time_header       = "            Time             "
         end
 
         time_underline = midrule^textwidth(time_header)
@@ -98,7 +98,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
         if compact
             allocation_header       = "  Allocations  "
         else
-            allocation_header = "       Allocations      "
+            allocation_header = "          Allocations         "
         end
 
         alloc_underline = midrule^textwidth(allocation_header)
@@ -136,7 +136,7 @@ function print_header(io, Δt, Δb, ∑t, ∑b, name_length, header, allocations
     end
 end
 
-function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, indent::Integer, name_length, allocations, sortby, compact)
+function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, tparent::Integer, ∑b::Integer, bparent::Integer, indent::Integer, name_length, allocations, sortby, compact)
     accum_data = to.accumulated_data
     t = accum_data.time
     b = accum_data.allocs
@@ -148,11 +148,15 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
 
     print(io, "   ", lpad(prettytime(t),        6, " "))
     print(io, "  ",  lpad(prettypercent(t, ∑t), 5, " "))
+    t_par_str = indent == 0 ? "    " : prettypercent(t, tparent, decimal=false)
+    print(io, "  ",  lpad(t_par_str, 3, " "))
     !compact && print(io, "  ",  rpad(prettytime(t / nc), 6, " "))
 
     if allocations
     print(io, "   ", rpad(prettymemory(b),      9, " "))
     print(io, rpad(prettypercent(b, ∑b), 5, " "))
+    b_par_str = indent == 0 ? "    " : prettypercent(b, bparent, decimal=false)
+    print(io, "  ", b_par_str)
     !compact && print(io, "  ",    lpad(prettymemory(b / nc), 5, " "))
     end
     print(io, "\n")
@@ -160,6 +164,6 @@ function _print_timer(io::IO, to::TimerOutput, ∑t::Integer, ∑b::Integer, ind
     rev = !in(sortby, [:name, :firstexec])
     by(x) = sortf(x, sortby)
     for timer in sort!(collect(values(to.inner_timers)); rev = rev, by = by)
-        _print_timer(io, timer, ∑t, ∑b, indent + 2, name_length, allocations, sortby, compact)
+        _print_timer(io, timer, ∑t, t, ∑b, b, indent + 2, name_length, allocations, sortby, compact)
     end
 end
