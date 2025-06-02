@@ -696,6 +696,9 @@ end
     end
 
     compare(to, todict(to))
+
+    # make sure we can serialise and deserialise properly
+    @test TimerOutput(todict(to)) == to
 end
 
 @testset "InstrumentedFunctions" begin
