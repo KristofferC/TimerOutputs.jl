@@ -1,3 +1,5 @@
+#TODO: Alternate background color between gray and white?
+
 print_timer(; kwargs...) = print_timer(stdout; kwargs...)
 print_timer(to::TimerOutput; kwargs...) = print_timer(stdout, to; kwargs...)
 print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
@@ -51,9 +53,11 @@ function _extract_table_data(to::TimerOutput, sortby::Symbol, root_time_total::I
 end
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
-function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars::Symbol = :unicode, compact::Bool = false, title::String = "")
+function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Symbol = :time, linechars = nothing, compact::Bool = false, title::String = "")
     sortby in (:time, :ncalls, :allocations, :name, :firstexec) || throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
-    linechars in (:unicode, :ascii) || throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
+    if linechars !== nothing
+        Base.depwarn("the `linechars` argument has been deprecated and now does nothing", :linechars)
+    end
 
     # Calculate total measurements
     t₀, b₀ = to.start_data.time, to.start_data.allocs
@@ -124,12 +128,11 @@ function Base.show(io::IO, to::TimerOutput; allocations::Bool = true, sortby::Sy
             push!(row1, MultiColumn(alloc_cols, "Allocations  (tot / % meas)"))
         end
 
-        row2 = Any["", ""] # MultiColumn(2, "Tot / % measured:")]
+        row2 = Any["", ""]
         measured_pct_time = ∑t > 0 ? prettypercent(∑t, Δt; dolpad = false) : "  -%"
         time_measured = "$(prettytime(Δt)) / $measured_pct_time"
         if !compact
             push!(row2, MultiColumn(3, time_measured))
-            # push!(row2, "")
         else
             push!(row2, time_measured)
         end

@@ -121,15 +121,6 @@ function totmeasured(to::TimerOutput)
     return t, b
 end
 
-function longest_name(to::TimerOutput, indent = 0)
-    m = textwidth(to.name) + indent
-    for inner_timer in values(to.inner_timers)
-        m = max(m, longest_name(inner_timer, indent + 2))
-    end
-    return m
-end
-
-
 # merging timer outputs
 const merge_lock = ReentrantLock() # needed for merges of objects on different threads
 
