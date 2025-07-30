@@ -55,7 +55,7 @@ function prettymemory(b)
     return lpad(str, 7, " ")
 end
 
-function prettypercent(nominator, denominator)
+function prettypercent(nominator, denominator; dolpad = true)
     value = nominator / denominator * 100
 
     if denominator == 0 && nominator == 0
@@ -65,7 +65,7 @@ function prettypercent(nominator, denominator)
     else
         str = string(@sprintf("%.1f", value), "%")
     end
-    return lpad(str, 6, " ")
+    return dolpad ? lpad(str, 6, " ") : str
 end
 
 function prettycount(t::Integer)
