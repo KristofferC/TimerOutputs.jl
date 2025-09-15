@@ -10,7 +10,8 @@ foreach(rm, find_cov_files())
     @test isempty(find_cov_files())
 
     script = joinpath(pkgdir(TimerOutputs), "test", "coverage_script.jl")
-    run(`julia --startup-file=no --project=$(pkgdir(TimerOutputs)) --check-bounds=yes --code-coverage $script`)
+    julia = Base.julia_cmd()[1]
+    run(`$julia --startup-file=no --project=$(pkgdir(TimerOutputs)) --check-bounds=yes --code-coverage $script`)
 
     @test !isempty(find_cov_files())
 end
