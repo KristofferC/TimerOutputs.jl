@@ -804,4 +804,8 @@ function foo_77(::Float64) end
     @test !contains(err, "src/TimerOutput.jl:")
 end
 
-include("test_coverage.jl")
+# Skip the `test_coverage.jl` tests if TIMEROUTPUTS_TEST_COVERAGE is not set
+# The purpose of this is to fix CI on the PkgEval.jl repo
+if haskey(ENV, "TIMEROUTPUTS_TEST_COVERAGE")
+    include("test_coverage.jl")
+end

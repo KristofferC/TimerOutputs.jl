@@ -33,6 +33,7 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         env:
           JULIA_NUM_THREADS: 2
+          TIMEROUTPUTS_TEST_COVERAGE: true
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
         with:
