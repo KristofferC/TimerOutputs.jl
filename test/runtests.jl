@@ -620,6 +620,18 @@ end
     @test match(r"aaaa", table).offset < match(r"bbbb", table).offset < match(r"cccc", table).offset
 end
 
+@testset "copy does not alias inner timers" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    c = copy(to)
+    @test haskey(c["a"], "b")
+    @timeit to "a" 1 + 1
+    @test ncalls(to["a"]) == 2
+    @test ncalls(c["a"]) == 1
+    c["a"].accumulated_data.ncalls = 99
+    @test ncalls(to["a"]) == 2
+end
+
 @static if isdefined(Threads, Symbol("@spawn"))
     @testset "merge at custom points during multithreading" begin
         to = TimerOutput()

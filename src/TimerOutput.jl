@@ -54,10 +54,19 @@ mutable struct TimerOutput
 
 end
 
-Base.copy(to::TimerOutput) = TimerOutput(
-    copy(to.start_data), copy(to.accumulated_data), copy(to.inner_timers),
-    copy(to.timer_stack), to.name, to.flattened, to.enabled, to.totmeasured, "", nothing
+# copy of a single node, without children and with no active sections
+copy_node(to::TimerOutput) = TimerOutput(
+    copy(to.start_data), copy(to.accumulated_data), Dict{String, TimerOutput}(),
+    TimerOutput[], to.name, to.flattened, to.enabled, to.totmeasured, nothing, nothing
 )
+
+function Base.copy(to::TimerOutput)
+    toc = copy_node(to)
+    for (k, v) in to.inner_timers
+        toc.inner_timers[k] = copy(v)
+    end
+    return toc
+end
 
 const DEFAULT_TIMER = TimerOutput()
 const _timers = Dict{String, TimerOutput}("Default" => DEFAULT_TIMER)
@@ -442,8 +451,7 @@ function flatten(to::TimerOutput)
     for inner_timer in values(to.inner_timers)
         _flatten!(inner_timer, inner_timers)
     end
-    toc = copy(to)
-    return TimerOutput(toc.start_data, toc.accumulated_data, inner_timers, TimerOutput[], "Flattened", true, true, (t, b), "", to)
+    return TimerOutput(copy(to.start_data), copy(to.accumulated_data), inner_timers, TimerOutput[], "Flattened", true, true, (t, b), "", to)
 end
 
 
@@ -456,9 +464,7 @@ function _flatten!(to::TimerOutput, inner_timers::Dict{String, TimerOutput})
         timer = inner_timers[to.name]
         timer.accumulated_data += to.accumulated_data
     else
-        toc = copy(to)
-        toc.inner_timers = Dict{String, TimerOutput}()
-        inner_timers[toc.name] = toc
+        inner_timers[to.name] = copy_node(to)
     end
 end
 
