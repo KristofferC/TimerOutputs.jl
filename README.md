@@ -156,6 +156,9 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` for a pure ASCII table
 * `compact::Bool` ─ hide the `%par` and `avg` columns (default `false`)
 * `maxdepth::Int` ─ only print sections nested up to this depth (default: no limit)
+* `complement::Bool` ─ also show what was *not* timed, in gray: a `~untimed~` row with the
+  wall time and allocations outside all sections, and a `~name~` row under each section with
+  the part not covered by its subsections (default `false`)
 
 ## Flattening
 
@@ -451,8 +454,28 @@ Often, operations that we do not consider time consuming turn out to be relevant
 However, adding additional timming blocks just to time initializations and other
 less important calls is annoying.
 
-The `TimerOutputs.complement!` function can be used to modify a timer and add
-values for complement of timed sections. For instance:
+The easiest way to see this is the `complement = true` display option, which adds
+(without modifying the timer) gray rows for everything that was not timed: a
+`~untimed~` row with the wall time and allocations outside all sections, and a
+`~name~` row under each section with the part not covered by its subsections:
+
+```julia
+julia> print_timer(to; complement = true)
+                 Total / % measured: 132ms / 50.3%   0.98MiB / 0.7%
+────────────────────────────────────────────────────────────────────────────────────
+                                   Time                       Allocations
+ Section       ncalls    time    %tot  %par     avg    alloc    %tot  %par      avg
+────────────────────────────────────────────────────────────────────────────────────
+ ~untimed~             65.3ms                        0.97MiB
+ compute            1  55.1ms   83.1%        55.1ms  6.39KiB   94.2%        6.39KiB
+ ├─ kernel          1  33.9ms   51.2%   62%  33.9ms  5.02KiB   74.0%   78%  5.02KiB
+ └─ ~compute~       1  21.1ms   31.9%   38%  21.1ms  1.38KiB   20.3%   22%  1.38KiB
+ io                 1  11.2ms   16.9%        11.2ms     400B    5.8%           400B
+────────────────────────────────────────────────────────────────────────────────────
+```
+
+Alternatively, the `TimerOutputs.complement!` function can be used to modify a
+timer in place and add the complement values as real sections. For instance:
 
 ```julia
 to = TimerOutput()

@@ -938,6 +938,27 @@ end
     @test_throws ArgumentError sprint((io, x) -> show(io, x; maxdepth = 0), to)
 end
 
+@testset "complement display option" begin
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" sleep(0.01)
+        sleep(0.01)
+    end
+    str = sprint((io, x) -> show(io, x; complement = true), to)
+    @test occursin("~untimed~", str)
+    @test occursin("~outer~", str)
+    @test !occursin("~", sprint(show, to)) # off by default
+    # display only: the timer itself is not mutated
+    @test collect(keys(to)) == ["outer"]
+    @test collect(keys(to["outer"])) == ["inner"]
+    # complement rows are gray when the io supports color
+    cstr = sprint((io, x) -> show(io, x; complement = true), to; context = :color => true)
+    @test occursin("\e[90m", cstr)
+    @test !occursin("\e[90m ~", sprint((io, x) -> show(io, x; complement = true), to)) # no color, no ansi
+    # works for a bare section too
+    @test occursin("~outer~", sprint((io, x) -> show(io, x; complement = true), to["outer"]))
+end
+
 @testset "compact show in containers" begin
     to = TimerOutput()
     @timeit to "a" @timeit to "b" 1 + 1

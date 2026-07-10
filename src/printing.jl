@@ -105,11 +105,11 @@ function sortf(s::Section, sortby::Symbol)
 end
 
 # non-mutating: the live children vector must not be reordered
-function sorted_children(s::Section, sortby::Symbol)
+function sort_sections!(sections::Vector{Section}, sortby::Symbol)
     if sortby === :name
-        return sort(s.children; by = c -> c.name)
+        return sort!(sections; by = c -> c.name)
     else
-        return sort(s.children; rev = sortby !== :firstexec, by = c -> sortf(c, sortby))
+        return sort!(sections; rev = sortby !== :firstexec, by = c -> sortf(c, sortby))
     end
 end
 
@@ -130,39 +130,61 @@ struct TableOptions
     compact::Bool
     ascii::Bool
     maxdepth::Int
+    complement::Bool
     guides::NTuple{4, String}
 end
 
-# Top level sections print flush; nested ones get tree guides.
+# A synthetic row shown with the `complement` display option, in gray. For the
+# top level `~untimed~` row the counts and percentages are meaningless and
+# left blank.
+struct ComplementRow
+    section::Section
+    full_stats::Bool
+end
+
+# Top level sections print flush; nested ones get tree guides. `gray` collects
+# the indices of complement rows for the highlighter. `extra` is a synthetic
+# complement row to show among the children of `s`.
 function table_rows!(
-        rows::Vector{Vector{String}}, s::Section, ∑t, ∑b,
-        prefix::String, depth::Int, parent_t, parent_b, opts::TableOptions
+        rows::Vector{Vector{String}}, gray::Vector{Int}, s::Section, ∑t, ∑b,
+        prefix::String, depth::Int, opts::TableOptions, extra::Union{ComplementRow, Nothing}
     )
     depth > opts.maxdepth && return rows
     toplevel = depth == 1
-    children = sorted_children(s, opts.sortby)
+    children = copy(s.children)
+    extra === nothing || push!(children, extra.section)
+    sort_sections!(children, opts.sortby)
     for (i, child) in enumerate(children)
         islast = i == length(children)
+        synthetic = extra !== nothing && child === extra.section
+        blank = synthetic && !extra.full_stats
         name = toplevel ? child.name : string(prefix, islast ? opts.guides[2] : opts.guides[1], child.name)
         row = String[
-            name, prettycount(child.ncalls),
-            asciitime(prettytime(child.time), opts.ascii), prettypercent(child.time, ∑t),
+            name, blank ? "" : prettycount(child.ncalls),
+            asciitime(prettytime(child.time), opts.ascii),
+            blank ? "" : prettypercent(child.time, ∑t),
         ]
         if !opts.compact
-            push!(row, prettypar(child.time, toplevel ? 0 : parent_t))
-            push!(row, asciitime(prettytime(child.time / child.ncalls), opts.ascii))
+            push!(row, blank || toplevel ? "" : prettypar(child.time, s.time))
+            push!(row, blank ? "" : asciitime(prettytime(child.time / child.ncalls), opts.ascii))
         end
         if opts.allocations
             push!(row, prettymemory(child.allocs))
-            push!(row, prettypercent(child.allocs, ∑b))
+            push!(row, blank ? "" : prettypercent(child.allocs, ∑b))
             if !opts.compact
-                push!(row, prettypar(child.allocs, toplevel ? 0 : parent_b))
-                push!(row, prettymemory(child.allocs / child.ncalls))
+                push!(row, blank || toplevel ? "" : prettypar(child.allocs, s.allocs))
+                push!(row, blank ? "" : prettymemory(child.allocs / child.ncalls))
             end
         end
         push!(rows, row)
+        synthetic && push!(gray, length(rows))
+        child_extra = if opts.complement && !synthetic && !isempty(child.children)
+            ComplementRow(complement_section(child), true)
+        else
+            nothing
+        end
         child_prefix = toplevel ? "" : string(prefix, islast ? opts.guides[4] : opts.guides[3])
-        table_rows!(rows, child, ∑t, ∑b, child_prefix, depth + 1, child.time, child.allocs, opts)
+        table_rows!(rows, gray, child, ∑t, ∑b, child_prefix, depth + 1, opts, child_extra)
     end
     return rows
 end
@@ -211,7 +233,7 @@ function Base.show(io::IO, s::Section; kwargs...)
     return show_table(io, s; kwargs...)
 end
 
-function validated_options(; sortby, allocations, compact, linechars, maxdepth)
+function validated_options(; sortby, allocations, compact, linechars, maxdepth, complement)
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
@@ -219,27 +241,40 @@ function validated_options(; sortby, allocations, compact, linechars, maxdepth)
     maxdepth >= 1 ||
         throw(ArgumentError("maxdepth should be at least 1, got $maxdepth"))
     return TableOptions(
-        sortby, allocations, compact, linechars === :ascii, maxdepth, tree_guides(linechars)
+        sortby, allocations, compact, linechars === :ascii, maxdepth, complement,
+        tree_guides(linechars)
     )
 end
 
 function show_table(
         io::IO, to::TimerOutput;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        linechars::Symbol = :unicode, maxdepth::Int = typemax(Int), title::String = ""
+        linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
+        complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth)
+    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth, complement)
 
     Δt = time_ns() - to.start_time
     Δb = gc_bytes() - to.start_allocs
     ∑t, ∑b = totmeasured(to)
+
+    # wall clock time and allocations not measured by any section
+    extra = if complement
+        untimed = Section(
+            "~untimed~", 0, max(Δt - ∑t, 0), max(Δb - ∑b, 0), typemax(Int64),
+            Section[], nothing, nothing
+        )
+        ComplementRow(untimed, false)
+    else
+        nothing
+    end
 
     subtitle = string(
         "Total / % measured: ", strip(asciitime(prettytime(Δt), opts.ascii)),
         " / ", strip(prettypercent(∑t, Δt)),
         allocations ? string("   ", strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))) : ""
     )
-    return _show_table(io, to.root, ∑t, ∑b, opts, title, subtitle)
+    return _show_table(io, to.root, ∑t, ∑b, opts, title, subtitle, extra)
 end
 
 # A bare section prints as a table too, but has no meaningful wall-clock
@@ -247,17 +282,24 @@ end
 function show_table(
         io::IO, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        linechars::Symbol = :unicode, maxdepth::Int = typemax(Int), title::String = ""
+        linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
+        complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth)
+    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth, complement)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
-    return _show_table(io, s, ∑t, ∑b, opts, title, "")
+    extra = if complement && s.ncalls > 0 && !isempty(s.children)
+        ComplementRow(complement_section(s), true)
+    else
+        nothing
+    end
+    return _show_table(io, s, ∑t, ∑b, opts, title, "", extra)
 end
 
-function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, subtitle)
+function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, subtitle, extra)
     allocations, compact = opts.allocations, opts.compact
     rows = Vector{Vector{String}}()
-    table_rows!(rows, s, ∑t, ∑b, "", 1, 0, 0, opts)
+    gray = Int[]
+    table_rows!(rows, gray, s, ∑t, ∑b, "", 1, opts, extra)
 
     labels = String["Section", "ncalls", "time", "%tot"]
     compact || append!(labels, ["%par", "avg"])
@@ -291,6 +333,13 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             first_line_merged_column_label = crayon"bold",
             column_label = crayon"default"
         ),
+        # complement rows are shown in gray
+        highlighters = if isempty(gray)
+            TextHighlighter[]
+        else
+            grayset = Set(gray)
+            [TextHighlighter((_, i, _) -> i in grayset, crayon"dark_gray")]
+        end,
         # crop to the display width in the REPL and on terminals so long
         # section names never make lines wrap (#166)
         fit_table_in_display_horizontally = get(io, :limit, io isa Base.TTY)::Bool,

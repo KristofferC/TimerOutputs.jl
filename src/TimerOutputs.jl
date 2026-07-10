@@ -3,7 +3,7 @@ module TimerOutputs
 using ExprTools: splitdef, combinedef
 using Printf: @sprintf
 using PrettyTables: pretty_table, MultiColumn, EmptyCells, TextTableFormat, TextTableStyle,
-    text_table_borders__compact, @text__no_vertical_lines, @crayon_str
+    TextHighlighter, text_table_borders__compact, @text__no_vertical_lines, @crayon_str
 import Tables
 
 import Base: show, time_ns

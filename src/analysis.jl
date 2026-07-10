@@ -172,20 +172,28 @@ function complement!(to::TimerOutput)
     return to
 end
 
-function _complement!(s::Section)
-    isempty(s.children) && return
+# A detached section holding what is left of `s` when its children are
+# subtracted, i.e. the time and allocations in `s` not covered by a nested
+# section
+function complement_section(s::Section)
     rem_time = s.time
     rem_allocs = s.allocs
     for child in s.children
         rem_time -= child.time
         rem_allocs -= child.allocs
+    end
+    return Section(
+        string("~", s.name, "~"), max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0),
+        s.firstexec, Section[], nothing, nothing
+    )
+end
+
+function _complement!(s::Section)
+    isempty(s.children) && return
+    complement = complement_section(s)
+    for child in s.children
         _complement!(child)
     end
-    name = string("~", s.name, "~")
-    complement = Section(
-        name, max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0), s.firstexec,
-        Section[], nothing, nothing
-    )
     add_child!(s, complement)
     return
 end
