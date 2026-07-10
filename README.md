@@ -340,6 +340,50 @@ julia> show(to_2; compact = true, allocations = false, linechars = :ascii)
 
 The percentages showed are now relative to that "root".
 
+## Timing in multithreaded / concurrent code
+
+A `TimerOutput` must only be used from one task at a time — timing sections on the
+same instance concurrently from multiple threads or tasks will race and crash. For
+concurrent code, use a `ConcurrentTimerOutput` instead. It supports `@timeit`,
+`@timeit_debug`, `@notimeit`, `begin_timed_section!`/`end_timed_section!` and the
+functional `timeit` form, and can be freely shared between tasks:
+
+```julia
+const cto = ConcurrentTimerOutput()
+
+function work(i)
+    @timeit cto "work" begin
+        @timeit cto "step" step(i)
+    end
+end
+
+foreach(wait, [Threads.@spawn work(i) for i in 1:100])
+print_timer(cto)
+```
+
+Internally each task records into its own private timer tree (an extra cost of a
+few ns per section over a plain `TimerOutput`), and the trees are combined by
+section label whenever the timer is printed or queried. Semantics to be aware of:
+
+* The time reported for a section is the **sum of the wall clock time every task
+  spent inside it**, including time where a task was waiting or descheduled. With
+  parallelism the measured percentage therefore exceeds 100% — e.g. 8 continuously
+  busy tasks approach 800% of the elapsed time.
+* Queries (`getindex`, `TimerOutputs.ncalls`, ...) and `TimerOutput(cto)` return
+  detached snapshot copies. Snapshots taken while sections are in flight are
+  approximately consistent; they are exact once the timed tasks have finished.
+* Sections that are in flight while `reset_timer!` is called may or may not be
+  counted.
+* For a flamegraph, convert to a snapshot first: `flamegraph(TimerOutput(cto))`
+  (note that section spans from different tasks overlap under concurrency).
+
+Reporting on-CPU time instead of wall time (via `Base.Experimental.task_running_time_ns`,
+Julia 1.12+) may be added as an opt-in in the future.
+
+Alternatively, the manual pattern from the previous section — one plain
+`TimerOutput` per task, combined with `merge!` at a join point — remains fully
+supported and has zero extra cost in the timed sections.
+
 ## Querying data
 
 The (unexported) functions `ncalls`, `time`, `allocated` give the accumulated data for a section.

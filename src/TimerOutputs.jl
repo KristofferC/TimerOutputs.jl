@@ -3,8 +3,8 @@ module TimerOutputs
 using ExprTools
 
 import Base: show, time_ns
-export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
-    enable_timer!, disable_timer!, @notimeit, get_timer,
+export TimerOutput, ConcurrentTimerOutput, @timeit, @timeit_debug, reset_timer!,
+    print_timer, timeit, enable_timer!, disable_timer!, @notimeit, get_timer,
     begin_timed_section!, end_timed_section!
 
 
@@ -20,6 +20,7 @@ using Printf
 include("TimerOutput.jl")
 include("show.jl")
 include("utilities.jl")
+include("threaded.jl")
 
 include("compile.jl")
 _precompile_()

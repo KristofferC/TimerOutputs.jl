@@ -164,6 +164,10 @@ end
 # API #
 #######
 
+# What the @timeit macro checks; the generic fallback keeps any timer-like
+# object with an `enabled` field working
+@inline isenabled(x) = x.enabled
+
 # Accessors
 ncalls(to::TimerOutput) = to.accumulated_data.ncalls
 allocated(to::TimerOutput) = to.accumulated_data.allocs
@@ -273,7 +277,7 @@ function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Unio
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
-        $enabled = $local_to.enabled
+        $enabled = $(isenabled)($local_to)
         if $enabled
             $accumulated_data = $(push!)($local_to, $label)
         end
@@ -307,7 +311,7 @@ function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Unio
     @gensym local_to enabled accumulated_data b₀ t₀ val
     timeit_block = quote
         $local_to = $to
-        $enabled = $local_to.enabled
+        $enabled = $(isenabled)($local_to)
         if $enabled
             $accumulated_data = $(push!)($local_to, $label)
         end
@@ -504,7 +508,7 @@ notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
 function notimeit_expr(to, ex::Expr)
     return quote
         local to = $(esc(to))
-        local enabled = to.enabled
+        local enabled = $(isenabled)(to)
         $(disable_timer!)(to)
         local val
         $(
