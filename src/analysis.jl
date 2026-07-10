@@ -7,21 +7,21 @@
 
 The number of times the section was entered.
 """
-ncalls(s::Section) = s.metrics.ncalls
+ncalls(s::Section) = s.ncalls
 
 """
     TimerOutputs.time(x = DEFAULT_TIMER)
 
 The accumulated time in the section in nanoseconds.
 """
-time(s::Section) = s.metrics.time
+time(s::Section) = s.time
 
 """
     TimerOutputs.allocated(x = DEFAULT_TIMER)
 
 The accumulated allocations in the section in bytes.
 """
-allocated(s::Section) = s.metrics.allocs
+allocated(s::Section) = s.allocs
 
 ncalls(to::TimerOutput) = ncalls(to.root)
 time(to::TimerOutput) = time(to.root)
@@ -34,9 +34,9 @@ allocated() = allocated(DEFAULT_TIMER)
 # total (time, allocs) covered by the top level sections
 function totmeasured(s::Section)
     t, b = Int64(0), Int64(0)
-    for child in values(s.children)
-        t += child.metrics.time
-        b += child.metrics.allocs
+    for child in s.children
+        t += child.time
+        b += child.allocs
     end
     return t, b
 end
@@ -65,15 +65,20 @@ totallocated() = totallocated(DEFAULT_TIMER)
 # Indexing #
 ############
 
-Base.haskey(s::Section, name::String) = haskey(s.children, name)
+Base.haskey(s::Section, name::String) = lookup_child(s, name) !== nothing
 Base.haskey(to::TimerOutput, name::String) = haskey(to.root, name)
-Base.getindex(s::Section, name::String) = s.children[name]
+function Base.getindex(s::Section, name::String)
+    child = lookup_child(s, name)
+    child === nothing && throw(KeyError(name))
+    return child
+end
 Base.getindex(to::TimerOutput, name::String) = to.root[name]
 
 # nested indexing: to["a", "b"] === to["a"]["b"]
 Base.getindex(x::Union{TimerOutput, Section}, name::String, rest::String...) = getindex(x[name], rest...)
 
-Base.keys(s::Section) = keys(s.children)
+# section names in insertion order
+Base.keys(s::Section) = (child.name for child in s.children)
 Base.keys(to::TimerOutput) = keys(to.root)
 
 ###########
@@ -87,7 +92,7 @@ Base.merge(to::TimerOutput, others::TimerOutput...) = merge!(TimerOutput(), to, 
 function Base.merge!(to::TimerOutput, others::TimerOutput...; tree_point = String[])
     return lock(merge_lock) do
         for other in others
-            combine!(to.root.metrics, other.root.metrics)
+            combine!(to.root, other.root)
             # the merged measurement period spans that of the inputs
             to.start_time = min(to.start_time, other.start_time)
             to.start_allocs = min(to.start_allocs, other.start_allocs)
@@ -95,20 +100,21 @@ function Base.merge!(to::TimerOutput, others::TimerOutput...; tree_point = Strin
             for label in tree_point
                 into = into[label]
             end
-            _merge!(into.children, other.root.children)
+            _merge_children!(into, other.root)
         end
         return to
     end
 end
 
-function _merge!(into::Dict{String, Section}, from::Dict{String, Section})
-    for (label, section) in from
-        existing = get(into, label, nothing)
+# merge (copies of) the children of `from` into `into`, by label
+function _merge_children!(into::Section, from::Section)
+    for child in from.children
+        existing = lookup_child(into, child.name)
         if existing === nothing
-            into[label] = copy(section)
+            add_child!(into, copy(child))
         else
-            combine!(existing.metrics, section.metrics)
-            _merge!(existing.children, section.children)
+            combine!(existing, child)
+            _merge_children!(existing, child)
         end
     end
     return into
@@ -129,21 +135,21 @@ function flatten(to::TimerOutput)
     flat.start_time = to.start_time
     flat.start_allocs = to.start_allocs
     flat.measured = totmeasured(to)
-    for child in values(to.root.children)
-        _flatten!(flat.root.children, child)
+    for child in to.root.children
+        _flatten!(flat.root, child)
     end
     return flat
 end
 
-function _flatten!(into::Dict{String, Section}, s::Section)
-    for child in values(s.children)
+function _flatten!(into::Section, s::Section)
+    for child in s.children
         _flatten!(into, child)
     end
-    existing = get(into, s.name, nothing)
+    existing = lookup_child(into, s.name)
     if existing === nothing
-        into[s.name] = copy_node(s)
+        add_child!(into, copy_node(s))
     else
-        combine!(existing.metrics, s.metrics)
+        combine!(existing, s)
     end
     return into
 end
@@ -160,7 +166,7 @@ allocations not covered by its subsections.
 """
 complement!() = complement!(DEFAULT_TIMER)
 function complement!(to::TimerOutput)
-    for child in values(to.root.children)
+    for child in to.root.children
         _complement!(child)
     end
     return to
@@ -168,16 +174,19 @@ end
 
 function _complement!(s::Section)
     isempty(s.children) && return
-    rem_time = s.metrics.time
-    rem_allocs = s.metrics.allocs
-    for child in values(s.children)
-        rem_time -= child.metrics.time
-        rem_allocs -= child.metrics.allocs
+    rem_time = s.time
+    rem_allocs = s.allocs
+    for child in s.children
+        rem_time -= child.time
+        rem_allocs -= child.allocs
         _complement!(child)
     end
     name = string("~", s.name, "~")
-    metrics = Metrics(max(1, s.metrics.ncalls), max(rem_time, 0), max(rem_allocs, 0), s.metrics.firstexec)
-    s.children[name] = Section(name, metrics, Dict{String, Section}(), nothing, nothing)
+    complement = Section(
+        name, max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0), s.firstexec,
+        Section[], nothing, nothing
+    )
+    add_child!(s, complement)
     return
 end
 
@@ -205,7 +214,7 @@ function todict(s::Section)
         "allocated_bytes" => allocated(s),
         "total_time_ns" => tottime(s),
         "total_allocated_bytes" => totallocated(s),
-        "inner_timers" => Dict{String, Any}(k => todict(v) for (k, v) in s.children)
+        "inner_timers" => Dict{String, Any}(c.name => todict(c) for c in s.children)
     )
 end
 
@@ -215,7 +224,7 @@ end
 
 struct SectionTimeData
     label::String # not needed for stopping, but useful for debugging
-    data::Metrics
+    data::Section
     allocs_start::Int64
     time_start::Int64
 end

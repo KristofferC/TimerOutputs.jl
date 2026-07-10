@@ -816,10 +816,11 @@ end
     @test occursin("b", str)
     # pre-0.6 internal names still readable
     @test to.inner_timers["a"].accumulated_data.ncalls == 1
-    @test TimerOutputs.TimeData === TimerOutputs.Metrics
+    # metrics are stored inline in the section; old accumulated_data name still reads
+    @test to["a"].accumulated_data.ncalls == 1
     # copy is fully detached
     c = copy(to)
-    c["a"].metrics.ncalls = 99
+    c["a"].ncalls = 99
     @test ncalls(to["a"]) == 1
 end
 
@@ -941,7 +942,7 @@ end
         flamegraph(cto)
         # getindex returns a detached snapshot
         snap = cto["manual"]
-        snap.metrics.ncalls = 999
+        snap.ncalls = 999
         @test ncalls(cto["manual"]) == 1
     end
 

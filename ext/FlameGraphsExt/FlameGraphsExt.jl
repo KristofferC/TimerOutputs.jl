@@ -30,25 +30,25 @@ FlameGraphs.flamegraph(cto::ConcurrentTimerOutput; kwargs...) =
 ## internals
 
 # Sections are created when first entered, so firstexec is the section's start
-section_start(s::Section) = s.metrics.firstexec
-section_end(s::Section) = section_start(s) + s.metrics.time
+section_start(s::Section) = s.firstexec
+section_end(s::Section) = section_start(s) + s.time
 
 function min_start_time(s::Section)
     return minimum(section_start(child) for child in values(s.children))
 end
 
 function max_end_time(s::Section, self_start)
-    self_end = self_start + s.metrics.time
+    self_end = self_start + s.time
     isempty(s.children) && return self_end
     return max(self_end, maximum(max_end_time(child, section_start(child)) for child in values(s.children)))
 end
 
 function section_frame(s::Section)
     # TODO: Use a better conversion to a StackFrame so this contains the right kind of data
-    label = string(s.name, " ", strip(prettytime(s.metrics.time)))
-    if s.metrics.ncalls > 1
-        avg = s.metrics.time / s.metrics.ncalls
-        label *= string(" ", s.metrics.ncalls, "×μ", strip(prettytime(avg)))
+    label = string(s.name, " ", strip(prettytime(s.time)))
+    if s.ncalls > 1
+        avg = s.time / s.ncalls
+        label *= string(" ", s.ncalls, "×μ", strip(prettytime(avg)))
     end
     # Set the pointer to ensure the sf is unique
     return StackFrame(Symbol(label), Symbol("none"), 0, nothing, false, false, Base.objectid(s))

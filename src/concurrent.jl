@@ -60,14 +60,14 @@ end
 end
 
 # Inserting a new label must take the lock: `merged` may be iterating this
-# task's children from another task while we mutate the Dict. Runs once per
+# task's children from another task while we mutate them. Runs once per
 # distinct label per task. A function instead of a `lock() do` closure in
 # push! to avoid boxing in the hot path there.
 @noinline function locked_insert!(cto::ConcurrentTimerOutput, parent::Section, label::String)
     section = Section(label)
     lock(cto.lock)
     try
-        parent.children[label] = section
+        add_child!(parent, section)
     finally
         unlock(cto.lock)
     end
@@ -79,22 +79,20 @@ end
 function Base.push!(cto::ConcurrentTimerOutput, label::String)
     to = task_timer(cto)
     parent = current_section(to)
-    if parent.prev_label == label
-        section = parent.prev_child::Section
+    prev = parent.prev_child
+    if prev !== nothing && fasteq(prev.name, label)
+        section = prev
     else
-        maybe_section = get(parent.children, label, nothing)
-        if maybe_section === nothing
+        section = lookup_child(parent, label)
+        if section === nothing
             section = locked_insert!(cto, parent, label)
-        else
-            section = maybe_section
         end
     end
     section = section::Section
-    parent.prev_label = label
     parent.prev_child = section
 
     push!(to.stack, section)
-    return section.metrics
+    return section
 end
 
 # Deliberately does not check the generation: if reset_timer! happened while a
@@ -115,17 +113,6 @@ function reset_timer!(cto::ConcurrentTimerOutput)
     return cto
 end
 
-# Copy of the parts of the tree that `merged` needs: names, metrics and
-# children. Does not touch the prev_child cache, which the owning task may be
-# mutating.
-function _snapshot(s::Section)
-    snap = copy_node(s)
-    for (k, v) in s.children
-        snap.children[k] = _snapshot(v)
-    end
-    return snap
-end
-
 """
     TimerOutput(cto::ConcurrentTimerOutput) -> TimerOutput
 
@@ -141,18 +128,21 @@ function merged(cto::ConcurrentTimerOutput)
         filter!(cto.task_timers) do (ref, timer)
             task = ref.value
             if task === nothing || istaskdone(task::Task)
-                combine!(cto.archive.root.metrics, timer.root.metrics)
-                _merge!(cto.archive.root.children, timer.root.children)
+                combine!(cto.archive.root, timer.root)
+                _merge_children!(cto.archive.root, timer.root)
                 false
             else
                 true
             end
         end
+        # `copy` reads only names, counters and children, never the prev_child
+        # cache the owning task may be mutating; counter reads of in-flight
+        # sections are approximately consistent (documented)
         archive = cto.archive
-        result = TimerOutput(_snapshot(archive.root), Section[], true, archive.start_time, archive.start_allocs, nothing)
+        result = TimerOutput(copy(archive.root), Section[], true, archive.start_time, archive.start_allocs, nothing)
         for (_, timer) in cto.task_timers
-            combine!(result.root.metrics, timer.root.metrics)
-            _merge!(result.root.children, _snapshot(timer.root).children)
+            combine!(result.root, timer.root)
+            _merge_children!(result.root, timer.root)
         end
         result
     end
@@ -204,8 +194,8 @@ Base.merge!(to::TimerOutput, cto::ConcurrentTimerOutput; kwargs...) = merge!(to,
 function Base.merge!(cto::ConcurrentTimerOutput, others::TimerOutput...)
     lock(cto.lock) do
         for other in others
-            combine!(cto.archive.root.metrics, other.root.metrics)
-            _merge!(cto.archive.root.children, other.root.children)
+            combine!(cto.archive.root, other.root)
+            _merge_children!(cto.archive.root, other.root)
         end
     end
     return cto

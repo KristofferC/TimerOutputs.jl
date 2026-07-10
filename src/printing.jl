@@ -97,21 +97,20 @@ end
 const SORTBY_OPTIONS = (:time, :ncalls, :allocations, :name, :firstexec)
 
 function sortf(s::Section, sortby::Symbol)
-    sortby === :time && return s.metrics.time
-    sortby === :ncalls && return s.metrics.ncalls
-    sortby === :allocations && return s.metrics.allocs
-    sortby === :firstexec && return s.metrics.firstexec
+    sortby === :time && return s.time
+    sortby === :ncalls && return s.ncalls
+    sortby === :allocations && return s.allocs
+    sortby === :firstexec && return s.firstexec
     return error("internal error")
 end
 
+# non-mutating: the live children vector must not be reordered
 function sorted_children(s::Section, sortby::Symbol)
-    children = collect(values(s.children))
     if sortby === :name
-        sort!(children; by = c -> c.name)
+        return sort(s.children; by = c -> c.name)
     else
-        sort!(children; rev = sortby !== :firstexec, by = c -> sortf(c, sortby))
+        return sort(s.children; rev = sortby !== :firstexec, by = c -> sortf(c, sortby))
     end
-    return children
 end
 
 # tree guide pieces: (branch, last branch, continuation, blank)
@@ -126,7 +125,7 @@ function table_rows!(
     children = sorted_children(s, sortby)
     for (i, child) in enumerate(children)
         islast = i == length(children)
-        m = child.metrics
+        m = child
         name = toplevel ? child.name : string(prefix, islast ? guides[2] : guides[1], child.name)
         row = String[name, prettycount(m.ncalls), prettytime(m.time), prettypercent(m.time, ∑t)]
         compact || push!(row, prettytime(m.time / m.ncalls))
@@ -183,7 +182,7 @@ function Base.show(
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         linechars::Symbol = :unicode, title::String = ""
     )
-    ∑t, ∑b = s.metrics.ncalls > 0 ? (s.metrics.time, s.metrics.allocs) : totmeasured(s)
+    ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     return _show_table(io, s, ∑t, ∑b; sortby, allocations, compact, linechars, title, subtitle = "")
 end
 
