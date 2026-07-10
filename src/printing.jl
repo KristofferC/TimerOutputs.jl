@@ -148,13 +148,44 @@ end
 print_timer(; kwargs...) = print_timer(stdout; kwargs...)
 print_timer(to::Union{TimerOutput, ConcurrentTimerOutput}; kwargs...) = print_timer(stdout, to; kwargs...)
 print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
-print_timer(io::IO, to::Union{TimerOutput, ConcurrentTimerOutput}; kwargs...) = (show(io, to; kwargs...); println(io))
+print_timer(io::IO, to::TimerOutput; kwargs...) = (show_table(io, to; kwargs...); println(io))
+print_timer(io::IO, cto::ConcurrentTimerOutput; kwargs...) = print_timer(io, merged(cto); kwargs...)
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
 Base.show(cto::ConcurrentTimerOutput; kwargs...) = show(stdout, cto; kwargs...)
-Base.show(io::IO, cto::ConcurrentTimerOutput; kwargs...) = show(io, merged(cto); kwargs...)
 
-function Base.show(
+function Base.show(io::IO, cto::ConcurrentTimerOutput; kwargs...)
+    if in_container(io) && isempty(kwargs)
+        n = length(merged(cto).root.children)
+        return print(io, "ConcurrentTimerOutput(", n, n == 1 ? " section)" : " sections)")
+    end
+    return show_table(io, merged(cto); kwargs...)
+end
+
+# Inside containers print a one line summary instead of the full table.
+# Container printing marks its context with :typeinfo (and matrix display
+# additionally with :compact).
+in_container(io::IO) = get(io, :compact, false)::Bool || haskey(io, :typeinfo)
+
+function Base.show(io::IO, to::TimerOutput; kwargs...)
+    if in_container(io) && isempty(kwargs)
+        n = length(to.root.children)
+        return print(io, "TimerOutput(", repr(to.root.name), ", ", n, n == 1 ? " section)" : " sections)")
+    end
+    return show_table(io, to; kwargs...)
+end
+
+function Base.show(io::IO, s::Section; kwargs...)
+    if in_container(io) && isempty(kwargs)
+        return print(
+            io, "Section(", repr(s.name), ", ncalls = ", s.ncalls,
+            ", time = ", strip(prettytime(s.time)), ")"
+        )
+    end
+    return show_table(io, s; kwargs...)
+end
+
+function show_table(
         io::IO, to::TimerOutput;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         linechars::Symbol = :unicode, title::String = ""
@@ -177,7 +208,7 @@ end
 
 # A bare section prints as a table too, but has no meaningful wall-clock
 # reference, so no "% measured" subtitle.
-function Base.show(
+function show_table(
         io::IO, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         linechars::Symbol = :unicode, title::String = ""

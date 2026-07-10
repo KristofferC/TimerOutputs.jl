@@ -2,10 +2,20 @@
 # Section #
 ###########
 
-# A node in the section tree. The accumulated measurements are stored inline;
-# children are stored in insertion order and scanned linearly (typical fanout
-# is small and labels are usually interned literals, making the scan a couple
-# of pointer compares), with a Dict index built once the fanout grows.
+"""
+    Section
+
+A node in the section tree of a timer, as returned by `to["label"]`. Query it
+with `TimerOutputs.ncalls`, `TimerOutputs.time` (ns) and
+`TimerOutputs.allocated` (bytes), index further into it with
+`section["child"]`, and iterate its child names with `keys`.
+
+# Implementation notes
+The accumulated measurements are stored inline; children are stored in
+insertion order and scanned linearly (typical fanout is small and labels are
+usually interned literals, making the scan a couple of pointer compares),
+with a Dict index built once the fanout grows.
+"""
 mutable struct Section
     const name::String
     ncalls::Int64

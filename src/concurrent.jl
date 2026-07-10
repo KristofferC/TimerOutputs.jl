@@ -193,9 +193,13 @@ end
 Base.merge!(to::TimerOutput, cto::ConcurrentTimerOutput; kwargs...) = merge!(to, merged(cto); kwargs...)
 function Base.merge!(cto::ConcurrentTimerOutput, others::TimerOutput...)
     lock(cto.lock) do
+        archive = cto.archive
         for other in others
-            combine!(cto.archive.root, other.root)
-            _merge_children!(cto.archive.root, other.root)
+            combine!(archive.root, other.root)
+            # the merged measurement period spans that of the inputs
+            archive.start_time = min(archive.start_time, other.start_time)
+            archive.start_allocs = min(archive.start_allocs, other.start_allocs)
+            _merge_children!(archive.root, other.root)
         end
     end
     return cto

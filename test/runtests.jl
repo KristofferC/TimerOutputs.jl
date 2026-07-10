@@ -804,6 +804,96 @@ function foo_77(::Float64) end
     @test !contains(err, "src/TimerOutput.jl:")
 end
 
+@timeit "foo_168" function foo_168()
+    1 + 1
+
+    error("boom")
+end
+const foo_168_error_line = @__LINE__() - 2
+
+@timeit_debug "dbg_168" function dbg_168()
+    1 + 1
+
+    error("boom")
+end
+const dbg_168_error_line = @__LINE__() - 2
+
+@testset "function body keeps line numbers (#168)" begin
+    st = try
+        foo_168()
+    catch
+        stacktrace(catch_backtrace())
+    end
+    i = findfirst(f -> f.func === :foo_168, st)
+    @test st[i].line == foo_168_error_line
+    @test endswith(String(st[i].file), "runtests.jl")
+
+    # debug variant: the user body lives in the `inner` closure, but the error
+    # line must still be visible in the trace
+    st = try
+        dbg_168()
+    catch
+        stacktrace(catch_backtrace())
+    end
+    @test any(f -> f.line == dbg_168_error_line && endswith(String(f.file), "runtests.jl"), st)
+end
+
+@testset "reset_timer! inside a timed section (#172)" begin
+    to = TimerOutput()
+    @timeit to function foo_172(x)
+        reset_timer!(to)
+        x
+    end
+    @test foo_172(42) == 42
+
+    # nested sections unwinding after a reset must not throw either
+    @timeit to "outer" begin
+        @timeit to "inner" reset_timer!(to)
+    end
+    @timeit to "afterwards" 1 + 1
+    @test ncalls(to["afterwards"]) == 1
+end
+
+@testset "no NaN for zero-call sections" begin
+    @test prettytime(NaN) == "     -"
+    to = TimerOutput()
+    begin_timed_section!(to, "unfinished")
+    str = sprint(show, to)
+    @test !occursin("NaN", str)
+end
+
+@testset "macro edge cases" begin
+    to = TimerOutput()
+    x = 7
+    # non-Expr bodies (literals, symbols) work
+    @test (@timeit to "lit" 42) == 42
+    @test (@timeit to "sym" x) == 7
+    @test (@timeit to "nothing" nothing) === nothing
+    @test ncalls(to["lit"]) == 1
+    # invalid forms give the friendly usage error
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit f(x)))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit 42))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit))
+    # an empty timer still renders
+    @test sprint(show, TimerOutput()) isa String
+end
+
+@testset "compact show in containers" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    # the REPL displays container elements with a :compact IOContext
+    display_str(x) = sprint(show, MIME("text/plain"), x)
+    str = display_str([to, to])
+    @test occursin("TimerOutput(\"root\", 1 section)", str)
+    @test !occursin("ncalls", str) # no table headers inside the array
+    @test occursin("Section(\"b\"", display_str([to["a", "b"]]))
+    cto = ConcurrentTimerOutput()
+    @timeit cto "a" 1 + 1
+    @test occursin("ConcurrentTimerOutput(1 section)", display_str([cto]))
+    # top level printing is unaffected
+    @test occursin("ncalls", sprint(show, to))
+end
+
 @testset "Tables.jl interface" begin
     import Tables
     to = TimerOutput()
