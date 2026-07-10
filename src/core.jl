@@ -30,16 +30,15 @@ end
 
 Section(name::String) = Section(name, 0, 0, 0, time_ns(), Section[], nothing, nothing)
 
-# label strings are usually the same interned literal, so try pointer equality first
-@inline fasteq(a::String, b::String) = a === b || a == b
-
 const INDEX_THRESHOLD = 8
 
+# The linear scan is fast for the common case: string equality (egal) starts
+# with a pointer comparison, and labels are usually the same interned literal.
 @inline function lookup_child(parent::Section, label::String)
     index = parent.index
     index === nothing || return get(index, label, nothing)
     for child in parent.children
-        fasteq(child.name, label) && return child
+        child.name == label && return child
     end
     return nothing
 end
@@ -60,7 +59,7 @@ end
 # The child of `parent` named `label`, created on first use
 function child_section(parent::Section, label::String)
     prev = parent.prev_child
-    if prev !== nothing && fasteq(prev.name, label)
+    if prev !== nothing && prev.name == label
         return prev
     end
     child = lookup_child(parent, label)

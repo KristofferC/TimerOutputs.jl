@@ -80,7 +80,7 @@ function Base.push!(cto::ConcurrentTimerOutput, label::String)
     to = task_timer(cto)
     parent = current_section(to)
     prev = parent.prev_child
-    if prev !== nothing && fasteq(prev.name, label)
+    if prev !== nothing && prev.name == label
         section = prev
     else
         section = lookup_child(parent, label)
