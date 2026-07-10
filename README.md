@@ -10,6 +10,8 @@ The output can be customized as to only show the things you are interested in.
 
 If you find this package useful please give it a star. I like stars and it also helps me know where my development time is best spent.
 
+See the [changelog](CHANGELOG.md) for what is new in version 1.0.
+
 ## Example output
 
 An example of the output (used in a finite element simulation) is shown below
