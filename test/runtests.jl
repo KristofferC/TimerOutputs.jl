@@ -804,6 +804,33 @@ function foo_77(::Float64) end
     @test !contains(err, "src/TimerOutput.jl:")
 end
 
+@testset "Tables.jl interface" begin
+    import Tables
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" sleep(0.01)
+    end
+    @timeit to "second" 1 + 1
+    @test Tables.istable(typeof(to))
+    rows = Tables.rows(to)
+    @test length(rows) == 3
+    @test [r.path for r in rows] == ["outer", "outer/inner", "second"]
+    @test [r.section for r in rows] == ["outer", "inner", "second"]
+    @test [r.depth for r in rows] == [0, 1, 0]
+    @test all(r.ncalls == 1 for r in rows)
+    @test rows[2].time_ns >= 10^7
+    cols = Tables.columntable(to)
+    @test cols.ncalls == [1, 1, 1]
+    @test Tables.schema(to).names ==
+        (:path, :section, :depth, :ncalls, :time_ns, :allocated_bytes, :firstexec_ns)
+
+    # a bare section includes itself; a concurrent timer converts via a snapshot
+    @test [r.path for r in Tables.rows(to["outer"])] == ["outer", "outer/inner"]
+    cto = ConcurrentTimerOutput()
+    @timeit cto "work" 1 + 1
+    @test [r.section for r in Tables.rows(cto)] == ["work"]
+end
+
 @testset "new API (0.6)" begin
     to = TimerOutput()
     @timeit to "a" @timeit to "b" 1 + 1

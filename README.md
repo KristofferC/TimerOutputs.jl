@@ -528,6 +528,27 @@ is not recommended to be used extensively by libraries as the namespace is
 shared and collisions are possible if two libraries happen to use the same timer
 name.
 
+## Tables.jl integration
+
+Timers implement the [Tables.jl](https://github.com/JuliaData/Tables.jl) interface:
+one row per section in depth-first order, with the raw (unformatted) measurements.
+This means they can be passed directly to any Tables-consuming package, e.g.
+`DataFrame(to)` or `CSV.write("timings.csv", to)`:
+
+```julia
+julia> Tables.columntable(to)
+(path = ["nest 1", "nest 1/level 2.1", "nest 1/level 2.2", "nest 2", ...],
+ section = ["nest 1", "level 2.1", "level 2.2", "nest 2", ...],
+ depth = [0, 1, 1, 0, ...],
+ ncalls = [1, 1, 20, 1, ...],
+ time_ns = [625648679, 100547624, 422780218, 435925439, ...],
+ allocated_bytes = [1392, 112, 2240, 944, ...],
+ firstexec_ns = [40605122592791, 40605223345650, 40605324068660, ...])
+```
+
+The `path` column joins the nesting with `/` for readability; `depth` together
+with the row order reconstructs the tree exactly.
+
 ## Serialization
 
 Timers may be converted to a nested set of dictionaries with the (unexported) `TimerOutputs.todict` function. This can be used to serialize a timer as JSON, for example.

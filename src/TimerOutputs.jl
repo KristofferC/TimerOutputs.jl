@@ -4,6 +4,7 @@ using ExprTools: splitdef, combinedef
 using Printf: @sprintf
 using PrettyTables: pretty_table, MultiColumn, EmptyCells, TextTableFormat, TextTableStyle,
     text_table_borders__compact, @text__no_vertical_lines, @crayon_str
+import Tables
 
 import Base: show, time_ns
 
@@ -21,6 +22,7 @@ include("core.jl")
 include("macros.jl")
 include("analysis.jl")
 include("concurrent.jl")
+include("tables.jl")
 include("printing.jl")
 include("compat.jl")
 
