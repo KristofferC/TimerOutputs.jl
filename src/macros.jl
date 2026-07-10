@@ -94,9 +94,9 @@ function section_bookends(mod::Module, is_debug::Bool, to, label)
         $enabled = $(isenabled)($to_local)
         if $enabled
             $data = $(push!)($to_local, $label)
+            $b₀ = $(gc_bytes)()
+            $t₀ = $(time_ns)()
         end
-        $b₀ = $(gc_bytes)()
-        $t₀ = $(time_ns)()
     end
     cleanup = quote
         if $enabled

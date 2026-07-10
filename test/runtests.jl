@@ -897,6 +897,47 @@ end
     @test all(l -> textwidth(l) <= 60, split(str, "\n"))
 end
 
+@testset "NoTimerOutput (#109)" begin
+    nt = NoTimerOutput()
+    f_nt(t) = @timeit t "sec" (1 + 1)
+    @test f_nt(nt) == 2
+    # compiles away entirely when the timer type is known
+    @test length(code_typed(f_nt, Tuple{NoTimerOutput})[1].first.code) == 1
+    @test timeit(() -> 42, nt, "x") == 42
+    section = begin_timed_section!(nt, "x")
+    end_timed_section!(nt, section)
+    @test (@notimeit nt f_nt(nt)) == 2
+    @test !TimerOutputs.isenabled(nt)
+    @test enable_timer!(nt) == false
+    @test disable_timer!(nt) == false
+    @test reset_timer!(nt) === nt
+    # funcdef form
+    @timeit nt nt_func(x) = x + 1
+    @test nt_func(1) == 2
+end
+
+@testset "%par column (#192)" begin
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" 1 + 1
+    end
+    str = sprint(show, to)
+    @test occursin("%par", str)
+    # top level has a blank %par; compact mode hides the column
+    @test !occursin("%par", sprint((io, x) -> show(io, x; compact = true), to))
+end
+
+@testset "maxdepth (#122)" begin
+    to = TimerOutput()
+    @timeit to "l1" @timeit to "l2" @timeit to "l3" 1 + 1
+    str1 = sprint((io, x) -> show(io, x; maxdepth = 1), to)
+    @test occursin("l1", str1) && !occursin("l2", str1)
+    str2 = sprint((io, x) -> show(io, x; maxdepth = 2), to)
+    @test occursin("l2", str2) && !occursin("l3", str2)
+    @test occursin("l3", sprint(show, to))
+    @test_throws ArgumentError sprint((io, x) -> show(io, x; maxdepth = 0), to)
+end
+
 @testset "compact show in containers" begin
     to = TimerOutput()
     @timeit to "a" @timeit to "b" 1 + 1

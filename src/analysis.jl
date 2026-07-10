@@ -256,12 +256,17 @@ function end_timed_section!(to::TimerOutput, section::SectionTimeData)
     return pop!(to)
 end
 
+# the manual section API is also a no-op for NoTimerOutput
+begin_timed_section!(::NoTimerOutput, ::String) = nothing
+end_timed_section!(::NoTimerOutput, ::Nothing) = nothing
+
 """
     timeit(f::Function, [to = DEFAULT_TIMER], label::String)
 
 Functional form of `@timeit`: time the call `f()` under `label`.
 """
 timeit(f::Function, label::String) = timeit(f, DEFAULT_TIMER, label)
+timeit(f::Function, ::NoTimerOutput, ::String) = f()
 function timeit(f::Function, to::TimerOutput, label::String)
     section = begin_timed_section!(to, label)
     local val

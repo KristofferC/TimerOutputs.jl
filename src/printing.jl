@@ -121,26 +121,48 @@ tree_guides(linechars::Symbol) =
 # time unit (#115)
 asciitime(str, ascii::Bool) = ascii ? replace(str, "μs" => "us") : str
 
+# integer percentage of the enclosing section; blank at the top level (#192)
+prettypar(v, parent) = parent <= 0 ? "" : string(round(Int, v / parent * 100), "%")
+
+struct TableOptions
+    sortby::Symbol
+    allocations::Bool
+    compact::Bool
+    ascii::Bool
+    maxdepth::Int
+    guides::NTuple{4, String}
+end
+
 # Top level sections print flush; nested ones get tree guides.
 function table_rows!(
-        rows::Vector{Vector{String}}, s::Section, ∑t, ∑b, prefix::String, toplevel::Bool,
-        sortby, allocations, compact, guides, ascii
+        rows::Vector{Vector{String}}, s::Section, ∑t, ∑b,
+        prefix::String, depth::Int, parent_t, parent_b, opts::TableOptions
     )
-    children = sorted_children(s, sortby)
+    depth > opts.maxdepth && return rows
+    toplevel = depth == 1
+    children = sorted_children(s, opts.sortby)
     for (i, child) in enumerate(children)
         islast = i == length(children)
-        m = child
-        name = toplevel ? child.name : string(prefix, islast ? guides[2] : guides[1], child.name)
-        row = String[name, prettycount(m.ncalls), asciitime(prettytime(m.time), ascii), prettypercent(m.time, ∑t)]
-        compact || push!(row, asciitime(prettytime(m.time / m.ncalls), ascii))
-        if allocations
-            push!(row, prettymemory(m.allocs))
-            push!(row, prettypercent(m.allocs, ∑b))
-            compact || push!(row, prettymemory(m.allocs / m.ncalls))
+        name = toplevel ? child.name : string(prefix, islast ? opts.guides[2] : opts.guides[1], child.name)
+        row = String[
+            name, prettycount(child.ncalls),
+            asciitime(prettytime(child.time), opts.ascii), prettypercent(child.time, ∑t),
+        ]
+        if !opts.compact
+            push!(row, prettypar(child.time, toplevel ? 0 : parent_t))
+            push!(row, asciitime(prettytime(child.time / child.ncalls), opts.ascii))
+        end
+        if opts.allocations
+            push!(row, prettymemory(child.allocs))
+            push!(row, prettypercent(child.allocs, ∑b))
+            if !opts.compact
+                push!(row, prettypar(child.allocs, toplevel ? 0 : parent_b))
+                push!(row, prettymemory(child.allocs / child.ncalls))
+            end
         end
         push!(rows, row)
-        child_prefix = toplevel ? "" : string(prefix, islast ? guides[4] : guides[3])
-        table_rows!(rows, child, ∑t, ∑b, child_prefix, false, sortby, allocations, compact, guides, ascii)
+        child_prefix = toplevel ? "" : string(prefix, islast ? opts.guides[4] : opts.guides[3])
+        table_rows!(rows, child, ∑t, ∑b, child_prefix, depth + 1, child.time, child.allocs, opts)
     end
     return rows
 end
@@ -189,26 +211,35 @@ function Base.show(io::IO, s::Section; kwargs...)
     return show_table(io, s; kwargs...)
 end
 
-function show_table(
-        io::IO, to::TimerOutput;
-        sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        linechars::Symbol = :unicode, title::String = ""
-    )
+function validated_options(; sortby, allocations, compact, linechars, maxdepth)
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
         throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
+    maxdepth >= 1 ||
+        throw(ArgumentError("maxdepth should be at least 1, got $maxdepth"))
+    return TableOptions(
+        sortby, allocations, compact, linechars === :ascii, maxdepth, tree_guides(linechars)
+    )
+end
+
+function show_table(
+        io::IO, to::TimerOutput;
+        sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
+        linechars::Symbol = :unicode, maxdepth::Int = typemax(Int), title::String = ""
+    )
+    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth)
 
     Δt = time_ns() - to.start_time
     Δb = gc_bytes() - to.start_allocs
     ∑t, ∑b = totmeasured(to)
 
     subtitle = string(
-        "Total / % measured: ", strip(asciitime(prettytime(Δt), linechars === :ascii)),
+        "Total / % measured: ", strip(asciitime(prettytime(Δt), opts.ascii)),
         " / ", strip(prettypercent(∑t, Δt)),
         allocations ? string("   ", strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))) : ""
     )
-    return _show_table(io, to.root, ∑t, ∑b; sortby, allocations, compact, linechars, title, subtitle)
+    return _show_table(io, to.root, ∑t, ∑b, opts, title, subtitle)
 end
 
 # A bare section prints as a table too, but has no meaningful wall-clock
@@ -216,30 +247,26 @@ end
 function show_table(
         io::IO, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        linechars::Symbol = :unicode, title::String = ""
+        linechars::Symbol = :unicode, maxdepth::Int = typemax(Int), title::String = ""
     )
+    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
-    return _show_table(io, s, ∑t, ∑b; sortby, allocations, compact, linechars, title, subtitle = "")
+    return _show_table(io, s, ∑t, ∑b, opts, title, "")
 end
 
-function _show_table(
-        io::IO, s::Section, ∑t, ∑b;
-        sortby, allocations, compact, linechars, title, subtitle
-    )
+function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, subtitle)
+    allocations, compact = opts.allocations, opts.compact
     rows = Vector{Vector{String}}()
-    table_rows!(
-        rows, s, ∑t, ∑b, "", true, sortby, allocations, compact,
-        tree_guides(linechars), linechars === :ascii
-    )
+    table_rows!(rows, s, ∑t, ∑b, "", 1, 0, 0, opts)
 
     labels = String["Section", "ncalls", "time", "%tot"]
-    compact || push!(labels, "avg")
+    compact || append!(labels, ["%par", "avg"])
     if allocations
         append!(labels, ["alloc", "%tot"])
-        compact || push!(labels, "avg")
+        compact || append!(labels, ["%par", "avg"])
     end
     ncols = length(labels)
-    time_cols = compact ? 2 : 3
+    time_cols = compact ? 2 : 4
     group_row = Any[EmptyCells(2), MultiColumn(time_cols, "Time")]
     allocations && push!(group_row, MultiColumn(time_cols, "Allocations"))
 
@@ -253,10 +280,10 @@ function _show_table(
         io, data;
         column_labels = [group_row, labels],
         alignment = [:l; fill(:r, ncols - 1)],
-        table_format = if linechars === :unicode
-            TextTableFormat(; @text__no_vertical_lines)
-        else
+        table_format = if opts.ascii
             TextTableFormat(; borders = text_table_borders__compact, @text__no_vertical_lines)
+        else
+            TextTableFormat(; @text__no_vertical_lines)
         end,
         style = TextTableStyle(;
             title = crayon"bold",

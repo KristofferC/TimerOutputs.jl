@@ -15,17 +15,17 @@ If you find this package useful please give it a star. I like stars and it also 
 An example of the output (used in a finite element simulation) is shown below
 
 ```
-              Total / % measured: 6.89s / 97.7%   5.20GiB / 84.9%
-────────────────────────────────────────────────────────────────────────────────
-                                        Time                 Allocations
- Section               ncalls    time    %tot     avg    alloc    %tot      avg
-────────────────────────────────────────────────────────────────────────────────
- assemble                   6   3.27s   48.5%   545ms  3.65GiB   82.7%   623MiB
- └─ inner assemble       240k   1.92s   28.5%  8.00μs  3.14GiB   71.1%  13.7KiB
- linear solve               5   2.73s   40.5%   546ms   108MiB    2.4%  21.6MiB
- create sparse matrix       6   658ms    9.8%   110ms   662MiB   14.6%   110MiB
- export                     1  78.4ms    1.2%  78.4ms  13.1MiB    0.3%  13.1MiB
-────────────────────────────────────────────────────────────────────────────────
+                    Total / % measured: 6.89s / 97.7%   5.20GiB / 84.9%
+────────────────────────────────────────────────────────────────────────────────────────────
+                                           Time                       Allocations
+ Section               ncalls    time    %tot  %par     avg    alloc    %tot  %par      avg
+────────────────────────────────────────────────────────────────────────────────────────────
+ assemble                   6   3.27s   48.5%         545ms  3.65GiB   82.7%         623MiB
+ └─ inner assemble       240k   1.92s   28.5%   59%  8.00μs  3.14GiB   71.1%   86%  13.7KiB
+ linear solve               5   2.73s   40.5%         546ms   108MiB    2.4%        21.6MiB
+ create sparse matrix       6   658ms    9.8%         110ms   662MiB   14.6%         110MiB
+ export                     1  78.4ms    1.2%        78.4ms  13.1MiB    0.3%        13.1MiB
+────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
 The first line shows the total (wall) time passed and allocations made since the start of the timer as well as
@@ -33,7 +33,8 @@ the percentage of those totals spent inside timed sections.
 The following lines shows data for all the timed sections.
 The section label is shown first followed by the number of calls made to that section.
 Finally, the total time elapsed or allocations made in that section are shown together with the
-percentage of the total in that section and the average (time / allocations per call).
+percentage of the total in that section (`%tot`), the percentage of the enclosing section
+(`%par`, blank for top level sections), and the average (time / allocations per call).
 
 ## Usage
 
@@ -118,23 +119,23 @@ spent in each section since `to` was created as well as averages (per call).
 Similar information is available for allocations:
 
 ```
-           Total / % measured: 4.30s / 67.2%   103MiB / 81.9%
-────────────────────────────────────────────────────────────────────────
-                                Time                 Allocations
- Section       ncalls    time    %tot     avg    alloc    %tot      avg
-────────────────────────────────────────────────────────────────────────
- sleep            101   1.14s   39.4%  11.3ms  16.7KiB    0.0%     169B
- nest 2             1   703ms   24.3%   703ms     944B    0.0%     944B
- ├─ level 2.2       1   401ms   13.9%   401ms     112B    0.0%     112B
- └─ level 2.1       1   302ms   10.4%   302ms     112B    0.0%     112B
- throwing           1   502ms   17.4%   502ms     512B    0.0%     512B
- nest 1             1   396ms   13.7%   396ms  1.36KiB    0.0%  1.36KiB
- ├─ level 2.2       1   201ms    7.0%   201ms     112B    0.0%     112B
- └─ level 2.1       3  93.2ms    3.2%  31.1ms     336B    0.0%     112B
- randoms            1   152ms    5.3%   152ms  84.2MiB  100.0%  84.2MiB
- funcdef            1  56.0ns    0.0%  56.0ns    0.00B    0.0%    0.00B
- foo                1  15.0ns    0.0%  15.0ns    0.00B    0.0%    0.00B
-────────────────────────────────────────────────────────────────────────
+                 Total / % measured: 4.27s / 67.6%   103MiB / 81.8%
+────────────────────────────────────────────────────────────────────────────────────
+                                   Time                       Allocations
+ Section       ncalls    time    %tot  %par     avg    alloc    %tot  %par      avg
+────────────────────────────────────────────────────────────────────────────────────
+ sleep            101   1.14s   39.4%        11.3ms  16.7KiB    0.0%           169B
+ nest 2             1   703ms   24.3%         703ms     496B    0.0%           496B
+ ├─ level 2.2       1   401ms   13.9%   57%   401ms     112B    0.0%   23%     112B
+ └─ level 2.1       1   301ms   10.4%   43%   301ms     112B    0.0%   23%     112B
+ throwing           1   502ms   17.4%         502ms     512B    0.0%           512B
+ nest 1             1   396ms   13.7%         396ms     944B    0.0%           944B
+ ├─ level 2.2       1   201ms    7.0%   51%   201ms     112B    0.0%   12%     112B
+ └─ level 2.1       3  93.4ms    3.2%   24%  31.1ms     336B    0.0%   36%     112B
+ randoms            1   149ms    5.1%         149ms  84.3MiB  100.0%        84.3MiB
+ funcdef            1  15.0ns    0.0%        15.0ns    0.00B    0.0%          0.00B
+ foo                1  14.0ns    0.0%        14.0ns    0.00B    0.0%          0.00B
+────────────────────────────────────────────────────────────────────────────────────
 ```
 
 It is also possible to manually start and stop a timed section.
@@ -152,8 +153,9 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 * `title::String` ─ title for the timer
 * `allocations::Bool` ─ show the allocation columns (default `true`)
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations`, `:name` or `:firstexec`
-* `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` to draw the horizontal lines in the table
-* `compact::Bool` ─ hide the `avg` column (default `false`)
+* `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` for a pure ASCII table
+* `compact::Bool` ─ hide the `%par` and `avg` columns (default `false`)
+* `maxdepth::Int` ─ only print sections nested up to this depth (default: no limit)
 
 ## Flattening
 
@@ -431,14 +433,14 @@ print_timer()
 which prints:
 ```julia
 julia> print_timer()
-         Total / % measured: 152ms / 80.4%   1.50MiB / 0.1%
-────────────────────────────────────────────────────────────────────
-                            Time                 Allocations
- Section   ncalls    time    %tot     avg    alloc    %tot      avg
-────────────────────────────────────────────────────────────────────
- section2       1   101ms   82.7%   101ms     400B   50.0%     400B
- section        1  21.1ms   17.3%  21.1ms     400B   50.0%     400B
-────────────────────────────────────────────────────────────────────
+               Total / % measured: 159ms / 78.7%   1.54MiB / 0.4%
+────────────────────────────────────────────────────────────────────────────────
+                               Time                       Allocations
+ Section   ncalls    time    %tot  %par     avg    alloc    %tot  %par      avg
+────────────────────────────────────────────────────────────────────────────────
+ section2       1   101ms   80.9%         101ms     400B   50.0%           400B
+ section        1  23.9ms   19.1%        23.9ms     400B   50.0%           400B
+────────────────────────────────────────────────────────────────────────────────
 ```
 
 The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`.
@@ -468,16 +470,16 @@ We can print the result:
 
 ```julia
 julia> print_timer(to)
-           Total / % measured: 143ms / 95.6%   73.4KiB / 10.0%
-─────────────────────────────────────────────────────────────────────────
-                                 Time                 Allocations
- Section        ncalls    time    %tot     avg    alloc    %tot      avg
-─────────────────────────────────────────────────────────────────────────
- section2            1   112ms   82.4%   112ms  1.77KiB   24.0%  1.77KiB
- ├─ section2.1       1   101ms   74.2%   101ms     400B    5.3%     400B
- └─ ~section2~       1  11.2ms    8.2%  11.2ms  1.38KiB   18.7%  1.38KiB
- section1            1  24.1ms   17.6%  24.1ms  5.58KiB   76.0%  5.58KiB
-─────────────────────────────────────────────────────────────────────────
+                 Total / % measured: 135ms / 98.9%   64.1KiB / 2.8%
+─────────────────────────────────────────────────────────────────────────────────────
+                                    Time                       Allocations
+ Section        ncalls    time    %tot  %par     avg    alloc    %tot  %par      avg
+─────────────────────────────────────────────────────────────────────────────────────
+ section2            1   112ms   84.2%         112ms  1.39KiB   78.1%        1.39KiB
+ ├─ section2.1       1   101ms   75.8%   90%   101ms     400B   21.9%   28%     400B
+ └─ ~section2~       1  11.1ms    8.3%   10%  11.1ms  1.00KiB   56.1%   72%  1.00KiB
+ section1            1  21.1ms   15.8%        21.1ms     400B   21.9%           400B
+─────────────────────────────────────────────────────────────────────────────────────
 ```
 
 In order to complement the default timer simply call `TimerOutputs.complement!()`.
@@ -511,14 +513,14 @@ end
 which prints:
 ```julia
 julia> print_timer(get_timer("Shared"))
-        Total / % measured: 127ms / 99.9%   1.36MiB / 99.8%
-────────────────────────────────────────────────────────────────────
-                            Time                 Allocations
- Section   ncalls    time    %tot     avg    alloc    %tot      avg
-────────────────────────────────────────────────────────────────────
- section1       1   127ms  100.0%   127ms  1.35MiB  100.0%  1.35MiB
- └─ foo         1   101ms   79.7%   101ms     224B    0.0%     224B
-────────────────────────────────────────────────────────────────────
+              Total / % measured: 124ms / 99.9%   1.30MiB / 99.8%
+────────────────────────────────────────────────────────────────────────────────
+                               Time                       Allocations
+ Section   ncalls    time    %tot  %par     avg    alloc    %tot  %par      avg
+────────────────────────────────────────────────────────────────────────────────
+ section1       1   124ms  100.0%         124ms  1.30MiB  100.0%        1.30MiB
+ └─ foo         1   101ms   81.4%   81%   101ms     224B    0.0%    0%     224B
+────────────────────────────────────────────────────────────────────────────────
 ```
 
 Note that the result of `get_timer` should not be called from top-level in a
@@ -614,6 +616,26 @@ Because you may wish to turn on only certain portions of your instrumented code 
 By default, debug timings are disabled, and this conditional should be optimized away, allowing for truly zero-overhead.
 If a user calls `TimerOutputs.enable_debug_timings(<module>)`, the `<module>.timeit_debug_enabled()` method will be redefined, causing all dependent methods to be recompiled within that module.
 This may take a while, and hence is intended only for debugging usage, however all calls to `@timeit_debug` (within that Module) will thereafter be enabled.
+
+An alternative zero-overhead mechanism is `NoTimerOutput`: a dummy timer where
+every timing operation is a no-op. When the type of the timer is known to the
+compiler — a `const`, or a type parameter of the struct it is stored in — the
+timed sections compile away entirely:
+
+```julia
+struct Solver{Timer}
+    to::Timer
+end
+
+solve(s::Solver) = @timeit s.to "solve" begin ... end
+
+Solver(TimerOutput())   # timed
+Solver(NoTimerOutput()) # timing compiled away
+```
+
+Unlike `@timeit_debug`, this selects timing per timer object instead of per
+module and involves no recompilation trickery, but flipping it requires
+reconstructing the object that holds the timer.
 
 ## Author
 

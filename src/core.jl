@@ -168,6 +168,26 @@ function reset_timer!(to::TimerOutput)
 end
 
 #################
+# NoTimerOutput #
+#################
+
+"""
+    NoTimerOutput()
+
+A zero-overhead stand-in for a `TimerOutput`. All timing operations on it are
+no-ops, and when the timer's type is known to the compiler (a `const`, or a
+type parameter of the algorithm struct it is stored in), `@timeit` sections
+compile away entirely. Unlike `@timeit_debug`, timing is selected per timer
+object instead of per module.
+"""
+struct NoTimerOutput end
+
+isenabled(::NoTimerOutput) = false
+enable_timer!(::NoTimerOutput) = false
+disable_timer!(::NoTimerOutput) = false
+reset_timer!(nt::NoTimerOutput) = nt
+
+#################
 # Default timer #
 #################
 
