@@ -895,6 +895,9 @@ end
     ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (24, 60))
     str = sprint(io -> show(IOContext(io, ctx), to))
     @test all(l -> textwidth(l) <= 60, split(str, "\n"))
+    # the Section column is shrunk before any data columns are cropped
+    @test occursin("…", str)
+    @test occursin("ncalls", str) && occursin("time", str)
 end
 
 @testset "NoTimerOutput (#109)" begin

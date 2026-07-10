@@ -409,8 +409,11 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             [TextHighlighter((_, i, _) -> i in grayset, crayon"dark_gray")]
         end,
         # crop to the display width in the REPL and on terminals so long
-        # section names never make lines wrap (#166)
+        # section names never make lines wrap (#166); the Section column is
+        # shrunk first so the numeric columns survive
         fit_table_in_display_horizontally = get(io, :limit, io isa Base.TTY)::Bool,
+        shrinkable_data_column = 1,
+        shrinkable_column_minimum_width = 10,
         title = title,
         title_alignment = :c,
         subtitle = subtitle,
