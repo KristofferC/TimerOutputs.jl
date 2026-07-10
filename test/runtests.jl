@@ -618,6 +618,12 @@ end
 
     table = sprint((io, to) -> show(io, to, sortby = :firstexec), to)
     @test match(r"aaaa", table).offset < match(r"bbbb", table).offset < match(r"cccc", table).offset
+
+    # copy and flatten must preserve the firstexec timestamp
+    td = TimerOutputs.TimeData(1, 2, 3, 4)
+    @test copy(td).firstexec == 4
+    fl = flatten(to)
+    @test fl["group"].accumulated_data.firstexec == to["group"].accumulated_data.firstexec
 end
 
 @static if isdefined(Threads, Symbol("@spawn"))

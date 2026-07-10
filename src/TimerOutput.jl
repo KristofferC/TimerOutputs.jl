@@ -8,7 +8,7 @@ mutable struct TimeData
     firstexec::Int64
 end
 TimeData(ncalls, time, allocs) = TimeData(ncalls, time, allocs, time)
-Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs)
+Base.copy(td::TimeData) = TimeData(td.ncalls, td.time, td.allocs, td.firstexec)
 TimeData() = TimeData(0, 0, 0, time_ns())
 
 function Base.:+(self::TimeData, other::TimeData)
