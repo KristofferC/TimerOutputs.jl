@@ -194,18 +194,14 @@ the table is displayed as:
 ```julia
 julia> show(to, allocations = false, compact = true)
 ──────────────────────────────────────
-                            Time
-                       ──────────────
-  Tot / % measured:    1.08s / 98.8%
- ────────────────────  ──────────────
  Section       ncalls    time    %tot
 ──────────────────────────────────────
- nest 1             1   625ms   58.8%
- ├─ level 2.2      20   423ms   39.8%
- └─ level 2.1       1   101ms    9.5%
- nest 2             1   438ms   41.2%
- ├─ level 2.1      30   336ms   31.6%
- └─ level 2.2       1   101ms    9.5%
+ nest 1             1   632ms   58.9%
+ ├─ level 2.2      20   427ms   39.8%
+ └─ level 2.1       1   101ms    9.4%
+ nest 2             1   441ms   41.1%
+ ├─ level 2.1      30   339ms   31.6%
+ └─ level 2.2       1   101ms    9.4%
 ──────────────────────────────────────
 ```
 
@@ -216,16 +212,12 @@ julia> to_flatten = TimerOutputs.flatten(to);
 
 julia> show(to_flatten; compact = true, allocations = false)
 ───────────────────────────────────
-                         Time
-                    ──────────────
- Tot / % measured:  1.10s / 96.5%
- ─────────────────  ──────────────
  Section    ncalls    time    %tot
 ───────────────────────────────────
- nest 1          1   625ms   58.8%
- level 2.2      21   524ms   49.3%
- nest 2          1   438ms   41.2%
- level 2.1      31   437ms   41.1%
+ nest 1          1   632ms   58.9%
+ level 2.2      21   528ms   49.2%
+ nest 2          1   441ms   41.1%
+ level 2.1      31   440ms   41.0%
 ───────────────────────────────────
 ```
 
@@ -247,39 +239,27 @@ julia> @timeit to2 "outer" begin
        end
 
 julia> show(to1; compact=true, allocations=false)
-────────────────────────────────────
-                          Time
-                     ──────────────
- Tot / % measured:   2.15s / 46.7%
- ──────────────────  ──────────────
- Section     ncalls    time    %tot
-────────────────────────────────────
- outer            1   1.01s  100.0%
- └─ inner         1   1.01s  100.0%
-────────────────────────────────────
+──────────────────────────────────
+ Section   ncalls    time    %tot
+──────────────────────────────────
+ outer          1   1.00s  100.0%
+ └─ inner       1   1.00s  100.0%
+──────────────────────────────────
 
 julia> show(to2; compact=true, allocations=false)
-───────────────────────────────────
-                         Time
-                    ──────────────
- Tot / % measured:  2.29s / 43.8%
- ─────────────────  ──────────────
- Section    ncalls    time    %tot
-───────────────────────────────────
- outer           1   1.00s  100.0%
-───────────────────────────────────
+─────────────────────────────────
+ Section  ncalls    time    %tot
+─────────────────────────────────
+ outer         1   1.00s  100.0%
+─────────────────────────────────
 
 julia> show(merge(to1, to2); compact=true, allocations=false)
-────────────────────────────────────
-                          Time
-                     ──────────────
- Tot / % measured:   2.30s / 87.1%
- ──────────────────  ──────────────
- Section     ncalls    time    %tot
-────────────────────────────────────
- outer            2   2.01s  100.0%
- └─ inner         1   1.01s   50.1%
-────────────────────────────────────
+──────────────────────────────────
+ Section   ncalls    time    %tot
+──────────────────────────────────
+ outer          2   2.01s  100.0%
+ └─ inner       1   1.00s   50.1%
+──────────────────────────────────
 ```
 
 Merging can be used to facilitate timing coverage throughout simple multi-threaded setups.

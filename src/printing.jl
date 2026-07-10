@@ -113,9 +113,10 @@ function sort_sections!(sections::Vector{Section}, sortby::Symbol)
     end
 end
 
-# tree guide pieces: (branch, last branch, continuation, blank)
+# tree guide pieces: (branch, last branch, continuation, blank);
+# ascii mode uses plain indentation like TimerOutputs 0.5 did
 tree_guides(linechars::Symbol) =
-    linechars === :unicode ? ("├─ ", "└─ ", "│  ", "   ") : ("+- ", "`- ", "|  ", "   ")
+    linechars === :unicode ? ("├─ ", "└─ ", "│  ", "   ") : ("  ", "  ", "  ", "  ")
 
 # with linechars = :ascii the output should be pure ASCII, including in the
 # time unit (#115)
@@ -186,6 +187,7 @@ struct TableOptions
     ascii::Bool
     maxdepth::Int
     complement::Bool
+    header::Bool # show the group header and totals block above the column labels
     guides::NTuple{4, String}
 end
 
@@ -284,9 +286,11 @@ function validated_options(; sortby, allocations, compact, columns, linechars, m
         throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
     maxdepth >= 1 ||
         throw(ArgumentError("maxdepth should be at least 1, got $maxdepth"))
+    # like 0.5, the most minimal selection also drops the header block
+    header = !(compact && !allocations && columns === nothing)
     columns = resolve_columns(columns === nothing ? default_columns(allocations, compact) : columns)
     return TableOptions(
-        sortby, columns, linechars === :ascii, maxdepth, complement,
+        sortby, columns, linechars === :ascii, maxdepth, complement, header,
         tree_guides(linechars)
     )
 end
@@ -318,12 +322,16 @@ function show_table(
         nothing
     end
 
-    totals = (;
-        time = string(
-            strip(asciitime(prettytime(Δt), opts.ascii)), " / ", strip(prettypercent(∑t, Δt))
-        ),
-        alloc = string(strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))),
-    )
+    totals = if opts.header
+        (;
+            time = string(
+                strip(asciitime(prettytime(Δt), opts.ascii)), " / ", strip(prettypercent(∑t, Δt))
+            ),
+            alloc = string(strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))),
+        )
+    else
+        nothing
+    end
     return _show_table(io, to.root, ∑t, ∑b, opts, title, totals, extra)
 end
 
@@ -389,7 +397,7 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
 
     labels = String["Section"; [c.label for c in opts.columns]]
     ncols = length(labels)
-    with_groups = any(c -> !isempty(c.group), opts.columns)
+    with_groups = opts.header && any(c -> !isempty(c.group), opts.columns)
 
     # the totals go in a row underneath the column group headers they belong
     # to; without group headers they become a plain line above the table

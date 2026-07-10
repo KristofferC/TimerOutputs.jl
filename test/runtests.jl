@@ -880,13 +880,27 @@ end
 
 @testset "ascii output is pure ASCII (#115)" begin
     to = TimerOutput()
-    @timeit to "microsleep" 1 + 1
+    @timeit to "microsleep" @timeit to "nested" 1 + 1
     to["microsleep"].time = 5_000 # 5 μs
     str = sprint((io, x) -> show(io, x; linechars = :ascii), to)
     @test isascii(str)
     @test occursin("us", str)
+    # ascii mode uses plain indentation, not tree guide characters
+    @test occursin("\n   nested", str)
     str_unicode = sprint(show, to)
     @test occursin("μs", str_unicode)
+    @test occursin("└─ nested", str_unicode)
+end
+
+@testset "compact without allocations hides the header block" begin
+    to = TimerOutput()
+    @timeit to "a" 1 + 1
+    str = sprint((io, x) -> show(io, x; compact = true, allocations = false), to)
+    @test !occursin("Time", str)
+    @test !occursin("Tot / % measured", str)
+    # but compact with allocations keeps it
+    str2 = sprint((io, x) -> show(io, x; compact = true), to)
+    @test occursin("Time", str2) && occursin("Tot / % measured", str2)
 end
 
 @testset "table is cropped to the display width (#166)" begin
@@ -958,12 +972,15 @@ end
     @test findfirst("Allocations", str3)[1] < findfirst("Time", str3)[1]
 
     # the compact/allocations keywords are shorthands for column selections
-    @test header_line(render(; compact = true, allocations = false)) ==
-        header_line(render(; columns = [:ncalls, :time, :time_pct]))
-    @test header_line(render()) ==
+    # (token comparison: the header block presence may change column padding)
+    @test split(header_line(render(; compact = true, allocations = false))) ==
+        split(header_line(render(; columns = [:ncalls, :time, :time_pct])))
+    @test split(header_line(render())) ==
+        split(
         header_line(
-        render(;
-            columns = [:ncalls, :time, :time_pct, :time_avg, :spacer, :allocs, :allocs_pct, :allocs_avg]
+            render(;
+                columns = [:ncalls, :time, :time_pct, :time_avg, :spacer, :allocs, :allocs_pct, :allocs_avg]
+            )
         )
     )
 
