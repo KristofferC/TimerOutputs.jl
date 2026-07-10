@@ -1,10 +1,10 @@
 # TimerOutputs changelog
 
-## Version 0.6.0
+## Version 0.5.30
 
-TimerOutputs 0.6 is a rewrite of the package internals with a number of new
-features. The documented API of 0.5 keeps working; code that relied on
-undocumented internals may need updating (see "Breaking" below).
+TimerOutputs 0.5.30 is a rewrite of the package internals with a number of new
+features. The documented API keeps working; code that relied on undocumented
+internals may need updating (see "Internal changes" below).
 
 ### New features
 
@@ -65,7 +65,7 @@ undocumented internals may need updating (see "Breaking" below).
   precompiled), at the cost of a larger load time (~120 ms) from the
   PrettyTables dependency.
 
-### Breaking
+### Internal changes
 
 * PrettyTables.jl and Tables.jl are new dependencies.
 * The printed table looks different (see above); output-parsing code needs
