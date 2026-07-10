@@ -164,10 +164,39 @@ end
 #######
 
 # Accessors
+"""
+    TimerOutputs.ncalls(to::TimerOutput = DEFAULT_TIMER)
+
+The number of times the section was entered.
+"""
 ncalls(to::TimerOutput) = to.accumulated_data.ncalls
+
+"""
+    TimerOutputs.allocated(to::TimerOutput = DEFAULT_TIMER)
+
+The accumulated allocations in the section in bytes.
+"""
 allocated(to::TimerOutput) = to.accumulated_data.allocs
+
+"""
+    TimerOutputs.time(to::TimerOutput = DEFAULT_TIMER)
+
+The accumulated time in the section in nanoseconds.
+"""
 time(to::TimerOutput) = to.accumulated_data.time
+
+"""
+    TimerOutputs.totallocated(to::TimerOutput = DEFAULT_TIMER)
+
+Total allocated bytes over all sections directly under `to`.
+"""
 totallocated(to::TimerOutput) = totmeasured(to)[2]
+
+"""
+    TimerOutputs.tottime(to::TimerOutput = DEFAULT_TIMER)
+
+Total time in nanoseconds over all sections directly under `to`.
+"""
 tottime(to::TimerOutput) = totmeasured(to)[1]
 
 time() = time(DEFAULT_TIMER)
@@ -436,6 +465,12 @@ end
 Base.haskey(to::TimerOutput, name::String) = haskey(to.inner_timers, name)
 Base.getindex(to::TimerOutput, name::String) = to.inner_timers[name]
 
+"""
+    TimerOutputs.flatten(to::TimerOutput) -> TimerOutput
+
+Return a new `TimerOutput` where the data for all sections with identical
+labels, regardless of nesting level, is accumulated into one flat level.
+"""
 function flatten(to::TimerOutput)
     t, b = totmeasured(to)
     inner_timers = Dict{String, TimerOutput}()
@@ -474,6 +509,12 @@ end
 # Default function throws an error for the benefit of the user
 notimeit_expr(args...) = throw(ArgumentError("invalid macro usage for @notimeit, use as @notimeit [to] codeblock"))
 
+"""
+    TimerOutputs.complement!(to::TimerOutput = DEFAULT_TIMER)
+
+Add to each section a `~name~` subsection accounting for the time and
+allocations not covered by its subsections.
+"""
 complement!() = complement!(DEFAULT_TIMER)
 function complement!(to::TimerOutput)
     if length(to.inner_timers) == 0

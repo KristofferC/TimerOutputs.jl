@@ -543,9 +543,18 @@ To do that use `crop_root=true`
 ProfileView.view(flamegraph(to, crop_root=true))
 ```
 
+## Thread safety
+
+A `TimerOutput` instance (including the implicit default timer) is not thread-safe:
+timing sections on the same instance concurrently from multiple threads or tasks
+will race. Instead, use one `TimerOutput` per thread/task and combine them with
+`merge!` (which is protected by a lock), see the section on merging above.
+
 ## Overhead
 
-There is a small overhead in timing a section (0.25 μs) which means that this package is not suitable for measuring sections that finish very quickly.
+There is a small overhead in timing a section (~30 ns on a modern machine, dominated
+by reading the clock) which means that this package is not suitable for measuring
+sections that finish very quickly.
 For proper benchmarking you want to use a more suitable tool like [*BenchmarkTools*](https://github.com/JuliaCI/BenchmarkTools.jl).
 
 It is sometimes desireable to be able "turn on and off" the `@timeit` macro, for instance you may wish to instrument a package with `@timeit` macros, but then not deal with the overhead of the timings during normal package operation.
