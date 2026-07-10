@@ -804,4 +804,151 @@ function foo_77(::Float64) end
     @test !contains(err, "src/TimerOutput.jl:")
 end
 
+@testset "new API (0.6)" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    # nested indexing and keys
+    @test ncalls(to["a", "b"]) == 1
+    @test collect(keys(to)) == ["a"]
+    @test collect(keys(to["a"])) == ["b"]
+    # sections print as tables
+    str = sprint(show, to["a"])
+    @test occursin("b", str)
+    # pre-0.6 internal names still readable
+    @test to.inner_timers["a"].accumulated_data.ncalls == 1
+    @test TimerOutputs.TimeData === TimerOutputs.Metrics
+    # copy is fully detached
+    c = copy(to)
+    c["a"].metrics.ncalls = 99
+    @test ncalls(to["a"]) == 1
+end
+
+const DEBUG_CTO = ConcurrentTimerOutput()
+@timeit_debug DEBUG_CTO function timeit_debug_cto()
+    1 + 1
+end
+
+@testset "ConcurrentTimerOutput" begin
+    @testset "single task parity" begin
+        cto = ConcurrentTimerOutput()
+        @timeit cto "outer" begin
+            @timeit cto "inner" sleep(0.01)
+            @timeit cto "inner" sleep(0.01)
+        end
+        m = TimerOutput(cto)
+        @test ncalls(m["outer"]) == 1
+        @test ncalls(m["outer"]["inner"]) == 2
+        @test TimerOutputs.time(m["outer"]) >= 2 * 10^7 # 2 * 10 ms in ns
+    end
+
+    @testset "invariants under @spawn" begin
+        cto = ConcurrentTimerOutput()
+        N, M = 32, 500
+        function spawn_worker(cto, i, M)
+            return Threads.@spawn for j in 1:M
+                @timeit cto "work" begin
+                    @timeit cto "inner" (j % 7 == 0 ? yield() : nothing)
+                    @timeit cto "task $i" (1 + 1)
+                end
+            end
+        end
+        tasks = [spawn_worker(cto, i, M) for i in 1:N]
+        foreach(wait, tasks)
+        m = TimerOutput(cto)
+        @test ncalls(m["work"]) == N * M
+        @test ncalls(m["work"]["inner"]) == N * M
+        for i in 1:N
+            @test ncalls(m["work"]["task $i"]) == M
+        end
+        # all tasks finished: trees are folded into the archive, no double counting
+        @test isempty(cto.task_timers)
+        @test ncalls(TimerOutput(cto)["work"]) == N * M
+        GC.gc()
+        @test ncalls(TimerOutput(cto)["work"]) == N * M
+    end
+
+    @testset "printing while tasks are running" begin
+        cto = ConcurrentTimerOutput()
+        stop = Threads.Atomic{Bool}(false)
+        function spawn_load(cto, stop)
+            return Threads.@spawn begin
+                k = 0
+                while !stop[]
+                    k += 1
+                    @timeit cto "label $(k % 50)" (k % 11 == 0 ? yield() : nothing)
+                end
+            end
+        end
+        workers = [spawn_load(cto, stop) for _ in 1:4]
+        for _ in 1:200
+            print_timer(devnull, cto)
+        end
+        stop[] = true
+        foreach(wait, workers)
+        @test true # no throw above
+    end
+
+    @testset "reset during in-flight section" begin
+        cto = ConcurrentTimerOutput()
+        c1, c2 = Channel{Nothing}(1), Channel{Nothing}(1)
+        t = Threads.@spawn begin
+            @timeit cto "flight" begin
+                put!(c1, nothing) # signal: inside the section
+                take!(c2)         # wait until the reset happened
+            end
+            @timeit cto "after" 1 + 1
+        end
+        take!(c1)
+        reset_timer!(cto)
+        put!(c2, nothing)
+        wait(t)
+        m = TimerOutput(cto)
+        @test !haskey(m, "flight")
+        @test ncalls(m["after"]) == 1
+    end
+
+    @testset "enable/disable and @notimeit" begin
+        cto = ConcurrentTimerOutput()
+        disable_timer!(cto)
+        @timeit cto "off" 1 + 1
+        enable_timer!(cto)
+        @timeit cto "on" 1 + 1
+        @notimeit cto (@timeit cto "notimeit" 1 + 1)
+        @test !haskey(cto, "off")
+        @test haskey(cto, "on")
+        @test !haskey(cto, "notimeit")
+        @test TimerOutputs.isenabled(cto)
+    end
+
+    @testset "API delegation" begin
+        cto = ConcurrentTimerOutput()
+        @test timeit(() -> 42, cto, "functional") == 42
+        section = begin_timed_section!(cto, "manual")
+        end_timed_section!(cto, section)
+        @test ncalls(cto["manual"]) == 1
+        @test flatten(cto) isa TimerOutput
+        @test todict(cto)["inner_timers"]["manual"]["n_calls"] == 1
+        @test TimerOutputs.tottime(cto) >= 0
+        @test TimerOutputs.totallocated(cto) >= 0
+        merged_into = merge!(TimerOutput(), cto)
+        @test ncalls(merged_into["manual"]) == 1
+        to = TimerOutput()
+        @timeit to "external" 1 + 1
+        merge!(cto, to)
+        @test ncalls(cto["external"]) == 1
+        @test_throws ArgumentError TimerOutputs.complement!(cto)
+        sprint((io, x) -> show(io, x; sortby = :firstexec), cto)
+        flamegraph(cto)
+        # getindex returns a detached snapshot
+        snap = cto["manual"]
+        snap.metrics.ncalls = 999
+        @test ncalls(cto["manual"]) == 1
+    end
+
+    @testset "@timeit_debug with ConcurrentTimerOutput" begin
+        timeit_debug_cto() # debug timings for Main are enabled further up in this file
+        @test ncalls(DEBUG_CTO["timeit_debug_cto"]) == 1
+    end
+end
+
 include("test_coverage.jl")

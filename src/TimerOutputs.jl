@@ -1,12 +1,15 @@
 module TimerOutputs
 
-using ExprTools
+using ExprTools: splitdef, combinedef
+using Printf: @sprintf
+using PrettyTables: pretty_table, MultiColumn, EmptyCells, TextTableFormat, TextTableStyle,
+    text_table_borders__compact, @text__no_vertical_lines, @crayon_str
 
 import Base: show, time_ns
-export TimerOutput, @timeit, @timeit_debug, reset_timer!, print_timer, timeit,
-    enable_timer!, disable_timer!, @notimeit, get_timer,
-    begin_timed_section!, end_timed_section!
 
+export TimerOutput, ConcurrentTimerOutput, @timeit, @timeit_debug, reset_timer!,
+    print_timer, timeit, enable_timer!, disable_timer!, @notimeit, get_timer,
+    begin_timed_section!, end_timed_section!
 
 function gc_bytes()
     b = Ref{Int64}(0)
@@ -14,14 +17,14 @@ function gc_bytes()
     return b[]
 end
 
-using Printf
+include("core.jl")
+include("macros.jl")
+include("analysis.jl")
+include("concurrent.jl")
+include("printing.jl")
+include("compat.jl")
 
-
-include("TimerOutput.jl")
-include("show.jl")
-include("utilities.jl")
-
-include("compile.jl")
+include("precompile.jl")
 _precompile_()
 
 function __init__()

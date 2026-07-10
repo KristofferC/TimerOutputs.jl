@@ -1,7 +1,7 @@
 module FlameGraphsExt
 
 using TimerOutputs
-using TimerOutputs: prettytime
+using TimerOutputs: Section, prettytime
 using FlameGraphs: FlameGraphs, NodeData
 using FlameGraphs.LeftChildRightSiblingTrees: Node, addchild
 using Base.StackTraces: StackFrame
@@ -14,62 +14,57 @@ function, with the width of each box proportional to the time spent in that func
 Use `crop_root = true` to crop the root node to the first and last child nodes.
 """
 function FlameGraphs.flamegraph(to::TimerOutput; crop_root = false)
-    # Skip the very top-level node, which contains no useful data
-    very_start = crop_root ? min_start_time(to) : to.start_data.time
-    node_data = _flamegraph_frame(to, very_start; toplevel = true, crop_root)
-    root = Node(node_data)
-    return _to_flamegraph(to, root, very_start)
+    root_section = to.root
+    # The root frame covers the total time being measured, so start when the
+    # timer (or, if cropping, the first section) was created and stop when the
+    # last section finished.
+    very_start = crop_root ? min_start_time(root_section) : to.start_time
+    range = (Int(very_start):Int(max_end_time(root_section, very_start))) .- very_start
+    root = Node(NodeData(section_frame(root_section), 0x00, range))
+    return _to_flamegraph(root_section, root, very_start)
 end
+
+FlameGraphs.flamegraph(cto::ConcurrentTimerOutput; kwargs...) =
+    FlameGraphs.flamegraph(TimerOutput(cto); kwargs...)
 
 ## internals
 
-function min_start_time(to::TimerOutput)
-    return minimum(child.start_data.time for child in values(to.inner_timers))
+# Sections are created when first entered, so firstexec is the section's start
+section_start(s::Section) = s.metrics.firstexec
+section_end(s::Section) = section_start(s) + s.metrics.time
+
+function min_start_time(s::Section)
+    return minimum(section_start(child) for child in values(s.children))
 end
 
-function max_end_time(to::TimerOutput)
-    self_end = to.start_data.time + to.accumulated_data.time
-    if isempty(to.inner_timers)
-        return self_end
-    end
-    # Compute max end time considering both direct end time and all inner timers
-    return max(self_end, maximum(max_end_time(child) for child in values(to.inner_timers)))
+function max_end_time(s::Section, self_start)
+    self_end = self_start + s.metrics.time
+    isempty(s.children) && return self_end
+    return max(self_end, maximum(max_end_time(child, section_start(child)) for child in values(s.children)))
 end
 
-# Make a flat frame for this TimerOutput
-function _flamegraph_frame(to::TimerOutput, start_ns; toplevel = false, crop_root = false)
+function section_frame(s::Section)
     # TODO: Use a better conversion to a StackFrame so this contains the right kind of data
-    tt_str = string(to.name, " ", strip(prettytime(to.accumulated_data.time)))
-    if to.accumulated_data.ncalls > 1
-        avg = to.accumulated_data.time / to.accumulated_data.ncalls
-        tt_str *= string(" ", to.accumulated_data.ncalls, "×μ", strip(prettytime(avg)))
+    label = string(s.name, " ", strip(prettytime(s.metrics.time)))
+    if s.metrics.ncalls > 1
+        avg = s.metrics.time / s.metrics.ncalls
+        label *= string(" ", s.metrics.ncalls, "×μ", strip(prettytime(avg)))
     end
-    tt = Symbol(tt_str)
     # Set the pointer to ensure the sf is unique
-    sf = StackFrame(tt, Symbol("none"), 0, nothing, false, false, Base.objectid(to))
-    status = 0x00  # "default" status -- See FlameGraphs.jl
-    # TODO: is this supposed to be inclusive or exclusive?
-    if toplevel
-        # The root frame covers the total time being measured, so start when the first node
-        # was created, and stop when the last node was finished.
-        _start = crop_root ? min_start_time(to) : to.start_data.time
-        _end = max_end_time(to)
-    else
-        #range = Int(start) : Int(start + TimerOutputs.tottime(to))
-        _start = to.start_data.time
-        _end = to.start_data.time + to.accumulated_data.time
-    end
-    range = (Int(_start):Int(_end)) .- start_ns
-    return FlameGraphs.NodeData(sf, status, range)
+    return StackFrame(Symbol(label), Symbol("none"), 0, nothing, false, false, Base.objectid(s))
 end
 
-function _to_flamegraph(to::TimerOutput, root, start_ns)
-    for (k, child) in to.inner_timers
-        node_data = _flamegraph_frame(child, start_ns)
-        node = addchild(root, node_data)
-        _to_flamegraph(child, node, start_ns)
+function _flamegraph_frame(s::Section, start_ns)
+    range = (Int(section_start(s)):Int(section_end(s))) .- start_ns
+    return NodeData(section_frame(s), 0x00, range)
+end
+
+function _to_flamegraph(s::Section, node, start_ns)
+    for child in values(s.children)
+        child_node = addchild(node, _flamegraph_frame(child, start_ns))
+        _to_flamegraph(child, child_node, start_ns)
     end
-    return root
+    return node
 end
 
 end # module
