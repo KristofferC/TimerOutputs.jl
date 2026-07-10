@@ -339,11 +339,26 @@ function _timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to::Unio
         timeit_block
     end
 
-    # remove existing line numbers (#77) but add in the source for code coverage (#194)
-    result_expr = Base.remove_linenums!(result_expr)
+    # remove wrapper line numbers (#77) but keep those of the user expression so
+    # stacktraces and coverage point into user code (#168), and add in the source
+    # for code coverage (#194)
+    remove_linenums_keep!(result_expr, ex)
     pushfirst!(result_expr.args, source)
 
     return result_expr
+end
+
+# Base.remove_linenums!, except the subtree `keep` is left untouched
+function remove_linenums_keep!(ex, keep)
+    if ex isa Expr && ex !== keep
+        if ex.head === :block || ex.head === :quote
+            filter!(x -> !(x isa LineNumberNode), ex.args)
+        end
+        for arg in ex.args
+            remove_linenums_keep!(arg, keep)
+        end
+    end
+    return ex
 end
 
 function timer_expr_func(source::LineNumberNode, m::Module, is_debug::Bool, to, expr::Expr, label = nothing)
@@ -353,12 +368,16 @@ function timer_expr_func(source::LineNumberNode, m::Module, is_debug::Bool, to, 
     label === nothing && (label = string(def[:name]))
 
     def[:body] = if is_debug
-        quote
+        body = def[:body]
+        wrapper = quote
             @inline function inner()
-                $(def[:body])
+                $body
             end
             $(_timer_expr(source, m, is_debug, to, label, :(inner())))
         end
+        remove_linenums_keep!(wrapper, body)
+        pushfirst!(wrapper.args, source)
+        wrapper
     else
         _timer_expr(source, m, is_debug, to, label, def[:body])
     end

@@ -804,4 +804,38 @@ function foo_77(::Float64) end
     @test !contains(err, "src/TimerOutput.jl:")
 end
 
+@timeit "foo_168" function foo_168()
+    1 + 1
+
+    error("boom")
+end
+const foo_168_error_line = @__LINE__() - 2
+
+@timeit_debug "dbg_168" function dbg_168()
+    1 + 1
+
+    error("boom")
+end
+const dbg_168_error_line = @__LINE__() - 2
+
+@testset "Function body keeps line numbers (#168)" begin
+    st = try
+        foo_168()
+    catch
+        stacktrace(catch_backtrace())
+    end
+    i = findfirst(f -> f.func === :foo_168, st)
+    @test st[i].line == foo_168_error_line
+    @test endswith(String(st[i].file), "runtests.jl")
+
+    # debug variant: the user body lives in the `inner` closure, but the error
+    # line must still be visible in the trace
+    st = try
+        dbg_168()
+    catch
+        stacktrace(catch_backtrace())
+    end
+    @test any(f -> f.line == dbg_168_error_line && endswith(String(f.file), "runtests.jl"), st)
+end
+
 include("test_coverage.jl")
