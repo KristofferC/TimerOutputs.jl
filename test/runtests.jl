@@ -918,8 +918,12 @@ end
     nt = NoTimerOutput()
     f_nt(t) = @timeit t "sec" (1 + 1)
     @test f_nt(nt) == 2
-    # compiles away entirely when the timer type is known
-    @test length(code_typed(f_nt, Tuple{NoTimerOutput})[1].first.code) == 1
+    # compiles away entirely when the timer type is known (code coverage
+    # inserts extra statements and inhibits inlining, so only check without)
+    if Base.JLOptions().code_coverage == 0
+        @test length(code_typed(f_nt, Tuple{NoTimerOutput})[1].first.code) == 1
+    end
+    @test (@allocated f_nt(nt)) == 0
     @test timeit(() -> 42, nt, "x") == 42
     section = begin_timed_section!(nt, "x")
     end_timed_section!(nt, section)
