@@ -17,10 +17,11 @@ See the [changelog](CHANGELOG.md) for what is new in version 0.6.
 An example of the output (used in a finite element simulation) is shown below
 
 ```
-               Total / % measured: 6.89s / 97.8%   5.20GiB / 84.6%
 ──────────────────────────────────────────────────────────────────────────────────
                                         Time                   Allocations
                                ──────────────────────    ────────────────────────
+      Tot / % measured:            6.89s / 97.8%             5.20GiB / 84.6%
+ ────────────────────────────  ──────────────────────    ────────────────────────
  Section               ncalls    time    %tot     avg      alloc    %tot      avg
 ──────────────────────────────────────────────────────────────────────────────────
  assemble                   6   3.27s   48.5%   545ms    3.65GiB   82.7%   623MiB
@@ -31,7 +32,7 @@ An example of the output (used in a finite element simulation) is shown below
 ──────────────────────────────────────────────────────────────────────────────────
 ```
 
-The first line shows the total (wall) time passed and allocations made since the start of the timer as well as
+The `Tot / % measured` row shows the total (wall) time passed and allocations made since the start of the timer as well as
 the percentage of those totals spent inside timed sections.
 The following lines shows data for all the timed sections.
 The section label is shown first followed by the number of calls made to that section.
@@ -123,22 +124,23 @@ spent in each section since `to` was created as well as averages (per call).
 Similar information is available for allocations:
 
 ```
-            Total / % measured: 4.21s / 67.2%   103MiB / 81.7%
 ──────────────────────────────────────────────────────────────────────────
                                 Time                   Allocations
                        ──────────────────────    ────────────────────────
+  Tot / % measured:        4.22s / 67.2%              103MiB / 81.7%
+ ────────────────────  ──────────────────────    ────────────────────────
  Section       ncalls    time    %tot     avg      alloc    %tot      avg
 ──────────────────────────────────────────────────────────────────────────
- sleep            101   1.14s   40.1%  11.2ms    17.1KiB    0.0%     173B
+ sleep            101   1.14s   40.2%  11.3ms    17.1KiB    0.0%     173B
  nest 2             1   703ms   24.8%   703ms       496B    0.0%     496B
- ├─ level 2.2       1   401ms   14.2%   401ms       112B    0.0%     112B
+ ├─ level 2.2       1   402ms   14.2%   402ms       112B    0.0%     112B
  └─ level 2.1       1   301ms   10.6%   301ms       112B    0.0%     112B
  throwing           1   502ms   17.7%   502ms       512B    0.0%     512B
  nest 1             1   396ms   14.0%   396ms       944B    0.0%     944B
  ├─ level 2.2       1   201ms    7.1%   201ms       112B    0.0%     112B
- └─ level 2.1       3  93.3ms    3.3%  31.1ms       336B    0.0%     112B
- randoms            1  94.6ms    3.3%  94.6ms    84.2MiB  100.0%  84.2MiB
- foo                1  56.0ns    0.0%  56.0ns      0.00B    0.0%    0.00B
+ └─ level 2.1       3  93.4ms    3.3%  31.1ms       336B    0.0%     112B
+ randoms            1  95.1ms    3.4%  95.1ms    84.2MiB  100.0%  84.2MiB
+ foo                1  15.0ns    0.0%  15.0ns      0.00B    0.0%    0.00B
  funcdef            1  14.0ns    0.0%  14.0ns      0.00B    0.0%    0.00B
 ──────────────────────────────────────────────────────────────────────────
 ```
@@ -191,18 +193,19 @@ the table is displayed as:
 
 ```julia
 julia> show(to, allocations = false, compact = true)
-  Total / % measured: 1.07s / 98.8%
 ──────────────────────────────────────
                             Time
                        ──────────────
+  Tot / % measured:    1.08s / 98.8%
+ ────────────────────  ──────────────
  Section       ncalls    time    %tot
 ──────────────────────────────────────
- nest 1             1   625ms   59.0%
- ├─ level 2.2      20   423ms   39.9%
+ nest 1             1   625ms   58.8%
+ ├─ level 2.2      20   423ms   39.8%
  └─ level 2.1       1   101ms    9.5%
- nest 2             1   435ms   41.0%
- ├─ level 2.1      30   334ms   31.5%
- └─ level 2.2       1   101ms    9.6%
+ nest 2             1   438ms   41.2%
+ ├─ level 2.1      30   336ms   31.6%
+ └─ level 2.2       1   101ms    9.5%
 ──────────────────────────────────────
 ```
 
@@ -212,16 +215,17 @@ It is possible to flatten this timer using the `TimerOutputs.flatten` function t
 julia> to_flatten = TimerOutputs.flatten(to);
 
 julia> show(to_flatten; compact = true, allocations = false)
- Total / % measured: 1.10s / 96.4%
 ───────────────────────────────────
                          Time
                     ──────────────
+ Tot / % measured:  1.10s / 96.5%
+ ─────────────────  ──────────────
  Section    ncalls    time    %tot
 ───────────────────────────────────
- nest 1          1   625ms   59.0%
- level 2.2      21   524ms   49.4%
- nest 2          1   435ms   41.0%
- level 2.1      31   435ms   41.0%
+ nest 1          1   625ms   58.8%
+ level 2.2      21   524ms   49.3%
+ nest 2          1   438ms   41.2%
+ level 2.1      31   437ms   41.1%
 ───────────────────────────────────
 ```
 
@@ -243,36 +247,39 @@ julia> @timeit to2 "outer" begin
        end
 
 julia> show(to1; compact=true, allocations=false)
-Total / % measured: 2.15s / 46.6%
-──────────────────────────────────
-                        Time
-                   ──────────────
- Section   ncalls    time    %tot
-──────────────────────────────────
- outer          1   1.00s  100.0%
- └─ inner       1   1.00s  100.0%
-──────────────────────────────────
+────────────────────────────────────
+                          Time
+                     ──────────────
+ Tot / % measured:   2.15s / 46.7%
+ ──────────────────  ──────────────
+ Section     ncalls    time    %tot
+────────────────────────────────────
+ outer            1   1.01s  100.0%
+ └─ inner         1   1.01s  100.0%
+────────────────────────────────────
 
 julia> show(to2; compact=true, allocations=false)
-Total / % measured: 2.29s / 43.7%
-─────────────────────────────────
-                       Time
-                  ──────────────
- Section  ncalls    time    %tot
-─────────────────────────────────
- outer         1   1.00s  100.0%
-─────────────────────────────────
+───────────────────────────────────
+                         Time
+                    ──────────────
+ Tot / % measured:  2.29s / 43.8%
+ ─────────────────  ──────────────
+ Section    ncalls    time    %tot
+───────────────────────────────────
+ outer           1   1.00s  100.0%
+───────────────────────────────────
 
 julia> show(merge(to1, to2); compact=true, allocations=false)
-Total / % measured: 2.31s / 86.8%
-──────────────────────────────────
-                        Time
-                   ──────────────
- Section   ncalls    time    %tot
-──────────────────────────────────
- outer          2   2.01s  100.0%
- └─ inner       1   1.00s   50.1%
-──────────────────────────────────
+────────────────────────────────────
+                          Time
+                     ──────────────
+ Tot / % measured:   2.30s / 87.1%
+ ──────────────────  ──────────────
+ Section     ncalls    time    %tot
+────────────────────────────────────
+ outer            2   2.01s  100.0%
+ └─ inner         1   1.01s   50.1%
+────────────────────────────────────
 ```
 
 Merging can be used to facilitate timing coverage throughout simple multi-threaded setups.
@@ -450,15 +457,16 @@ print_timer()
 which prints:
 ```julia
 julia> print_timer()
-          Total / % measured: 152ms / 80.5%   1.50MiB / 0.1%
-──────────────────────────────────────────────────────────────────────
-                            Time                   Allocations
-                   ──────────────────────    ────────────────────────
- Section   ncalls    time    %tot     avg      alloc    %tot      avg
-──────────────────────────────────────────────────────────────────────
- section2       1   101ms   82.7%   101ms       400B   50.0%     400B
- section        1  21.2ms   17.3%  21.2ms       400B   50.0%     400B
-──────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────
+                              Time                   Allocations
+                     ──────────────────────    ────────────────────────
+ Tot / % measured:       152ms / 80.4%              1.50MiB / 0.1%
+ ──────────────────  ──────────────────────    ────────────────────────
+ Section     ncalls    time    %tot     avg      alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────
+ section2         1   101ms   82.7%   101ms       400B   50.0%     400B
+ section          1  21.2ms   17.3%  21.2ms       400B   50.0%     400B
+────────────────────────────────────────────────────────────────────────
 ```
 
 The default timer object can be retrieved with `TimerOutputs.get_defaulttimer()`.
@@ -476,17 +484,18 @@ The easiest way to see this is the `complement = true` display option, which add
 
 ```julia
 julia> print_timer(to; complement = true)
-            Total / % measured: 126ms / 50.1%   1.18MiB / 0.1%
 ──────────────────────────────────────────────────────────────────────────
                                 Time                   Allocations
                        ──────────────────────    ────────────────────────
+  Tot / % measured:        126ms / 50.4%              1.18MiB / 0.1%
+ ────────────────────  ──────────────────────    ────────────────────────
  Section       ncalls    time    %tot     avg      alloc    %tot      avg
 ──────────────────────────────────────────────────────────────────────────
- ~untimed~             63.0ms                    1.18MiB
- compute            1  52.3ms   82.5%  52.3ms    1.39KiB   78.1%  1.39KiB
- ├─ kernel          1  31.2ms   49.2%  31.2ms       400B   21.9%     400B
+ ~untimed~             62.4ms                    1.18MiB
+ compute            1  52.2ms   82.4%  52.2ms    1.39KiB   78.1%  1.39KiB
+ ├─ kernel          1  31.1ms   49.2%  31.1ms       400B   21.9%     400B
  └─ ~compute~       1  21.1ms   33.3%  21.1ms    1.00KiB   56.1%  1.00KiB
- io                 1  11.1ms   17.5%  11.1ms       400B   21.9%     400B
+ io                 1  11.1ms   17.6%  11.1ms       400B   21.9%     400B
 ──────────────────────────────────────────────────────────────────────────
 ```
 
@@ -509,16 +518,17 @@ We can print the result:
 
 ```julia
 julia> print_timer(to)
-            Total / % measured: 138ms / 97.0%   69.7KiB / 2.6%
 ───────────────────────────────────────────────────────────────────────────
                                  Time                   Allocations
                         ──────────────────────    ────────────────────────
+   Tot / % measured:        140ms / 97.2%              265KiB / 2.1%
+ ─────────────────────  ──────────────────────    ────────────────────────
  Section        ncalls    time    %tot     avg      alloc    %tot      avg
 ───────────────────────────────────────────────────────────────────────────
- section2            1   112ms   84.1%   112ms    1.39KiB   78.1%  1.39KiB
- ├─ section2.1       1   101ms   75.8%   101ms       400B   21.9%     400B
- └─ ~section2~       1  11.2ms    8.4%  11.2ms    1.00KiB   56.1%  1.00KiB
- section1            1  21.2ms   15.9%  21.2ms       400B   21.9%     400B
+ section2            1   112ms   82.5%   112ms    1.39KiB   24.9%  1.39KiB
+ ├─ section2.1       1   101ms   74.3%   101ms       400B    7.0%     400B
+ └─ ~section2~       1  11.1ms    8.2%  11.1ms    1.00KiB   17.9%  1.00KiB
+ section1            1  23.9ms   17.5%  23.9ms    4.19KiB   75.1%  4.19KiB
 ───────────────────────────────────────────────────────────────────────────
 ```
 
@@ -553,15 +563,16 @@ end
 which prints:
 ```julia
 julia> print_timer(get_timer("Shared"))
-         Total / % measured: 126ms / 99.8%   1.30MiB / 99.6%
-──────────────────────────────────────────────────────────────────────
-                            Time                   Allocations
-                   ──────────────────────    ────────────────────────
- Section   ncalls    time    %tot     avg      alloc    %tot      avg
-──────────────────────────────────────────────────────────────────────
- section1       1   125ms  100.0%   125ms    1.30MiB  100.0%  1.30MiB
- └─ foo         1   101ms   80.8%   101ms       224B    0.0%     224B
-──────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────
+                              Time                   Allocations
+                     ──────────────────────    ────────────────────────
+ Tot / % measured:       124ms / 99.9%             1.30MiB / 99.6%
+ ──────────────────  ──────────────────────    ────────────────────────
+ Section     ncalls    time    %tot     avg      alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────
+ section1         1   124ms  100.0%   124ms    1.30MiB  100.0%  1.30MiB
+ └─ foo           1   101ms   81.6%   101ms       224B    0.0%     224B
+────────────────────────────────────────────────────────────────────────
 ```
 
 Note that the result of `get_timer` should not be called from top-level in a

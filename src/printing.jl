@@ -318,13 +318,13 @@ function show_table(
         nothing
     end
 
-    subtitle = string(
-        "Total / % measured: ", strip(asciitime(prettytime(Δt), opts.ascii)),
-        " / ", strip(prettypercent(∑t, Δt)),
-        has_group(opts, "Allocations") ?
-            string("   ", strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))) : ""
+    totals = (;
+        time = string(
+            strip(asciitime(prettytime(Δt), opts.ascii)), " / ", strip(prettypercent(∑t, Δt))
+        ),
+        alloc = string(strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))),
     )
-    return _show_table(io, to.root, ∑t, ∑b, opts, title, subtitle, extra)
+    return _show_table(io, to.root, ∑t, ∑b, opts, title, totals, extra)
 end
 
 # A bare section prints as a table too, but has no meaningful wall-clock
@@ -343,28 +343,38 @@ function show_table(
     else
         nothing
     end
-    return _show_table(io, s, ∑t, ∑b, opts, title, "", extra)
+    return _show_table(io, s, ∑t, ∑b, opts, title, nothing, extra)
 end
 
-# the merged header row: contiguous runs of columns in the same group
-function group_header(columns::Vector{ColumnSpec})
+# the merged header row: contiguous runs of columns in the same group. If
+# `content` is given, the run of a group renders `content[group]` instead of
+# the group name — used for the "Tot / % measured" totals row, where the
+# leading empty run carries the row label.
+function group_header(columns::Vector{ColumnSpec}, content = nothing, row_label = "")
     cells = Any[]
     empty_run = 1 # the Section column
     i = 1
+    put(span, data) = push!(cells, span == 1 ? data : MultiColumn(span, data))
     while i <= length(columns)
         group = columns[i].group
         if isempty(group)
             empty_run += 1
             i += 1
         else
-            empty_run > 0 && push!(cells, EmptyCells(empty_run))
-            empty_run = 0
+            if empty_run > 0
+                if isempty(cells) && !isempty(row_label)
+                    put(empty_run, row_label)
+                else
+                    push!(cells, EmptyCells(empty_run))
+                end
+                empty_run = 0
+            end
             j = i
             while j <= length(columns) && columns[j].group == group
                 j += 1
             end
-            # MultiColumn requires a span of at least 2
-            push!(cells, j - i == 1 ? group : MultiColumn(j - i, group))
+            data = content === nothing ? group : get(content, group, "")
+            put(j - i, data)
             i = j
         end
     end
@@ -372,7 +382,7 @@ function group_header(columns::Vector{ColumnSpec})
     return cells
 end
 
-function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, subtitle, extra)
+function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, totals, extra)
     rows = Vector{Vector{String}}()
     gray = Int[]
     table_rows!(rows, gray, s, ∑t, ∑b, "", 1, opts, extra)
@@ -380,7 +390,24 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
     labels = String["Section"; [c.label for c in opts.columns]]
     ncols = length(labels)
     with_groups = any(c -> !isempty(c.group), opts.columns)
-    column_labels = with_groups ? [group_header(opts.columns), labels] : [labels]
+
+    # the totals go in a row underneath the column group headers they belong
+    # to; without group headers they become a plain line above the table
+    subtitle = ""
+    column_labels = if with_groups
+        # note: the outer container must not be a Vector{Any}, PrettyTables
+        # only expands MultiColumn/EmptyCells cells for vectors of vectors
+        label_rows = [group_header(opts.columns)]
+        if totals !== nothing
+            content = Dict("Time" => totals.time, "Allocations" => totals.alloc)
+            push!(label_rows, group_header(opts.columns, content, "Tot / % measured:"))
+        end
+        push!(label_rows, labels)
+        label_rows
+    else
+        totals === nothing || (subtitle = string("Tot / % measured: ", totals.time))
+        [labels]
+    end
 
     data = if isempty(rows)
         Matrix{String}(undef, 0, ncols)
