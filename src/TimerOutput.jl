@@ -249,20 +249,20 @@ end
 
 function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, ex::Expr)
     is_func_def(ex) && return timer_expr_func(source, m, is_debug, :($(TimerOutputs.DEFAULT_TIMER)), ex)
-    return _esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER)))
+    return timer_expr() # throws the usage error
 end
 
-function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label_or_to, ex::Expr)
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label_or_to, ex)
     is_func_def(ex) && return timer_expr_func(source, m, is_debug, label_or_to, ex)
     return _esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label_or_to))
 end
 
-function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label::String, ex::Expr)
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, label::String, ex)
     is_func_def(ex) && return timer_expr_func(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), ex, label)
     return _esc(_timer_expr(source, m, is_debug, :($(TimerOutputs).DEFAULT_TIMER), label))
 end
 
-function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to, label, ex::Expr)
+function timer_expr(source::LineNumberNode, m::Module, is_debug::Bool, to, label, ex)
     is_func_def(ex) && return timer_expr_func(source, m, is_debug, to, ex, label)
     return _esc(_timer_expr(source, m, is_debug, to, label))
 end

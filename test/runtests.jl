@@ -760,6 +760,26 @@ end
     @test ncalls(to.inner_timers[""]) == 1
 end
 
+@testset "@timeit works with a non-Expr body" begin
+    to = TimerOutput()
+    x = 7
+    @test (@timeit to "lit" 42) == 42
+    @test (@timeit to "sym" x) == 7
+    @test (@timeit to "nothing" nothing) === nothing
+    @test ncalls(to["lit"]) == 1
+    @test ncalls(to["sym"]) == 1
+    @test ncalls(to["nothing"]) == 1
+    @test (@timeit "lit_216" 1) == 1
+    @test ncalls(DEFAULT_TIMER["lit_216"]) == 1
+end
+
+@testset "invalid @timeit usage throws ArgumentError" begin
+    # label-less non-function expression used to throw an internal MethodError
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit f(x)))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit 42))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit))
+end
+
 @testset "FlameGraphsExt" begin
     to = TimerOutput()
     begin
