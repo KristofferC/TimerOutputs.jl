@@ -740,7 +740,7 @@ end
     s = x -> x + 1
     t = to(s)
     t(1)
-    ncalls(to.inner_timers[repr(s)]) == 1
+    @test ncalls(to.inner_timers[repr(s)]) == 1
 end
 
 @testset "Interleaved sections" begin

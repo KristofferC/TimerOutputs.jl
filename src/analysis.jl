@@ -299,13 +299,9 @@ struct InstrumentedFunction{F} <: Function
     name::String
 end
 
-function funcname(f::F) where {F}
-    return if @generated
-        string(repr(F.instance))
-    else
-        string(repr(f))
-    end
-end
+# plain runtime repr: construction is a cold path, and computing the name at
+# code generation time gives a module qualified repr on Julia 1.13
+funcname(f) = repr(f)
 
 InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
 
