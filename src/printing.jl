@@ -124,10 +124,63 @@ asciitime(str, ascii::Bool) = ascii ? replace(str, "μs" => "us") : str
 # integer percentage of the enclosing section; blank at the top level (#192)
 prettypar(v, parent) = parent <= 0 ? "" : string(round(Int, v / parent * 100), "%")
 
+###########
+# Columns #
+###########
+
+# Everything a cell renderer may need besides the section and its parent
+struct CellContext
+    ∑t::Int64
+    ∑b::Int64
+    toplevel::Bool
+    ascii::Bool
+end
+
+# A table column: its header, the merged group header it sits under ("" for
+# none), whether it is blanked on summary rows like ~untimed~, and how to
+# render a cell. Adding a new column to the table means adding an entry to
+# `COLUMNS` below.
+struct ColumnSpec
+    label::String
+    group::String
+    blankable::Bool
+    cell::Function # (section, parent, ctx::CellContext) -> String
+end
+
+const COLUMNS = (;
+    ncalls = ColumnSpec("ncalls", "", true, (c, p, ctx) -> prettycount(c.ncalls)),
+    time = ColumnSpec("time", "Time", false, (c, p, ctx) -> asciitime(prettytime(c.time), ctx.ascii)),
+    time_pct = ColumnSpec("%tot", "Time", true, (c, p, ctx) -> prettypercent(c.time, ctx.∑t)),
+    time_par = ColumnSpec("%par", "Time", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.time, p.time)),
+    time_avg = ColumnSpec("avg", "Time", true, (c, p, ctx) -> asciitime(prettytime(c.time / c.ncalls), ctx.ascii)),
+    allocs = ColumnSpec("alloc", "Allocations", false, (c, p, ctx) -> prettymemory(c.allocs)),
+    allocs_pct = ColumnSpec("%tot", "Allocations", true, (c, p, ctx) -> prettypercent(c.allocs, ctx.∑b)),
+    allocs_par = ColumnSpec("%par", "Allocations", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.allocs, p.allocs)),
+    allocs_avg = ColumnSpec("avg", "Allocations", true, (c, p, ctx) -> prettymemory(c.allocs / c.ncalls)),
+)
+
+# the selection the `allocations` and `compact` keywords correspond to
+function default_columns(allocations::Bool, compact::Bool)
+    columns = [:ncalls, :time, :time_pct]
+    compact || append!(columns, [:time_par, :time_avg])
+    if allocations
+        append!(columns, [:allocs, :allocs_pct])
+        compact || append!(columns, [:allocs_par, :allocs_avg])
+    end
+    return columns
+end
+
+function resolve_columns(ids)
+    return map(collect(ids)) do id
+        haskey(COLUMNS, id) ||
+            throw(ArgumentError("unknown column $(repr(id)), valid columns are $(join(repr.(keys(COLUMNS)), ", "))"))
+        getproperty(COLUMNS, id)
+    end
+end
+
 struct TableOptions
     sortby::Symbol
-    allocations::Bool
-    compact::Bool
+    columns::Vector{ColumnSpec}
     ascii::Bool
     maxdepth::Int
     complement::Bool
@@ -151,6 +204,7 @@ function table_rows!(
     )
     depth > opts.maxdepth && return rows
     toplevel = depth == 1
+    ctx = CellContext(∑t, ∑b, toplevel, opts.ascii)
     children = copy(s.children)
     extra === nothing || push!(children, extra.section)
     sort_sections!(children, opts.sortby)
@@ -159,22 +213,10 @@ function table_rows!(
         synthetic = extra !== nothing && child === extra.section
         blank = synthetic && !extra.full_stats
         name = toplevel ? child.name : string(prefix, islast ? opts.guides[2] : opts.guides[1], child.name)
-        row = String[
-            name, blank ? "" : prettycount(child.ncalls),
-            asciitime(prettytime(child.time), opts.ascii),
-            blank ? "" : prettypercent(child.time, ∑t),
-        ]
-        if !opts.compact
-            push!(row, blank || toplevel ? "" : prettypar(child.time, s.time))
-            push!(row, blank ? "" : asciitime(prettytime(child.time / child.ncalls), opts.ascii))
-        end
-        if opts.allocations
-            push!(row, prettymemory(child.allocs))
-            push!(row, blank ? "" : prettypercent(child.allocs, ∑b))
-            if !opts.compact
-                push!(row, blank || toplevel ? "" : prettypar(child.allocs, s.allocs))
-                push!(row, blank ? "" : prettymemory(child.allocs / child.ncalls))
-            end
+        row = Vector{String}(undef, 1 + length(opts.columns))
+        row[1] = name
+        for (k, column) in enumerate(opts.columns)
+            row[k + 1] = blank && column.blankable ? "" : column.cell(child, s, ctx)
         end
         push!(rows, row)
         synthetic && push!(gray, length(rows))
@@ -233,26 +275,31 @@ function Base.show(io::IO, s::Section; kwargs...)
     return show_table(io, s; kwargs...)
 end
 
-function validated_options(; sortby, allocations, compact, linechars, maxdepth, complement)
+function validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
         throw(ArgumentError("linechars should be :unicode or :ascii, got $linechars"))
     maxdepth >= 1 ||
         throw(ArgumentError("maxdepth should be at least 1, got $maxdepth"))
+    columns = resolve_columns(columns === nothing ? default_columns(allocations, compact) : columns)
     return TableOptions(
-        sortby, allocations, compact, linechars === :ascii, maxdepth, complement,
+        sortby, columns, linechars === :ascii, maxdepth, complement,
         tree_guides(linechars)
     )
 end
 
+# whether any shown column belongs to the given merged header group
+has_group(opts::TableOptions, group::String) = any(c -> c.group == group, opts.columns)
+
 function show_table(
         io::IO, to::TimerOutput;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
+        columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
         complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth, complement)
+    opts = validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
 
     Δt = time_ns() - to.start_time
     Δb = gc_bytes() - to.start_allocs
@@ -272,7 +319,8 @@ function show_table(
     subtitle = string(
         "Total / % measured: ", strip(asciitime(prettytime(Δt), opts.ascii)),
         " / ", strip(prettypercent(∑t, Δt)),
-        allocations ? string("   ", strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))) : ""
+        has_group(opts, "Allocations") ?
+            string("   ", strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))) : ""
     )
     return _show_table(io, to.root, ∑t, ∑b, opts, title, subtitle, extra)
 end
@@ -282,10 +330,11 @@ end
 function show_table(
         io::IO, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
+        columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
         complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, linechars, maxdepth, complement)
+    opts = validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     extra = if complement && s.ncalls > 0 && !isempty(s.children)
         ComplementRow(complement_section(s), true)
@@ -295,22 +344,41 @@ function show_table(
     return _show_table(io, s, ∑t, ∑b, opts, title, "", extra)
 end
 
+# the merged header row: contiguous runs of columns in the same group
+function group_header(columns::Vector{ColumnSpec})
+    cells = Any[]
+    empty_run = 1 # the Section column
+    i = 1
+    while i <= length(columns)
+        group = columns[i].group
+        if isempty(group)
+            empty_run += 1
+            i += 1
+        else
+            empty_run > 0 && push!(cells, EmptyCells(empty_run))
+            empty_run = 0
+            j = i
+            while j <= length(columns) && columns[j].group == group
+                j += 1
+            end
+            # MultiColumn requires a span of at least 2
+            push!(cells, j - i == 1 ? group : MultiColumn(j - i, group))
+            i = j
+        end
+    end
+    empty_run > 0 && push!(cells, EmptyCells(empty_run))
+    return cells
+end
+
 function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, subtitle, extra)
-    allocations, compact = opts.allocations, opts.compact
     rows = Vector{Vector{String}}()
     gray = Int[]
     table_rows!(rows, gray, s, ∑t, ∑b, "", 1, opts, extra)
 
-    labels = String["Section", "ncalls", "time", "%tot"]
-    compact || append!(labels, ["%par", "avg"])
-    if allocations
-        append!(labels, ["alloc", "%tot"])
-        compact || append!(labels, ["%par", "avg"])
-    end
+    labels = String["Section"; [c.label for c in opts.columns]]
     ncols = length(labels)
-    time_cols = compact ? 2 : 4
-    group_row = Any[EmptyCells(2), MultiColumn(time_cols, "Time")]
-    allocations && push!(group_row, MultiColumn(time_cols, "Allocations"))
+    with_groups = any(c -> !isempty(c.group), opts.columns)
+    column_labels = with_groups ? [group_header(opts.columns), labels] : [labels]
 
     data = if isempty(rows)
         Matrix{String}(undef, 0, ncols)
@@ -320,7 +388,7 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
 
     pretty_table(
         io, data;
-        column_labels = [group_row, labels],
+        column_labels = column_labels,
         alignment = [:l; fill(:r, ncols - 1)],
         table_format = if opts.ascii
             TextTableFormat(; borders = text_table_borders__compact, @text__no_vertical_lines)

@@ -151,10 +151,14 @@ end_timed_section!(to, section)
 The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
 
 * `title::String` ─ title for the timer
-* `allocations::Bool` ─ show the allocation columns (default `true`)
+* `columns::Vector{Symbol}` ─ exactly which columns to show, in order. Available:
+  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`,
+  `:allocs`, `:allocs_pct`, `:allocs_par`, `:allocs_avg`.
+  For example `columns = [:ncalls, :time, :time_pct]`
+* `allocations::Bool` ─ show the allocation columns (default `true`); shorthand for a `columns` selection
+* `compact::Bool` ─ hide the `%par` and `avg` columns (default `false`); shorthand for a `columns` selection
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations`, `:name` or `:firstexec`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` for a pure ASCII table
-* `compact::Bool` ─ hide the `%par` and `avg` columns (default `false`)
 * `maxdepth::Int` ─ only print sections nested up to this depth (default: no limit)
 * `complement::Bool` ─ also show what was *not* timed, in gray: a `~untimed~` row with the
   wall time and allocations outside all sections, and a `~name~` row under each section with

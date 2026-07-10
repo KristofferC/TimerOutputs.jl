@@ -938,6 +938,38 @@ end
     @test_throws ArgumentError sprint((io, x) -> show(io, x; maxdepth = 0), to)
 end
 
+@testset "columns selection" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    header_line(s) = first(filter(l -> occursin("Section", l), split(s, "\n")))
+    render(; kwargs...) = sprint((io, x) -> show(io, x; kwargs...), to)
+
+    str = render(; columns = [:ncalls, :time])
+    @test occursin("ncalls", str) && occursin("time", str)
+    @test !occursin("avg", str) && !occursin("alloc", str) && !occursin("%tot", str)
+
+    # order is respected, and group headers follow the columns
+    str2 = render(; columns = [:time, :ncalls])
+    @test findfirst("time", header_line(str2))[1] < findfirst("ncalls", header_line(str2))[1]
+    str3 = render(; columns = [:allocs, :allocs_pct, :time])
+    @test findfirst("Allocations", str3)[1] < findfirst("Time", str3)[1]
+
+    # the compact/allocations keywords are shorthands for column selections
+    @test header_line(render(; compact = true, allocations = false)) ==
+        header_line(render(; columns = [:ncalls, :time, :time_pct]))
+    @test header_line(render()) ==
+        header_line(
+        render(;
+            columns = [
+                :ncalls, :time, :time_pct, :time_par, :time_avg,
+                :allocs, :allocs_pct, :allocs_par, :allocs_avg,
+            ]
+        )
+    )
+
+    @test_throws ArgumentError render(; columns = [:bogus])
+end
+
 @testset "complement display option" begin
     to = TimerOutput()
     @timeit to "outer" begin
