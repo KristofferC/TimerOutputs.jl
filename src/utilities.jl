@@ -3,6 +3,8 @@
 ###################
 
 function prettytime(t)
+    # can be NaN if a section never finished (ncalls == 0 makes avg = 0/0)
+    isnan(t) && return lpad("-", 6, " ")
     if t < 1.0e3
         value, units = t, "ns"
     elseif t < 1.0e6

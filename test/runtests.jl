@@ -302,6 +302,14 @@ end
         )
         @test prettytime(t) == str
     end
+    @test prettytime(NaN) == "     -"
+
+    # a section that never finished has ncalls == 0; avg must not print as NaN
+    let to_nan = TimerOutput()
+        begin_timed_section!(to_nan, "unfinished")
+        str = sprint(show, to_nan)
+        @test !occursin("NaN", str)
+    end
     for (b, str) in (
             (9.999 * 1024, "10.0KiB"), (99.999 * 1024, " 100KiB"),
             (9.999 * 1024^2, "10.0MiB"), (99.999 * 1024^2, " 100MiB"),
