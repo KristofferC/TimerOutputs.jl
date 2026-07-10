@@ -108,7 +108,8 @@ function Base.push!(to::TimerOutput, label::String)
     return timer.accumulated_data
 end
 
-Base.pop!(to::TimerOutput) = pop!(to.timer_stack)
+# The stack may be empty if `reset_timer!` was called inside a timed section (#172)
+Base.pop!(to::TimerOutput) = isempty(to.timer_stack) ? nothing : pop!(to.timer_stack)
 
 # Only sum the highest parents
 function totmeasured(to::TimerOutput)

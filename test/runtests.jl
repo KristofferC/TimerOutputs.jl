@@ -760,6 +760,22 @@ end
     end_timed_section!(to, section2)
 end
 
+@testset "reset_timer! inside a timed section (#172)" begin
+    to = TimerOutput()
+    @timeit to function foo_172(x)
+        reset_timer!(to)
+        x
+    end
+    @test foo_172(42) == 42
+
+    # nested sections unwinding after a reset must not throw either
+    @timeit to "outer" begin
+        @timeit to "inner" reset_timer!(to)
+    end
+    @timeit to "afterwards" 1 + 1
+    @test ncalls(to["afterwards"]) == 1
+end
+
 @testset "@timeit works with an empty label" begin
     to = TimerOutput()
     @timeit to "" begin end
