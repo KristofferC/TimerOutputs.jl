@@ -117,18 +117,22 @@ end
 tree_guides(linechars::Symbol) =
     linechars === :unicode ? ("├─ ", "└─ ", "│  ", "   ") : ("+- ", "`- ", "|  ", "   ")
 
+# with linechars = :ascii the output should be pure ASCII, including in the
+# time unit (#115)
+asciitime(str, ascii::Bool) = ascii ? replace(str, "μs" => "us") : str
+
 # Top level sections print flush; nested ones get tree guides.
 function table_rows!(
         rows::Vector{Vector{String}}, s::Section, ∑t, ∑b, prefix::String, toplevel::Bool,
-        sortby, allocations, compact, guides
+        sortby, allocations, compact, guides, ascii
     )
     children = sorted_children(s, sortby)
     for (i, child) in enumerate(children)
         islast = i == length(children)
         m = child
         name = toplevel ? child.name : string(prefix, islast ? guides[2] : guides[1], child.name)
-        row = String[name, prettycount(m.ncalls), prettytime(m.time), prettypercent(m.time, ∑t)]
-        compact || push!(row, prettytime(m.time / m.ncalls))
+        row = String[name, prettycount(m.ncalls), asciitime(prettytime(m.time), ascii), prettypercent(m.time, ∑t)]
+        compact || push!(row, asciitime(prettytime(m.time / m.ncalls), ascii))
         if allocations
             push!(row, prettymemory(m.allocs))
             push!(row, prettypercent(m.allocs, ∑b))
@@ -136,7 +140,7 @@ function table_rows!(
         end
         push!(rows, row)
         child_prefix = toplevel ? "" : string(prefix, islast ? guides[4] : guides[3])
-        table_rows!(rows, child, ∑t, ∑b, child_prefix, false, sortby, allocations, compact, guides)
+        table_rows!(rows, child, ∑t, ∑b, child_prefix, false, sortby, allocations, compact, guides, ascii)
     end
     return rows
 end
@@ -200,7 +204,8 @@ function show_table(
     ∑t, ∑b = totmeasured(to)
 
     subtitle = string(
-        "Total / % measured: ", strip(prettytime(Δt)), " / ", strip(prettypercent(∑t, Δt)),
+        "Total / % measured: ", strip(asciitime(prettytime(Δt), linechars === :ascii)),
+        " / ", strip(prettypercent(∑t, Δt)),
         allocations ? string("   ", strip(prettymemory(Δb)), " / ", strip(prettypercent(∑b, Δb))) : ""
     )
     return _show_table(io, to.root, ∑t, ∑b; sortby, allocations, compact, linechars, title, subtitle)
@@ -222,7 +227,10 @@ function _show_table(
         sortby, allocations, compact, linechars, title, subtitle
     )
     rows = Vector{Vector{String}}()
-    table_rows!(rows, s, ∑t, ∑b, "", true, sortby, allocations, compact, tree_guides(linechars))
+    table_rows!(
+        rows, s, ∑t, ∑b, "", true, sortby, allocations, compact,
+        tree_guides(linechars), linechars === :ascii
+    )
 
     labels = String["Section", "ncalls", "time", "%tot"]
     compact || push!(labels, "avg")
@@ -256,7 +264,9 @@ function _show_table(
             first_line_merged_column_label = crayon"bold",
             column_label = crayon"default"
         ),
-        fit_table_in_display_horizontally = get(io, :limit, false)::Bool,
+        # crop to the display width in the REPL and on terminals so long
+        # section names never make lines wrap (#166)
+        fit_table_in_display_horizontally = get(io, :limit, io isa Base.TTY)::Bool,
         title = title,
         title_alignment = :c,
         subtitle = subtitle,

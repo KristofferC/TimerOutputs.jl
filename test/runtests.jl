@@ -878,6 +878,25 @@ end
     @test sprint(show, TimerOutput()) isa String
 end
 
+@testset "ascii output is pure ASCII (#115)" begin
+    to = TimerOutput()
+    @timeit to "microsleep" 1 + 1
+    to["microsleep"].time = 5_000 # 5 μs
+    str = sprint((io, x) -> show(io, x; linechars = :ascii), to)
+    @test isascii(str)
+    @test occursin("us", str)
+    str_unicode = sprint(show, to)
+    @test occursin("μs", str_unicode)
+end
+
+@testset "table is cropped to the display width (#166)" begin
+    to = TimerOutput()
+    @timeit to "a section with an annoyingly long name that overflows" 1 + 1
+    ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (24, 60))
+    str = sprint(io -> show(IOContext(io, ctx), to))
+    @test all(l -> textwidth(l) <= 60, split(str, "\n"))
+end
+
 @testset "compact show in containers" begin
     to = TimerOutput()
     @timeit to "a" @timeit to "b" 1 + 1
