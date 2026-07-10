@@ -70,10 +70,7 @@ If no timers are associated with `name`, a new `TimerOutput` will be created.
 """
 function get_timer(name::String)
     return lock(_timers_lock) do
-        if !haskey(_timers, name)
-            _timers[name] = TimerOutput(name)
-        end
-        _timers[name]
+        get!(() -> TimerOutput(name), _timers, name)
     end
 end
 
@@ -488,7 +485,7 @@ function complement!(to::TimerOutput)
     end
     tot_time = max(tot_time, 0)
     tot_allocs = max(tot_allocs, 0)
-    if !(to.name in ["root", "Flattened"])
+    if !(to.name in ("root", "Flattened"))
         name = string("~", to.name, "~")
         timer = TimerOutput(to.start_data, TimeData(max(1, to.accumulated_data.ncalls), tot_time, tot_allocs), Dict{String, TimerOutput}(), TimerOutput[], name, false, true, (tot_time, tot_allocs), to.name, to)
         to.inner_timers[name] = timer
