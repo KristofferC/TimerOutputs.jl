@@ -433,6 +433,9 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             title = crayon"bold",
             subtitle = crayon"dark_gray",
             first_line_merged_column_label = crayon"bold",
+            # the totals row consists of merged label cells; the PrettyTables
+            # default for those is gray and underlined
+            merged_column_label = crayon"default",
             column_label = crayon"default"
         ),
         # complement rows are shown in gray

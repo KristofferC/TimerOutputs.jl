@@ -970,6 +970,17 @@ end
     @test_throws ArgumentError render(; columns = [:bogus])
 end
 
+@testset "totals row styling" begin
+    to = TimerOutput()
+    @timeit to "a" 1 + 1
+    cstr = sprint(show, to; context = :color => true)
+    # PrettyTables styles merged label rows gray + underlined by default;
+    # the totals row must stay plain
+    @test !occursin("\e[4m", cstr)
+    total_line = first(filter(l -> occursin("Tot / % measured", l), split(cstr, "\n")))
+    @test !occursin("\e[90m", total_line)
+end
+
 @testset "complement display option" begin
     to = TimerOutput()
     @timeit to "outer" begin
