@@ -760,6 +760,15 @@ end
     @test ncalls(to.inner_timers[""]) == 1
 end
 
+@testset "truncdots truncates by display width" begin
+    truncdots = TimerOutputs.truncdots
+    @test truncdots("abc", 10) == "abc"
+    @test truncdots("abcdefghijk", 10) == "abcdefg..."
+    @test truncdots("日本語の名前です", 10) == "日本語..."
+    @test textwidth(truncdots("日本語の名前です", 10)) <= 10
+    @test truncdots("日本語", 3) == ""
+end
+
 @testset "FlameGraphsExt" begin
     to = TimerOutput()
     begin

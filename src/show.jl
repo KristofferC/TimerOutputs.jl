@@ -52,15 +52,18 @@ function sortf(x, sortby)
     error("internal error")
 end
 
-# truncate string and add dots
+# truncate string to a display width of n and add dots
 function truncdots(str, n)
     textwidth(str) <= n && return str
     n <= 3 && return ""
     io = IOBuffer()
-    for (i, c) in enumerate(str)
-        i == n - 2 && (write(io, "..."); break)
+    width = 3 # for the dots
+    for c in str
+        width += textwidth(c)
+        width > n && break
         write(io, c)
     end
+    write(io, "...")
     return String(take!(io))
 end
 
