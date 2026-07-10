@@ -25,8 +25,8 @@ undocumented internals may need updating (see "Breaking" below).
   (`path`, `section`, `depth`, `ncalls`, `time_ns`, `allocated_bytes`,
   `firstexec_ns`).
 * **New table layout** (now built on PrettyTables.jl): tree guides (`├─`, `└─`)
-  instead of plain indentation, grouped `Time` / `Allocations` headers, and a
-  new `%par` column showing each section's share of its enclosing section.
+  instead of plain indentation, and an optional `%par` column showing each
+  section's share of its enclosing section (`columns = [..., :time_par]`).
 * **Column selection**: `print_timer(to; columns = [:ncalls, :time, :time_pct])`
   picks exactly which columns to show, in order; `allocations` and `compact`
   remain as shorthands.

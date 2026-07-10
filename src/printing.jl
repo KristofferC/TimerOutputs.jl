@@ -148,6 +148,7 @@ struct ColumnSpec
 end
 
 const COLUMNS = (;
+    spacer = ColumnSpec("", "", false, (c, p, ctx) -> ""),
     ncalls = ColumnSpec("ncalls", "", true, (c, p, ctx) -> prettycount(c.ncalls)),
     time = ColumnSpec("time", "Time", false, (c, p, ctx) -> asciitime(prettytime(c.time), ctx.ascii)),
     time_pct = ColumnSpec("%tot", "Time", true, (c, p, ctx) -> prettypercent(c.time, ctx.∑t)),
@@ -159,13 +160,14 @@ const COLUMNS = (;
     allocs_avg = ColumnSpec("avg", "Allocations", true, (c, p, ctx) -> prettymemory(c.allocs / c.ncalls)),
 )
 
-# the selection the `allocations` and `compact` keywords correspond to
+# the selection the `allocations` and `compact` keywords correspond to;
+# the %par columns are opt-in through the `columns` keyword
 function default_columns(allocations::Bool, compact::Bool)
     columns = [:ncalls, :time, :time_pct]
-    compact || append!(columns, [:time_par, :time_avg])
+    compact || push!(columns, :time_avg)
     if allocations
-        append!(columns, [:allocs, :allocs_pct])
-        compact || append!(columns, [:allocs_par, :allocs_avg])
+        append!(columns, [:spacer, :allocs, :allocs_pct])
+        compact || push!(columns, :allocs_avg)
     end
     return columns
 end
@@ -390,10 +392,15 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
         io, data;
         column_labels = column_labels,
         alignment = [:l; fill(:r, ncols - 1)],
+        # underline the Time/Allocations column group headers
         table_format = if opts.ascii
-            TextTableFormat(; borders = text_table_borders__compact, @text__no_vertical_lines)
+            TextTableFormat(;
+                borders = text_table_borders__compact,
+                horizontal_line_at_merged_column_labels = true,
+                @text__no_vertical_lines
+            )
         else
-            TextTableFormat(; @text__no_vertical_lines)
+            TextTableFormat(; horizontal_line_at_merged_column_labels = true, @text__no_vertical_lines)
         end,
         style = TextTableStyle(;
             title = crayon"bold",

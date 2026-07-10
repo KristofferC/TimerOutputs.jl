@@ -924,10 +924,10 @@ end
     @timeit to "outer" begin
         @timeit to "inner" 1 + 1
     end
-    str = sprint(show, to)
+    # opt-in via the columns keyword, not shown by default
+    str = sprint((io, x) -> show(io, x; columns = [:ncalls, :time, :time_pct, :time_par]), to)
     @test occursin("%par", str)
-    # top level has a blank %par; compact mode hides the column
-    @test !occursin("%par", sprint((io, x) -> show(io, x; compact = true), to))
+    @test !occursin("%par", sprint(show, to))
 end
 
 @testset "maxdepth (#122)" begin
@@ -963,10 +963,7 @@ end
     @test header_line(render()) ==
         header_line(
         render(;
-            columns = [
-                :ncalls, :time, :time_pct, :time_par, :time_avg,
-                :allocs, :allocs_pct, :allocs_par, :allocs_avg,
-            ]
+            columns = [:ncalls, :time, :time_pct, :time_avg, :spacer, :allocs, :allocs_pct, :allocs_avg]
         )
     )
 
