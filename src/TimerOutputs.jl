@@ -8,7 +8,7 @@ import Tables
 
 import Base: show, time_ns
 
-export TimerOutput, ConcurrentTimerOutput, NoTimerOutput, @timeit, @timeit_debug,
+export TimerOutput, NoTimerOutput, @timeit, @timeit_debug,
     reset_timer!, print_timer, timeit, enable_timer!, disable_timer!, @notimeit,
     get_timer, begin_timed_section!, end_timed_section!
 
@@ -21,7 +21,6 @@ end
 include("core.jl")
 include("macros.jl")
 include("analysis.jl")
-include("concurrent.jl")
 include("tables.jl")
 include("printing.jl")
 include("compat.jl")

@@ -240,21 +240,12 @@ end
 ############
 
 print_timer(; kwargs...) = print_timer(stdout; kwargs...)
-print_timer(to::Union{TimerOutput, ConcurrentTimerOutput}; kwargs...) = print_timer(stdout, to; kwargs...)
+print_timer(to::TimerOutput; kwargs...) = print_timer(stdout, to; kwargs...)
 print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
 print_timer(io::IO, to::TimerOutput; kwargs...) = (show_table(io, to; kwargs...); println(io))
-print_timer(io::IO, cto::ConcurrentTimerOutput; kwargs...) = print_timer(io, merged(cto); kwargs...)
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
-Base.show(cto::ConcurrentTimerOutput; kwargs...) = show(stdout, cto; kwargs...)
 
-function Base.show(io::IO, cto::ConcurrentTimerOutput; kwargs...)
-    if in_container(io) && isempty(kwargs)
-        n = length(merged(cto).root.children)
-        return print(io, "ConcurrentTimerOutput(", n, n == 1 ? " section)" : " sections)")
-    end
-    return show_table(io, merged(cto); kwargs...)
-end
 
 # Inside containers print a one line summary instead of the full table.
 # Container printing marks its context with :typeinfo (and matrix display
