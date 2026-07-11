@@ -14,8 +14,8 @@ const SectionRow = @NamedTuple{
     ncalls::Int64, time_ns::Int64, allocated_bytes::Int64, firstexec_ns::Int64,
 }
 
-Tables.istable(::Type{<:Union{TimerOutput, Section}}) = true
-Tables.rowaccess(::Type{<:Union{TimerOutput, Section}}) = true
+Tables.istable(::Type{<:Union{TimerOutput, Section, ConcurrentTimerOutput}}) = true
+Tables.rowaccess(::Type{<:Union{TimerOutput, Section, ConcurrentTimerOutput}}) = true
 
 function Tables.rows(to::TimerOutput)
     rows = SectionRow[]
@@ -28,8 +28,9 @@ end
 # a bare section includes itself as the first row
 Tables.rows(s::Section) = _section_rows!(SectionRow[], s, "", 0)
 
+Tables.rows(cto::ConcurrentTimerOutput) = Tables.rows(merged(cto))
 
-Tables.schema(::Union{TimerOutput, Section}) =
+Tables.schema(::Union{TimerOutput, Section, ConcurrentTimerOutput}) =
     Tables.Schema(fieldnames(SectionRow), fieldtypes(SectionRow))
 
 function _section_rows!(rows::Vector{SectionRow}, s::Section, prefix::String, depth::Int)

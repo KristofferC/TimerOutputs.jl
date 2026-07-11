@@ -109,8 +109,8 @@ end
 The main timer type. Time sections of code with `@timeit to "label" ...`;
 print the accumulated table with `print_timer(to)` or `show`.
 
-A `TimerOutput` must only be used from one task at a time; for concurrent
-code use one timer per task and combine them with `merge!`.
+A `TimerOutput` must only be used from one task at a time, see
+[`ConcurrentTimerOutput`](@ref) for concurrent code.
 """
 mutable struct TimerOutput
     const root::Section

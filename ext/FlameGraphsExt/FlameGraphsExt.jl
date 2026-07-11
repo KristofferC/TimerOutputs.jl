@@ -24,6 +24,8 @@ function FlameGraphs.flamegraph(to::TimerOutput; crop_root = false)
     return _to_flamegraph(root_section, root, very_start)
 end
 
+FlameGraphs.flamegraph(cto::ConcurrentTimerOutput; kwargs...) =
+    FlameGraphs.flamegraph(TimerOutput(cto); kwargs...)
 
 ## internals
 

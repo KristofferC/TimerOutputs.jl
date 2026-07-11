@@ -8,6 +8,11 @@ internals may need updating (see "Internal changes" below).
 
 ### New features
 
+* **Timing in concurrent code**: the new `ConcurrentTimerOutput` can be shared
+  freely between tasks and threads. Each task transparently records into its
+  own private tree (a few ns extra per section); the trees are merged by
+  section label whenever the timer is printed or queried. See the README
+  section on multithreaded timing for the semantics.
 * **Zero-overhead timer disabling**: the new `NoTimerOutput` is a dummy timer
   where all operations are no-ops. When its type is known to the compiler
   (a `const`, or a type parameter of the struct holding it), `@timeit`
