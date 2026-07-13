@@ -225,6 +225,8 @@ function notimeit_expr(to, ex::Expr)
                 quote
                     if enabled
                         $(enable_timer!)(to)
+                    else
+                        $(disable_timer!)(to)
                     end
                 end
             )

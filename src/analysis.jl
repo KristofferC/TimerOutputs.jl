@@ -189,6 +189,17 @@ function complement_section(s::Section)
 end
 
 function _complement!(s::Section)
+    # `complement!` may be called repeatedly. Remove the previously generated
+    # complement before recomputing it so section labels stay unique and the
+    # value reflects measurements accumulated since the previous call.
+    complement_name = string("~", s.name, "~")
+    filter!(child -> child.name != complement_name, s.children)
+    s.index = length(s.children) > INDEX_THRESHOLD ?
+        Dict{String, Section}(child.name => child for child in s.children) : nothing
+    if s.prev_child !== nothing && s.prev_child.name == complement_name
+        s.prev_child = nothing
+    end
+
     isempty(s.children) && return
     complement = complement_section(s)
     for child in s.children

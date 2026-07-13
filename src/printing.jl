@@ -337,12 +337,10 @@ function show_table(
     )
     opts = validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
-    extra = if complement && s.ncalls > 0 && !isempty(s.children)
-        ComplementRow(complement_section(s), true)
-    else
-        nothing
-    end
-    return _show_table(io, s, ∑t, ∑b, opts, title, nothing, extra)
+    # `_show_table` renders the children of its root. Wrap the section in a
+    # detached display-only root so the section itself is the first row.
+    display_root = Section("", 0, 0, 0, s.firstexec, Section[s], nothing, nothing)
+    return _show_table(io, display_root, ∑t, ∑b, opts, title, nothing, nothing)
 end
 
 # the merged header row: contiguous runs of columns in the same group. If

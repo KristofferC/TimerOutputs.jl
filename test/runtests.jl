@@ -383,6 +383,13 @@ end
     tom = flatten(to)
     @test ncalls(tom["~section2~"]) == 1
 
+    # Repeated calls refresh complement sections instead of creating duplicate
+    # labels (which would make indexing and serialization disagree).
+    TimerOutputs.complement!(to)
+    @test collect(keys(to["section2"])) == ["section2.1", "~section2~"]
+    @test TimerOutputs.time(to["section2", "~section2~"]) ==
+        todict(to)["inner_timers"]["section2"]["inner_timers"]["~section2~"]["time_ns"]
+
 end # testset
 
 struct Simulation
@@ -522,6 +529,11 @@ end
     @notimeit to ff1()
     ff1()
     @test ncalls(to["ff1"]) == 3
+
+    # Restore the exact prior state even if the body changes it.
+    disable_timer!(to)
+    @test (@notimeit to enable_timer!(to)) == true
+    @test !TimerOutputs.isenabled(to)
 end
 
 # Type inference with @timeit_debug
@@ -1016,7 +1028,10 @@ end
     @test collect(keys(to)) == ["outer"]
     @test collect(keys(to["outer"])) == ["inner"]
     # complement rows are gray when the io supports color
-    cstr = sprint((io, x) -> show(io, x; complement = true), to; context = :color => true)
+    # Crayons checks terminal/global color support rather than IOContext(:color).
+    cstr = withenv("FORCE_COLOR" => "true") do
+        sprint((io, x) -> show(io, x; complement = true), to; context = :color => true)
+    end
     @test occursin("\e[90m", cstr)
     @test !occursin("\e[90m ~", sprint((io, x) -> show(io, x; complement = true), to)) # no color, no ansi
     # works for a bare section too
@@ -1069,7 +1084,11 @@ end
     @test collect(keys(to["a"])) == ["b"]
     # sections print as tables
     str = sprint(show, to["a"])
+    @test occursin("a", str)
     @test occursin("b", str)
+    leaf_str = sprint(show, to["a", "b"])
+    @test occursin("b", leaf_str)
+    @test occursin("1", leaf_str)
     # pre-0.6 internal names still readable
     @test to.inner_timers["a"].accumulated_data.ncalls == 1
     # metrics are stored inline in the section; old accumulated_data name still reads
