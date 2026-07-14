@@ -383,6 +383,13 @@ end
     tom = flatten(to)
     @test ncalls(tom["~section2~"]) == 1
 
+    # Repeated calls refresh complement sections instead of creating duplicate
+    # labels (which would make indexing and serialization disagree).
+    TimerOutputs.complement!(to)
+    @test collect(keys(to["section2"])) == ["section2.1", "~section2~"]
+    @test TimerOutputs.time(to["section2", "~section2~"]) ==
+        todict(to)["inner_timers"]["section2"]["inner_timers"]["~section2~"]["time_ns"]
+
 end # testset
 
 struct Simulation
@@ -522,6 +529,11 @@ end
     @notimeit to ff1()
     ff1()
     @test ncalls(to["ff1"]) == 3
+
+    # Restore the exact prior state even if the body changes it.
+    disable_timer!(to)
+    @test (@notimeit to enable_timer!(to)) == true
+    @test !TimerOutputs.isenabled(to)
 end
 
 # Type inference with @timeit_debug
@@ -740,7 +752,7 @@ end
     s = x -> x + 1
     t = to(s)
     t(1)
-    ncalls(to.inner_timers[repr(s)]) == 1
+    @test ncalls(to.inner_timers[repr(s)]) == 1
 end
 
 @testset "Interleaved sections" begin
@@ -802,6 +814,289 @@ function foo_77(::Float64) end
 
     # this err shouldn't have any stacktrace pointing into TimerOutputs.jl
     @test !contains(err, "src/TimerOutput.jl:")
+end
+
+@timeit "foo_168" function foo_168()
+    1 + 1
+
+    error("boom")
+end
+const foo_168_error_line = @__LINE__() - 2
+
+@timeit_debug "dbg_168" function dbg_168()
+    1 + 1
+
+    error("boom")
+end
+const dbg_168_error_line = @__LINE__() - 2
+
+@testset "function body keeps line numbers (#168)" begin
+    st = try
+        foo_168()
+    catch
+        stacktrace(catch_backtrace())
+    end
+    i = findfirst(f -> f.func === :foo_168, st)
+    @test st[i].line == foo_168_error_line
+    @test endswith(String(st[i].file), "runtests.jl")
+
+    # debug variant: the user body lives in the `inner` closure, but the error
+    # line must still be visible in the trace
+    st = try
+        dbg_168()
+    catch
+        stacktrace(catch_backtrace())
+    end
+    @test any(f -> f.line == dbg_168_error_line && endswith(String(f.file), "runtests.jl"), st)
+end
+
+@testset "reset_timer! inside a timed section (#172)" begin
+    to = TimerOutput()
+    @timeit to function foo_172(x)
+        reset_timer!(to)
+        x
+    end
+    @test foo_172(42) == 42
+
+    # nested sections unwinding after a reset must not throw either
+    @timeit to "outer" begin
+        @timeit to "inner" reset_timer!(to)
+    end
+    @timeit to "afterwards" 1 + 1
+    @test ncalls(to["afterwards"]) == 1
+end
+
+@testset "no NaN for zero-call sections" begin
+    @test prettytime(NaN) == "     -"
+    to = TimerOutput()
+    begin_timed_section!(to, "unfinished")
+    str = sprint(show, to)
+    @test !occursin("NaN", str)
+end
+
+@testset "macro edge cases" begin
+    to = TimerOutput()
+    x = 7
+    # non-Expr bodies (literals, symbols) work
+    @test (@timeit to "lit" 42) == 42
+    @test (@timeit to "sym" x) == 7
+    @test (@timeit to "nothing" nothing) === nothing
+    @test ncalls(to["lit"]) == 1
+    # invalid forms give the friendly usage error
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit f(x)))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit 42))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit))
+    # an empty timer still renders
+    @test sprint(show, TimerOutput()) isa String
+end
+
+@testset "ascii output is pure ASCII (#115)" begin
+    to = TimerOutput()
+    @timeit to "microsleep" @timeit to "nested" 1 + 1
+    to["microsleep"].time = 5_000 # 5 μs
+    str = sprint((io, x) -> show(io, x; linechars = :ascii), to)
+    @test isascii(str)
+    @test occursin("us", str)
+    # ascii mode uses plain indentation, not tree guide characters
+    @test occursin("\n   nested", str)
+    str_unicode = sprint(show, to)
+    @test occursin("μs", str_unicode)
+    @test occursin("└─ nested", str_unicode)
+end
+
+@testset "compact without allocations hides the header block" begin
+    to = TimerOutput()
+    @timeit to "a" 1 + 1
+    str = sprint((io, x) -> show(io, x; compact = true, allocations = false), to)
+    @test !occursin("Time", str)
+    @test !occursin("Tot / % measured", str)
+    # but compact with allocations keeps it
+    str2 = sprint((io, x) -> show(io, x; compact = true), to)
+    @test occursin("Time", str2) && occursin("Tot / % measured", str2)
+end
+
+@testset "table is cropped to the display width (#166)" begin
+    to = TimerOutput()
+    @timeit to "a section with an annoyingly long name that overflows" 1 + 1
+    ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (24, 60))
+    str = sprint(io -> show(IOContext(io, ctx), to))
+    @test all(l -> textwidth(l) <= 60, split(str, "\n"))
+    # the Section column is shrunk before any data columns are cropped
+    @test occursin("…", str)
+    @test occursin("ncalls", str) && occursin("time", str)
+end
+
+@testset "NoTimerOutput (#109)" begin
+    nt = NoTimerOutput()
+    f_nt(t) = @timeit t "sec" (1 + 1)
+    @test f_nt(nt) == 2
+    # compiles away entirely when the timer type is known (code coverage
+    # inserts extra statements and inhibits inlining, so only check without)
+    if Base.JLOptions().code_coverage == 0
+        @test length(code_typed(f_nt, Tuple{NoTimerOutput})[1].first.code) == 1
+    end
+    @test (@allocated f_nt(nt)) == 0
+    @test timeit(() -> 42, nt, "x") == 42
+    section = begin_timed_section!(nt, "x")
+    end_timed_section!(nt, section)
+    @test (@notimeit nt f_nt(nt)) == 2
+    @test !TimerOutputs.isenabled(nt)
+    @test enable_timer!(nt) == false
+    @test disable_timer!(nt) == false
+    @test reset_timer!(nt) === nt
+    # funcdef form
+    @timeit nt nt_func(x) = x + 1
+    @test nt_func(1) == 2
+end
+
+@testset "%par column (#192)" begin
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" 1 + 1
+    end
+    # opt-in via the columns keyword, not shown by default
+    str = sprint((io, x) -> show(io, x; columns = [:ncalls, :time, :time_pct, :time_par]), to)
+    @test occursin("%par", str)
+    @test !occursin("%par", sprint(show, to))
+end
+
+@testset "maxdepth (#122)" begin
+    to = TimerOutput()
+    @timeit to "l1" @timeit to "l2" @timeit to "l3" 1 + 1
+    str1 = sprint((io, x) -> show(io, x; maxdepth = 1), to)
+    @test occursin("l1", str1) && !occursin("l2", str1)
+    str2 = sprint((io, x) -> show(io, x; maxdepth = 2), to)
+    @test occursin("l2", str2) && !occursin("l3", str2)
+    @test occursin("l3", sprint(show, to))
+    @test_throws ArgumentError sprint((io, x) -> show(io, x; maxdepth = 0), to)
+end
+
+@testset "columns selection" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    header_line(s) = first(filter(l -> occursin("Section", l), split(s, "\n")))
+    render(; kwargs...) = sprint((io, x) -> show(io, x; kwargs...), to)
+
+    str = render(; columns = [:ncalls, :time])
+    @test occursin("ncalls", str) && occursin("time", str)
+    @test !occursin("avg", str) && !occursin("alloc", str) && !occursin("%tot", str)
+
+    # order is respected, and group headers follow the columns
+    str2 = render(; columns = [:time, :ncalls])
+    @test findfirst("time", header_line(str2))[1] < findfirst("ncalls", header_line(str2))[1]
+    str3 = render(; columns = [:allocs, :allocs_pct, :time])
+    @test findfirst("Allocations", str3)[1] < findfirst("Time", str3)[1]
+
+    # the compact/allocations keywords are shorthands for column selections
+    # (token comparison: the header block presence may change column padding)
+    @test split(header_line(render(; compact = true, allocations = false))) ==
+        split(header_line(render(; columns = [:ncalls, :time, :time_pct])))
+    @test split(header_line(render())) ==
+        split(
+        header_line(
+            render(;
+                columns = [:ncalls, :time, :time_pct, :time_avg, :spacer, :allocs, :allocs_pct, :allocs_avg]
+            )
+        )
+    )
+
+    @test_throws ArgumentError render(; columns = [:bogus])
+end
+
+@testset "totals row styling" begin
+    to = TimerOutput()
+    @timeit to "a" 1 + 1
+    cstr = sprint(show, to; context = :color => true)
+    # PrettyTables styles merged label rows gray + underlined by default;
+    # the totals row must stay plain
+    @test !occursin("\e[4m", cstr)
+    total_line = first(filter(l -> occursin("Tot / % measured", l), split(cstr, "\n")))
+    @test !occursin("\e[90m", total_line)
+end
+
+@testset "complement display option" begin
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" sleep(0.01)
+        sleep(0.01)
+    end
+    str = sprint((io, x) -> show(io, x; complement = true), to)
+    @test occursin("~untimed~", str)
+    @test occursin("~outer~", str)
+    @test !occursin("~", sprint(show, to)) # off by default
+    # display only: the timer itself is not mutated
+    @test collect(keys(to)) == ["outer"]
+    @test collect(keys(to["outer"])) == ["inner"]
+    # complement rows are gray when the io supports color
+    # Crayons checks terminal/global color support rather than IOContext(:color).
+    cstr = withenv("FORCE_COLOR" => "true") do
+        sprint((io, x) -> show(io, x; complement = true), to; context = :color => true)
+    end
+    @test occursin("\e[90m", cstr)
+    @test !occursin("\e[90m ~", sprint((io, x) -> show(io, x; complement = true), to)) # no color, no ansi
+    # works for a bare section too
+    @test occursin("~outer~", sprint((io, x) -> show(io, x; complement = true), to["outer"]))
+end
+
+@testset "compact show in containers" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    # the REPL displays container elements with a :compact IOContext
+    display_str(x) = sprint(show, MIME("text/plain"), x)
+    str = display_str([to, to])
+    @test occursin("TimerOutput(\"root\", 1 section)", str)
+    @test !occursin("ncalls", str) # no table headers inside the array
+    @test occursin("Section(\"b\"", display_str([to["a", "b"]]))
+    # top level printing is unaffected
+    @test occursin("ncalls", sprint(show, to))
+end
+
+@testset "Tables.jl interface" begin
+    import Tables
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" sleep(0.01)
+    end
+    @timeit to "second" 1 + 1
+    @test Tables.istable(typeof(to))
+    rows = Tables.rows(to)
+    @test length(rows) == 3
+    @test [r.path for r in rows] == ["outer", "outer/inner", "second"]
+    @test [r.section for r in rows] == ["outer", "inner", "second"]
+    @test [r.depth for r in rows] == [0, 1, 0]
+    @test all(r.ncalls == 1 for r in rows)
+    @test rows[2].time_ns >= 10^7
+    cols = Tables.columntable(to)
+    @test cols.ncalls == [1, 1, 1]
+    @test Tables.schema(to).names ==
+        (:path, :section, :depth, :ncalls, :time_ns, :allocated_bytes, :firstexec_ns)
+
+    # a bare section includes itself as the first row
+    @test [r.path for r in Tables.rows(to["outer"])] == ["outer", "outer/inner"]
+end
+
+@testset "new API (0.6)" begin
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+    # nested indexing and keys
+    @test ncalls(to["a", "b"]) == 1
+    @test collect(keys(to)) == ["a"]
+    @test collect(keys(to["a"])) == ["b"]
+    # sections print as tables
+    str = sprint(show, to["a"])
+    @test occursin("a", str)
+    @test occursin("b", str)
+    leaf_str = sprint(show, to["a", "b"])
+    @test occursin("b", leaf_str)
+    @test occursin("1", leaf_str)
+    # pre-0.6 internal names still readable
+    @test to.inner_timers["a"].accumulated_data.ncalls == 1
+    # metrics are stored inline in the section; old accumulated_data name still reads
+    @test to["a"].accumulated_data.ncalls == 1
+    # copy is fully detached
+    c = copy(to)
+    c["a"].ncalls = 99
+    @test ncalls(to["a"]) == 1
 end
 
 include("test_coverage.jl")
