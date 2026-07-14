@@ -109,6 +109,17 @@ end
 
 funcdef(2)
 
+# @timeit_all additionally times every statement in a block or function body
+@timeit_all to function line_profile(n)
+    x = 0
+    for i in 1:n
+        x += i
+    end
+    x
+end
+
+line_profile(10)
+
 # Or to instrument an existing function:
 foo(x) = x + 1
 timed_foo = to(foo)
