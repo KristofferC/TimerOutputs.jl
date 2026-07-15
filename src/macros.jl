@@ -210,7 +210,7 @@ end
 
 notimeit_expr(args...) = throw(ArgumentError("invalid macro usage for @notimeit, use as @notimeit [to] codeblock"))
 
-notimeit_expr(ex::Expr) = notimeit_expr(:($(TimerOutputs.DEFAULT_TIMER)), ex)
+notimeit_expr(ex::Expr) = notimeit_expr(default_timer_expr(), ex)
 
 function notimeit_expr(to, ex::Expr)
     return quote

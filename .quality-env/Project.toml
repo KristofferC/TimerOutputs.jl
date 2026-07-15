@@ -1,0 +1,18 @@
+[deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
+FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+Runic = "62bfec6d-59d7-401d-8490-b29ee721c001"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+
+[sources]
+TimerOutputs = {path = ".."}
+
+[compat]
+Aqua = "0.8"
+ExplicitImports = "1"
+FlameGraphs = "1"
+JET = "0.11"
+Runic = "1.7"   # keep in sync with .pre-commit-config.yaml and Checks.yml
+julia = "1.10"

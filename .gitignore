@@ -2,4 +2,6 @@
 *.jl.*.cov
 *.jl.mem
 **/Manifest.toml
+# keep the pinned analysis-tool versions for reproducible quality CI
+!.quality-env/Manifest.toml
 tmp.jl
