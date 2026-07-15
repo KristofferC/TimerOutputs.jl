@@ -41,7 +41,8 @@ function totmeasured(s::Section)
     return t, b
 end
 function totmeasured(to::TimerOutput)
-    to.measured === nothing || return to.measured
+    measured = to.measured
+    measured === nothing || return measured
     return totmeasured(to.root)
 end
 
@@ -317,11 +318,21 @@ funcname(f) = repr(f)
 InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
 
 function (inst::InstrumentedFunction)(args...; kwargs...)
-    return @timeit inst.t inst.name inst.func(args...; kwargs...)
+    to = inst.t
+    isenabled(to) || return inst.func(args...; kwargs...)
+    data = push!(to, inst.name)
+    b₀ = gc_bytes()
+    t₀ = time_ns()
+    try
+        return inst.func(args...; kwargs...)
+    finally
+        do_accumulate!(data, t₀, b₀)
+        pop!(to)
+    end
 end
 
 """
-    (t::TimerOutput)(f, name=string(repr(f))) -> InstrumentedFunction
+    (t::TimerOutput)(f, name = string(repr(f))) -> InstrumentedFunction
 
 Instruments `f` by the [`TimerOutput`](@ref) `t` returning an `InstrumentedFunction`.
 This function can be used just like `f`, but whenever it is called it stores timing

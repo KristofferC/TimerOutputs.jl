@@ -27,4 +27,23 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: fredrikekre/runic-action@v1
         with:
-          version: "1.4" # Keep version in sync with .pre-commit-config.yaml
+          version: "1.7" # Keep version in sync with .pre-commit-config.yaml
+          docstrings: true
+
+  # Aqua, JET and ExplicitImports run in the dedicated `.quality-env` project,
+  # which pins the analysis tools independently of the package's own deps.
+  quality:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [aqua, jet, explicit_imports]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v2
+      - name: ${{ matrix.check }}
+        run: julia --color=yes --project=.quality-env -e 'using Pkg; Pkg.instantiate(); include("test/${{ matrix.check }}.jl")'

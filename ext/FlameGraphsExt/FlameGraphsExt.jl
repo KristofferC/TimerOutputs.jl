@@ -1,7 +1,6 @@
 module FlameGraphsExt
 
-using TimerOutputs
-using TimerOutputs: Section, prettytime
+using TimerOutputs: TimerOutput, Section, prettytime
 using FlameGraphs: FlameGraphs, NodeData
 using FlameGraphs.LeftChildRightSiblingTrees: Node, addchild
 using Base.StackTraces: StackFrame
