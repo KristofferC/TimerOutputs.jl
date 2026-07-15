@@ -16,8 +16,9 @@ function FlameGraphs.flamegraph(to::TimerOutput; crop_root = false)
     root_section = to.root
     # The root frame covers the total time being measured, so start when the
     # timer (or, if cropping, the first section) was created and stop when the
-    # last section finished.
-    very_start = crop_root ? min_start_time(root_section) : to.start_time
+    # last section finished. With no sections there is nothing to crop to, so
+    # fall back to the timer start (`min_start_time` would error on no children).
+    very_start = crop_root && !isempty(root_section.children) ? min_start_time(root_section) : to.start_time
     range = (Int(very_start):Int(max_end_time(root_section, very_start))) .- very_start
     root = Node(NodeData(section_frame(root_section), 0x00, range))
     return _to_flamegraph(root_section, root, very_start)

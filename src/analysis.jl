@@ -92,6 +92,22 @@ Base.merge(to::TimerOutput, others::TimerOutput...) = merge!(TimerOutput(), to, 
 
 function Base.merge!(to::TimerOutput, others::TimerOutput...; tree_point = String[])
     return lock(merge_lock) do
+        # If any input carries a `measured` override (as `flatten` sets, where
+        # the flattened rows no longer sum to the original total), the merged
+        # total is the sum of the inputs' measured totals. Compute it before
+        # mutating anything. Without an override it stays derived from children.
+        overridden = to.measured !== nothing || any(o -> o.measured !== nothing, others)
+        measured = if overridden
+            t, b = totmeasured(to)
+            for other in others
+                ot, ob = totmeasured(other)
+                t += ot
+                b += ob
+            end
+            (t, b)
+        else
+            nothing
+        end
         for other in others
             combine!(to.root, other.root)
             # the merged measurement period spans that of the inputs
@@ -103,6 +119,7 @@ function Base.merge!(to::TimerOutput, others::TimerOutput...; tree_point = Strin
             end
             _merge_children!(into, other.root)
         end
+        to.measured = measured
         return to
     end
 end
@@ -185,19 +202,20 @@ function complement_section(s::Section)
     end
     return Section(
         string("~", s.name, "~"), max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0),
-        s.firstexec, Section[], nothing, nothing
+        s.firstexec, Section[], nothing, nothing, true
     )
 end
 
 function _complement!(s::Section)
     # `complement!` may be called repeatedly. Remove the previously generated
-    # complement before recomputing it so section labels stay unique and the
-    # value reflects measurements accumulated since the previous call.
-    complement_name = string("~", s.name, "~")
-    filter!(child -> child.name != complement_name, s.children)
+    # complement before recomputing it so the value reflects measurements
+    # accumulated since the previous call. Identify it by its `is_complement`
+    # flag, not its label: a user section that happens to be named `~name~`
+    # holds real timing data and must not be deleted.
+    filter!(child -> !child.is_complement, s.children)
     s.index = length(s.children) > INDEX_THRESHOLD ?
         Dict{String, Section}(child.name => child for child in s.children) : nothing
-    if s.prev_child !== nothing && s.prev_child.name == complement_name
+    if s.prev_child !== nothing && s.prev_child.is_complement
         s.prev_child = nothing
     end
 
@@ -288,6 +306,7 @@ Functional form of `@timeit`: time the call `f()` under `label`.
 timeit(f::Function, label::String) = timeit(f, DEFAULT_TIMER, label)
 timeit(f::Function, ::NoTimerOutput, ::String) = f()
 function timeit(f::Function, to::TimerOutput, label::String)
+    isenabled(to) || return f()
     section = begin_timed_section!(to, label)
     local val
     try
