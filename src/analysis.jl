@@ -202,7 +202,7 @@ function complement_section(s::Section)
     end
     return Section(
         string("~", s.name, "~"), max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0),
-        s.firstexec, Section[], nothing, nothing, true, false
+        s.firstexec, Section[], nothing, nothing, true, false, s.srcfile
     )
 end
 

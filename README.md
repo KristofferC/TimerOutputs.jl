@@ -151,10 +151,10 @@ Similar information is available for allocations:
  ├─ level 2.2                       1   201ms    7.1%   201ms       112B    0.0%     112B
  └─ level 2.1                       3  93.4ms    3.3%  31.1ms       336B    0.0%     112B
  randoms                            1  95.1ms    3.4%  95.1ms    84.2MiB  100.0%  84.2MiB
- line_profile                       1  3.87μs    0.0%  3.87μs       432B    0.0%     432B
- ├─ example.jl:5: for i = 1:n       1   558ns    0.0%   558ns       160B    0.0%     160B
- │  └─ example.jl:6: x += i        10   105ns    0.0%  10.5ns      0.00B    0.0%    0.00B
- └─ example.jl:4: x = 0             1  13.0ns    0.0%  13.0ns      0.00B    0.0%    0.00B
+ line_profile @ example.jl          1  3.87μs    0.0%  3.87μs       432B    0.0%     432B
+ ├─ L5: for i = 1:n                 1   558ns    0.0%   558ns       160B    0.0%     160B
+ │  └─ L6: x += i                  10   105ns    0.0%  10.5ns      0.00B    0.0%    0.00B
+ └─ L4: x = 0                       1  13.0ns    0.0%  13.0ns      0.00B    0.0%    0.00B
  funcdef                            1  15.0ns    0.0%  15.0ns      0.00B    0.0%    0.00B
  foo                                1  14.0ns    0.0%  14.0ns      0.00B    0.0%    0.00B
 ──────────────────────────────────────────────────────────────────────────────────────────

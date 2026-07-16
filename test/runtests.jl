@@ -1214,6 +1214,15 @@ const timeit_all_error_line = @__LINE__() - 2
     @test length(for_keys) == 1
     @test any(occursin("x += i", k) for k in keys(func_section[for_keys[1]]))
 
+    # printing shows the file once, on the function row; statement rows below
+    # shorten to `L<line>: code`
+    out = sprint(show, to)
+    @test occursin("timeit_all_sum @ " * filename, out)
+    @test occursin(r"L\d+: x = 0", out)
+    @test count(filename, out) == 1
+    # a statement section shown directly keeps its full label
+    @test occursin(filename * ":", sprint(show, func_section[for_keys[1]]))
+
     # control flow: early return, break, continue
     to = TimerOutput()
     @timeit_all to function taf_flow(n)
@@ -1285,6 +1294,7 @@ const timeit_all_error_line = @__LINE__() - 2
     end
     @test val == 3
     @test haskey(to, "labeled")
+    @test occursin("labeled @ " * filename, sprint(show, to))
     val = @timeit_all to begin
         block_b = 2 + 2
         block_b

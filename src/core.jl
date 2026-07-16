@@ -33,12 +33,15 @@ mutable struct Section
     # `name` is a module-qualified function label (from an instrumented function)
     # that may be shortened to its final component when printing
     qualified::Bool
+    # basename of the source file of the `@timeit_all` expansion that created
+    # this section; lets the printer show the file once instead of on every row
+    srcfile::Union{String, Nothing}
 end
 
-# `is_complement`/`qualified` default to false; the positional call sites that
-# predate them, and the single-argument form, don't need to pass them
+# `is_complement`/`qualified`/`srcfile` default off; the positional call sites
+# that predate them, and the single-argument form, don't need to pass them
 Section(name, ncalls, time, allocs, firstexec, children, index, prev_child) =
-    Section(name, ncalls, time, allocs, firstexec, children, index, prev_child, false, false)
+    Section(name, ncalls, time, allocs, firstexec, children, index, prev_child, false, false, nothing)
 Section(name::String) = Section(name, 0, 0, 0, time_ns(), Section[], nothing, nothing)
 
 const INDEX_THRESHOLD = 8
@@ -94,12 +97,13 @@ function combine!(a::Section, b::Section)
     a.time += b.time
     a.allocs += b.allocs
     a.firstexec = min(a.firstexec, b.firstexec)
+    a.srcfile === nothing && (a.srcfile = b.srcfile)
     return a
 end
 
 # Copy of a single node without its children
 function copy_node(s::Section)
-    return Section(s.name, s.ncalls, s.time, s.allocs, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified)
+    return Section(s.name, s.ncalls, s.time, s.allocs, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified, s.srcfile)
 end
 
 function Base.copy(s::Section)
@@ -152,6 +156,14 @@ end
 
 # The stack may be empty if `reset_timer!` was called inside a timed section
 Base.pop!(to::TimerOutput) = isempty(to.stack) ? nothing : pop!(to.stack)
+
+# `push!` variant used by `@timeit_all`: also record the source file the label
+# refers to, so the printer can elide the file name from repeated rows
+@inline function push_srcfile!(to, label::String, srcfile::String)
+    section = push!(to, label)
+    section.srcfile === nothing && (section.srcfile = srcfile)
+    return section
+end
 
 # What the @timeit macro checks; the generic fallback keeps any timer-like
 # object with an `enabled` field working

@@ -204,21 +204,36 @@ end
 # dotted identifier and splitting on the last '.' is safe.
 bare_name(name::AbstractString) = String(last(rsplit(name, '.'; limit = 2)))
 
-# Display label for each sibling: a qualified function's bare name, unless two
-# siblings would collapse to the same string, in which case keep the full names.
-function section_labels(children::Vector{Section})
-    n = length(children)
+# `@timeit_all` sections carry their source file. A statement row (label
+# `file:line: code`) whose file the parent row already carries shortens to
+# `L<line>: code`; a function or labeled block row instead shows the file once,
+# as `name @ file`, when the parent does not carry it.
+function short_label(c::Section, parent_srcfile::Union{String, Nothing})
+    c.qualified && return bare_name(c.name)
+    f = c.srcfile
+    f === nothing && return c.name
+    # a complement row wraps its section's label in `~ ~`; shorten the inside
+    name = c.is_complement ? chop(c.name; head = 1, tail = 1) : c.name
+    prefix = string(f, ':')
+    if startswith(name, prefix) # a statement label embedding the file
+        f == parent_srcfile || return c.name
+        short = string("L", chopprefix(name, prefix))
+        return c.is_complement ? string('~', short, '~') : short
+    end
+    f == parent_srcfile && return c.name # an ancestor row already shows the file
+    c.is_complement && return c.name
+    return string(c.name, " @ ", f)
+end
+
+# Display label for each sibling: shortened as above, unless two siblings would
+# collapse to the same string, in which case keep the full names.
+function section_labels(children::Vector{Section}, parent_srcfile::Union{String, Nothing})
+    shorts = [short_label(c, parent_srcfile) for c in children]
     counts = Dict{String, Int}()
-    for c in children
-        key = c.qualified ? bare_name(c.name) : c.name
-        counts[key] = get(counts, key, 0) + 1
+    for short in shorts
+        counts[short] = get(counts, short, 0) + 1
     end
-    labels = Vector{String}(undef, n)
-    for (i, c) in enumerate(children)
-        short = c.qualified ? bare_name(c.name) : c.name
-        labels[i] = counts[short] == 1 ? short : c.name
-    end
-    return labels
+    return [counts[shorts[i]] == 1 ? shorts[i] : children[i].name for i in eachindex(children)]
 end
 
 # Top level sections print flush; nested ones get tree guides. `gray` collects
@@ -234,7 +249,7 @@ function table_rows!(
     children = copy(s.children)
     extra === nothing || push!(children, extra.section)
     sort_sections!(children, opts.sortby)
-    labels = section_labels(children)
+    labels = section_labels(children, s.srcfile)
     for (i, child) in enumerate(children)
         islast = i == length(children)
         synthetic = extra !== nothing && child === extra.section
