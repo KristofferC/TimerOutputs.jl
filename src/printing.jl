@@ -199,6 +199,28 @@ struct ComplementRow
     full_stats::Bool
 end
 
+# An instrumented function stores a module-qualified label (`Main.foo`); show
+# just the final component. Only set on plain named functions, so the name is a
+# dotted identifier and splitting on the last '.' is safe.
+bare_name(name::AbstractString) = String(last(rsplit(name, '.'; limit = 2)))
+
+# Display label for each sibling: a qualified function's bare name, unless two
+# siblings would collapse to the same string, in which case keep the full names.
+function section_labels(children::Vector{Section})
+    n = length(children)
+    counts = Dict{String, Int}()
+    for c in children
+        key = c.qualified ? bare_name(c.name) : c.name
+        counts[key] = get(counts, key, 0) + 1
+    end
+    labels = Vector{String}(undef, n)
+    for (i, c) in enumerate(children)
+        short = c.qualified ? bare_name(c.name) : c.name
+        labels[i] = counts[short] == 1 ? short : c.name
+    end
+    return labels
+end
+
 # Top level sections print flush; nested ones get tree guides. `gray` collects
 # the indices of complement rows for the highlighter. `extra` is a synthetic
 # complement row to show among the children of `s`.
@@ -212,11 +234,13 @@ function table_rows!(
     children = copy(s.children)
     extra === nothing || push!(children, extra.section)
     sort_sections!(children, opts.sortby)
+    labels = section_labels(children)
     for (i, child) in enumerate(children)
         islast = i == length(children)
         synthetic = extra !== nothing && child === extra.section
         blank = synthetic && !extra.full_stats
-        name = toplevel ? child.name : string(prefix, islast ? opts.guides[2] : opts.guides[1], child.name)
+        label = labels[i]
+        name = toplevel ? label : string(prefix, islast ? opts.guides[2] : opts.guides[1], label)
         row = Vector{String}(undef, 1 + length(opts.columns))
         row[1] = name
         for (k, column) in enumerate(opts.columns)

@@ -202,7 +202,7 @@ function complement_section(s::Section)
     end
     return Section(
         string("~", s.name, "~"), max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0),
-        s.firstexec, Section[], nothing, nothing, true
+        s.firstexec, Section[], nothing, nothing, true, false
     )
 end
 
@@ -328,18 +328,29 @@ struct InstrumentedFunction{F} <: Function
     func::F
     t::TimerOutput
     name::String
+    # `name` is a module-qualified function label the printer may shorten
+    qualified::Bool
 end
 
-# plain runtime repr: construction is a cold path, and computing the name at
-# code generation time gives a module qualified repr on Julia 1.13
+# The section label: the module-qualified `repr` so functions of the same name
+# from different modules get distinct sections. The printer shows just the final
+# component unless siblings would collide (see `qualified`). Construction is cold.
 funcname(f) = repr(f)
 
-InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
+# Whether `f`'s label is a plain module-qualified identifier (`MyPkg.foo`), safe
+# to shorten to its last component for display. Excludes closures/anonymous
+# (gensym names), ComposedFunction, Fix*, and callable structs, whose `repr` is
+# not a dotted identifier.
+shortenable(f) = f isa Function && fieldcount(typeof(f)) == 0 && !startswith(string(nameof(f)), "#")
+
+InstrumentedFunction(f, t, name) = InstrumentedFunction(f, t, name, false)
+InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f), shortenable(f))
 
 function (inst::InstrumentedFunction)(args...; kwargs...)
     to = inst.t
     isenabled(to) || return inst.func(args...; kwargs...)
     data = push!(to, inst.name)
+    inst.qualified && (data.qualified = true)
     b₀ = gc_bytes()
     t₀ = time_ns()
     try
@@ -351,10 +362,17 @@ function (inst::InstrumentedFunction)(args...; kwargs...)
 end
 
 """
-    (t::TimerOutput)(f, name = string(repr(f))) -> InstrumentedFunction
+    (t::TimerOutput)(f) -> InstrumentedFunction
+    (t::TimerOutput)(f, name::String) -> InstrumentedFunction
 
 Instruments `f` by the [`TimerOutput`](@ref) `t` returning an `InstrumentedFunction`.
 This function can be used just like `f`, but whenever it is called it stores timing
 results in `t`.
+
+Without an explicit `name`, the section is labeled by `f`'s module-qualified name
+but printed as just the final component (e.g. `foo` for `MyPkg.foo`), falling back
+to the qualified name if two instrumented functions would otherwise collide. An
+explicit `name` is shown verbatim.
 """
-(t::TimerOutput)(f, name = funcname(f)) = InstrumentedFunction(f, t, name)
+(t::TimerOutput)(f) = InstrumentedFunction(f, t)
+(t::TimerOutput)(f, name::AbstractString) = InstrumentedFunction(f, t, String(name), false)

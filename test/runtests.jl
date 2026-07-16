@@ -769,6 +769,14 @@ end
     compare(to, todict(to))
 end
 
+# functions instrumented in different modules that share a name
+module InstrModA
+    dup(x) = x + 1
+end
+module InstrModB
+    dup(x) = x + 1
+end
+
 @testset "InstrumentedFunctions" begin
     to = TimerOutput()
     f = to(x -> x^2, "f")
@@ -783,6 +791,31 @@ end
     t = to(s)
     t(1)
     @test ncalls(to.inner_timers[repr(s)]) == 1
+end
+
+@testset "InstrumentedFunctions labels" begin
+    # the section key is the module-qualified name, but it prints as the bare name
+    to = TimerOutput()
+    to(InstrModA.dup)(1)
+    @test haskey(to.inner_timers, "Main.InstrModA.dup")
+    out = sprint(show, to)
+    @test occursin("dup", out)
+    @test !occursin("InstrModA", out)
+
+    # two functions with the same bare name keep their qualified labels
+    to = TimerOutput()
+    to(InstrModA.dup)(1)
+    to(InstrModB.dup)(1)
+    @test haskey(to.inner_timers, "Main.InstrModA.dup")
+    @test haskey(to.inner_timers, "Main.InstrModB.dup")
+    out = sprint(show, to)
+    @test occursin("InstrModA.dup", out)
+    @test occursin("InstrModB.dup", out)
+
+    # an explicit name is shown verbatim, never shortened
+    to = TimerOutput()
+    to(InstrModA.dup, "A.dup")(1)
+    @test occursin("A.dup", sprint(show, to))
 end
 
 @testset "Interleaved sections" begin
@@ -1154,6 +1187,132 @@ end
     c = copy(to)
     c["a"].ncalls = 99
     @test ncalls(to["a"]) == 1
+end
+
+@timeit_all function timeit_all_thrower(n)
+    x = 0
+
+    error("boom")
+end
+const timeit_all_error_line = @__LINE__() - 2
+
+@testset "@timeit_all" begin
+    # every statement gets a `file:line: code` section, nested per block
+    to = TimerOutput()
+    @timeit_all to function timeit_all_sum(n)
+        x = 0
+        for i in 1:n
+            x += i
+        end
+        x
+    end
+    @test timeit_all_sum(3) == 6
+    func_section = to["timeit_all_sum"]
+    filename = basename(@__FILE__)
+    @test all(startswith(k, filename * ":") for k in keys(func_section))
+    for_keys = filter(k -> occursin("for i = 1:n", k), collect(keys(func_section)))
+    @test length(for_keys) == 1
+    @test any(occursin("x += i", k) for k in keys(func_section[for_keys[1]]))
+
+    # control flow: early return, break, continue
+    to = TimerOutput()
+    @timeit_all to function taf_flow(n)
+        s = 0
+        for i in 1:n
+            i == 2 && continue
+            s += i
+            if i > 3
+                break
+            end
+        end
+        if s > 100
+            return 0
+        elseif s < 0
+            return -1
+        end
+        while true
+            break
+        end
+        return s
+    end
+    @test taf_flow(10) == 1 + 3 + 4
+    @test ncalls(to["taf_flow"]) == 1
+
+    # nested function definitions get their own timer
+    to = TimerOutput()
+    @timeit_all to function taf_outer(n)
+        function taf_helper(y)
+            return y + 1
+        end
+        taf_helper(n)
+    end
+    @test taf_outer(1) == 2
+    @test haskey(flatten(to), "taf_helper")
+
+    # let / try / catch / finally
+    to = TimerOutput()
+    @timeit_all to function taf_scopes(n)
+        y = let a = n
+            a * 2
+        end
+        z = try
+            error("x")
+        catch
+            y + 1
+        finally
+            nothing
+        end
+        return z
+    end
+    @test taf_scopes(3) == 7
+
+    # type inference is preserved
+    @timeit_all to function taf_stable(n)
+        x = 0.0
+        for i in 1:n
+            x += i
+        end
+        x
+    end
+    taf_stable(2)
+    @test (@inferred taf_stable(2)) == 3.0
+
+    # block forms, with and without label
+    to = TimerOutput()
+    val = @timeit_all to "labeled" begin
+        block_a = 1 + 1
+        block_a + 1
+    end
+    @test val == 3
+    @test haskey(to, "labeled")
+    val = @timeit_all to begin
+        block_b = 2 + 2
+        block_b
+    end
+    @test val == 4
+
+    # long statements get truncated labels
+    to = TimerOutput()
+    @timeit_all to "long" begin
+        block_c = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+    end
+    @test all(textwidth(k) <= 60 for k in keys(to["long"]))
+
+    # @notimeit statements are not instrumented
+    to = TimerOutput()
+    @timeit_all to "skip" begin
+        block_d = 1
+        @notimeit to sleep(0.001)
+    end
+    @test !any(occursin("sleep", k) for k in keys(to["skip"]))
+
+    # line numbers of the original code are preserved in stacktraces
+    st = try
+        timeit_all_thrower(1)
+    catch
+        stacktrace(catch_backtrace())
+    end
+    @test any(f -> f.line == timeit_all_error_line && endswith(String(f.file), "runtests.jl"), st)
 end
 
 include("test_coverage.jl")

@@ -8,7 +8,7 @@ import Tables
 
 import Base: show, time_ns
 
-export TimerOutput, NoTimerOutput, @timeit, @timeit_debug,
+export TimerOutput, NoTimerOutput, @timeit, @timeit_debug, @timeit_all,
     reset_timer!, print_timer, timeit, enable_timer!, disable_timer!, @notimeit,
     get_timer, begin_timed_section!, end_timed_section!
 

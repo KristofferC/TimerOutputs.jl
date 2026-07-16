@@ -30,12 +30,15 @@ mutable struct Section
     # refreshed by identity rather than by label (a user section named `~name~`
     # is a real measurement and must not be deleted)
     const is_complement::Bool
+    # `name` is a module-qualified function label (from an instrumented function)
+    # that may be shortened to its final component when printing
+    qualified::Bool
 end
 
-# default: a normal (non-complement) section. Complement nodes pass `true`.
+# `is_complement`/`qualified` default to false; the positional call sites that
+# predate them, and the single-argument form, don't need to pass them
 Section(name, ncalls, time, allocs, firstexec, children, index, prev_child) =
-    Section(name, ncalls, time, allocs, firstexec, children, index, prev_child, false)
-
+    Section(name, ncalls, time, allocs, firstexec, children, index, prev_child, false, false)
 Section(name::String) = Section(name, 0, 0, 0, time_ns(), Section[], nothing, nothing)
 
 const INDEX_THRESHOLD = 8
@@ -96,7 +99,7 @@ end
 
 # Copy of a single node without its children
 function copy_node(s::Section)
-    return Section(s.name, s.ncalls, s.time, s.allocs, s.firstexec, Section[], nothing, nothing, s.is_complement)
+    return Section(s.name, s.ncalls, s.time, s.allocs, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified)
 end
 
 function Base.copy(s::Section)
