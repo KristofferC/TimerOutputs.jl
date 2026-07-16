@@ -17,19 +17,19 @@ See the [changelog](CHANGELOG.md) for what is new in version 0.5.30.
 An example of the output (used in a finite element simulation) is shown below
 
 ```
-──────────────────────────────────────────────────────────────────────────────────
-                                        Time                   Allocations
-                               ──────────────────────    ────────────────────────
-      Tot / % measured:            6.89s / 97.8%             5.20GiB / 84.6%
- ────────────────────────────  ──────────────────────    ────────────────────────
- Section               ncalls    time    %tot     avg      alloc    %tot      avg
-──────────────────────────────────────────────────────────────────────────────────
- assemble                   6   3.27s   48.5%   545ms    3.65GiB   82.7%   623MiB
- └─ inner assemble       240k   1.92s   28.5%  8.00μs    3.14GiB   71.1%  13.7KiB
- linear solve               5   2.73s   40.5%   546ms     108MiB    2.4%  21.6MiB
- create sparse matrix       6   658ms    9.8%   110ms     662MiB   14.6%   110MiB
- export                     1  78.4ms    1.2%  78.4ms    13.1MiB    0.3%  13.1MiB
-──────────────────────────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────────────────
+                                             Time                             Allocations
+                               ────────────────────────────────    ──────────────────────────────────
+      Tot / % measured:                 6.89s / 97.8%                       5.20GiB / 84.9%
+ ────────────────────────────  ────────────────────────────────    ──────────────────────────────────
+ Section               ncalls    time    %tot     avg                alloc    %tot      avg
+──────────────────────────────────────────────────────────────────────────────────────────────────────
+ assemble                   6   3.27s   48.5%   545ms  ███▉        3.65GiB   82.7%   623MiB  ██████▋
+ └─ inner assemble       240k   1.92s   28.5%  8.00μs  ██▎         3.14GiB   71.1%  13.7KiB  █████▊
+ linear solve               5   2.73s   40.5%   546ms  ███▎         108MiB    2.4%  21.6MiB  ▎
+ create sparse matrix       6   658ms    9.8%   110ms  ▊            662MiB   14.6%   110MiB  █▏
+ export                     1  78.4ms    1.2%  78.4ms  ▏           13.1MiB    0.3%  13.1MiB
+──────────────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
 The `Tot / % measured` row shows the total (wall) time passed and allocations made since the start of the timer as well as
@@ -38,6 +38,8 @@ The following lines shows data for all the timed sections.
 The section label is shown first followed by the number of calls made to that section.
 Finally, the total time elapsed or allocations made in that section are shown together with the
 percentage of the total in that section and the average (time / allocations per call).
+The bar columns visualize each section's share of the total; in color-capable
+terminals they are colored from blue (cheap) to red (expensive).
 A `%par` column showing the percentage of the enclosing section is available through the
 `columns` printing option, see below.
 
@@ -135,29 +137,29 @@ spent in each section since `to` was created as well as averages (per call).
 Similar information is available for allocations:
 
 ```
-──────────────────────────────────────────────────────────────────────────────────────────
-                                                Time                   Allocations
-                                       ──────────────────────    ────────────────────────
-          Tot / % measured:                4.22s / 67.2%              103MiB / 81.7%
- ────────────────────────────────────  ──────────────────────    ────────────────────────
- Section                       ncalls    time    %tot     avg      alloc    %tot      avg
-──────────────────────────────────────────────────────────────────────────────────────────
- sleep                            101   1.14s   40.2%  11.3ms    17.1KiB    0.0%     173B
- nest 2                             1   703ms   24.8%   703ms       496B    0.0%     496B
- ├─ level 2.2                       1   402ms   14.2%   402ms       112B    0.0%     112B
- └─ level 2.1                       1   301ms   10.6%   301ms       112B    0.0%     112B
- throwing                           1   502ms   17.7%   502ms       512B    0.0%     512B
- nest 1                             1   396ms   14.0%   396ms       944B    0.0%     944B
- ├─ level 2.2                       1   201ms    7.1%   201ms       112B    0.0%     112B
- └─ level 2.1                       3  93.4ms    3.3%  31.1ms       336B    0.0%     112B
- randoms                            1  95.1ms    3.4%  95.1ms    84.2MiB  100.0%  84.2MiB
- line_profile @ example.jl          1  3.87μs    0.0%  3.87μs       432B    0.0%     432B
- ├─ L5: for i = 1:n                 1   558ns    0.0%   558ns       160B    0.0%     160B
- │  └─ L6: x += i                  10   105ns    0.0%  10.5ns      0.00B    0.0%    0.00B
- └─ L4: x = 0                       1  13.0ns    0.0%  13.0ns      0.00B    0.0%    0.00B
- funcdef                            1  15.0ns    0.0%  15.0ns      0.00B    0.0%    0.00B
- foo                                1  14.0ns    0.0%  14.0ns      0.00B    0.0%    0.00B
-──────────────────────────────────────────────────────────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                  Time                             Allocations
+                                    ────────────────────────────────    ──────────────────────────────────
+         Tot / % measured:                   4.38s / 63.9%                        113MiB / 68.3%
+ ─────────────────────────────────  ────────────────────────────────    ──────────────────────────────────
+ Section                    ncalls    time    %tot     avg                alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
+ sleep                         101   1.16s   41.4%  11.5ms  ███▍        16.7KiB    0.0%     169B
+ nest 2                          1   703ms   25.1%   703ms  ██             528B    0.0%     528B
+ ├─ level 2.2                    1   402ms   14.3%   402ms  █▏             112B    0.0%     112B
+ └─ level 2.1                    1   302ms   10.8%   302ms  ▉              112B    0.0%     112B
+ throwing                        1   502ms   17.9%   502ms  █▍             512B    0.0%     512B
+ nest 1                          1   399ms   14.2%   399ms  █▏          1.23KiB    0.0%  1.23KiB
+ ├─ level 2.2                    1   202ms    7.2%   202ms  ▋              400B    0.0%     400B
+ └─ level 2.1                    3  95.8ms    3.4%  31.9ms  ▎              336B    0.0%     112B
+ randoms                         1  35.7ms    1.3%  35.7ms  ▏           76.9MiB  100.0%  76.9MiB  ████████
+ line_profile @ example.jl       1  8.95μs    0.0%  8.95μs                 480B    0.0%     480B
+ ├─ L5: for i = 1:n              1  2.15μs    0.0%  2.15μs                 176B    0.0%     176B
+ │  └─ L6: x += i               10   103ns    0.0%  10.3ns                0.00B    0.0%    0.00B
+ └─ L4: x = 0                    1  16.0ns    0.0%  16.0ns                0.00B    0.0%    0.00B
+ foo                             1  16.0ns    0.0%  16.0ns                0.00B    0.0%    0.00B
+ funcdef                         1  15.0ns    0.0%  15.0ns                0.00B    0.0%    0.00B
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
 It is also possible to manually start and stop a timed section.
@@ -174,11 +176,14 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 
 * `title::String` ─ title for the timer
 * `columns::Vector{Symbol}` ─ exactly which columns to show, in order. Available:
-  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`,
-  `:allocs`, `:allocs_pct`, `:allocs_par`, `:allocs_avg`, and `:spacer` (an empty
-  gap column). For example `columns = [:ncalls, :time, :time_pct, :time_par]`
+  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`, `:time_bar`,
+  `:allocs`, `:allocs_pct`, `:allocs_par`, `:allocs_avg`, `:allocs_bar`, and `:spacer` (an empty
+  gap column). For example `columns = [:ncalls, :time, :time_pct, :time_par]`.
+  The `_bar` columns show each section's share of the total as a bar, colored
+  from blue (cheap) to red (expensive) in color-capable terminals
 * `allocations::Bool` ─ show the allocation columns (default `true`); shorthand for a `columns` selection
-* `compact::Bool` ─ hide the `avg` columns (default `false`); shorthand for a `columns` selection
+* `compact::Bool` ─ hide the `avg` and bar columns (default `false`); shorthand for a `columns` selection
+* `bars::Bool` ─ show the bar columns (default `true`); shorthand for a `columns` selection
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations`, `:name` or `:firstexec`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` for a pure ASCII table
 * `maxdepth::Int` ─ only print sections nested up to this depth (default: no limit)
