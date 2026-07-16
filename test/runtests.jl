@@ -769,10 +769,12 @@ end
     compare(to, todict(to))
 end
 
-# named functions are labeled by their bare name, dropping the module qualifier
-instrumented_named(x) = x + 1
-module InstrModule
-    inmodule(x) = x + 1
+# functions instrumented in different modules that share a name
+module InstrModA
+    dup(x) = x + 1
+end
+module InstrModB
+    dup(x) = x + 1
 end
 
 @testset "InstrumentedFunctions" begin
@@ -789,10 +791,31 @@ end
     t = to(s)
     t(1)
     @test ncalls(to.inner_timers[repr(s)]) == 1
-    to(instrumented_named)(1)
-    @test haskey(to.inner_timers, "instrumented_named")
-    to(InstrModule.inmodule)(1)
-    @test haskey(to.inner_timers, "inmodule")
+end
+
+@testset "InstrumentedFunctions labels" begin
+    # the section key is the module-qualified name, but it prints as the bare name
+    to = TimerOutput()
+    to(InstrModA.dup)(1)
+    @test haskey(to.inner_timers, "Main.InstrModA.dup")
+    out = sprint(show, to)
+    @test occursin("dup", out)
+    @test !occursin("InstrModA", out)
+
+    # two functions with the same bare name keep their qualified labels
+    to = TimerOutput()
+    to(InstrModA.dup)(1)
+    to(InstrModB.dup)(1)
+    @test haskey(to.inner_timers, "Main.InstrModA.dup")
+    @test haskey(to.inner_timers, "Main.InstrModB.dup")
+    out = sprint(show, to)
+    @test occursin("InstrModA.dup", out)
+    @test occursin("InstrModB.dup", out)
+
+    # an explicit name is shown verbatim, never shortened
+    to = TimerOutput()
+    to(InstrModA.dup, "A.dup")(1)
+    @test occursin("A.dup", sprint(show, to))
 end
 
 @testset "Interleaved sections" begin
