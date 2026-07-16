@@ -101,8 +101,11 @@ end
 # does not elide an empty try/finally. Splicing `ex` verbatim (rather than
 # behind a closure or temporary) also preserves its line numbers and lets
 # `return`, `break`, `continue` and assignments behave as in the unwrapped code.
-function timed_section(to, label, ex)
+function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing)
     @gensym to_local enabled data b₀ t₀
+    # `@timeit_all` sections record the source file their label refers to
+    push_call = srcfile === nothing ? :($(push!)($to_local, $label)) :
+        :($(push_srcfile!)($to_local, $label, $srcfile))
     cleanup = quote
         $(do_accumulate!)($data, $t₀, $b₀)
         $(pop!)($to_local)
@@ -111,7 +114,7 @@ function timed_section(to, label, ex)
         $to_local = $to
         $enabled = $(isenabled)($to_local)
         if $enabled
-            $data = $(push!)($to_local, $label)
+            $data = $push_call
             $b₀ = $(gc_bytes)()
             $t₀ = $(time_ns)()
             $(Expr(:tryfinally, ex, cleanup))
@@ -142,8 +145,8 @@ function timed_block_expr(source::LineNumberNode, mod::Module, is_debug::Bool, t
 end
 
 # an (unescaped) expression that times `ex` and evaluates to its value
-function timed_value_expr(mod::Module, is_debug::Bool, to, label, ex)
-    core = timed_section(to, label, ex)
+function timed_value_expr(mod::Module, is_debug::Bool, to, label, ex, srcfile::Union{String, Nothing} = nothing)
+    core = timed_section(to, label, ex, srcfile)
     is_debug && (core = debug_gated(mod, core, ex))
     return core
 end
@@ -241,8 +244,9 @@ end
 
 Like [`@timeit`](@ref), but additionally times every statement, recursing into
 `for`, `while`, `if`, `let` and `try` blocks and nested function definitions.
-Statements are labeled `file:line: code`. Wrap a statement in
-[`@notimeit`](@ref) to exclude it.
+Statements are labeled `file:line: code`; when printed, the file is shown once
+on the enclosing section (`name @ file`) and rows below it shorten to
+`L<line>: code`. Wrap a statement in [`@notimeit`](@ref) to exclude it.
 """
 macro timeit_all(args...)
     return timeit_all_expr(__source__, __module__, args...)
@@ -277,7 +281,7 @@ function timeit_all_expr(source::LineNumberNode, mod::Module, to, label, ex)
         body = Expr(:block, :($to_local = $to), instrumented)
         return Expr(:block, source, esc(body))
     end
-    body = Expr(:block, :($to_local = $to), timed_section(to_local, label, instrumented))
+    body = Expr(:block, :($to_local = $to), timed_section(to_local, label, instrumented, src_file(source)))
     return Expr(:block, source, esc(body))
 end
 
@@ -291,7 +295,7 @@ function instrument_function_def(source::LineNumberNode, mod::Module, to, label,
     # bind the timer once per call so every statement shares the same object
     @gensym to_local
     body = instrument(mod, to_local, def[:body], source)
-    wrapped = timed_value_expr(mod, false, to_local, label, body)
+    wrapped = timed_value_expr(mod, false, to_local, label, body, src_file(source))
     remove_linenums_keep!(wrapped, body)
     pushfirst!(wrapped.args, :($to_local = $to))
     pushfirst!(wrapped.args, source)
@@ -370,7 +374,7 @@ function instrument_stmt(mod::Module, to, ex, line::LineNumberNode)
     if head === :return
         if length(ex.args) == 1 && ex.args[1] isa Expr
             operand = instrument_inner(mod, to, ex.args[1], line)
-            return Expr(:return, timed_value_expr(mod, false, to, stmt_label(ex, line), operand))
+            return Expr(:return, timed_value_expr(mod, false, to, stmt_label(ex, line), operand, src_file(line)))
         end
         return ex
     end
@@ -417,15 +421,17 @@ end
 # bookkeeping code is stripped of line info.
 function timed_stmt_expr(to, label::String, line::LineNumberNode, stmt)
     inner = Expr(:block, line, stmt)
-    wrapped = timed_section(to, label, inner)
+    wrapped = timed_section(to, label, inner, src_file(line))
     remove_linenums_keep!(wrapped, inner)
     return wrapped
 end
 
 const STMT_LABEL_WIDTH = 60
 
+src_file(line::LineNumberNode) = basename(string(line.file))
+
 function stmt_label(ex::Expr, line::LineNumberNode)
-    prefix = string(basename(string(line.file)), ":", line.line, ": ")
+    prefix = string(src_file(line), ":", line.line, ": ")
     # Keep the whole `file:line:` prefix so distinct statements never collapse to
     # the same key (a long basename would otherwise truncate away line and code);
     # only the trailing code is shortened to fit the width.
