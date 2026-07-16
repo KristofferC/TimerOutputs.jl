@@ -330,10 +330,18 @@ struct InstrumentedFunction{F} <: Function
     name::String
 end
 
-# plain runtime repr: construction is a cold path. Recent Julia versions qualify
-# a function's repr with its module (`Main.foo`); strip a leading `Main.` so the
-# common top-level case reads as `foo` while submodules stay qualified.
-funcname(f) = String(chopprefix(repr(f), "Main."))
+# Label a plain named function by its bare name (no module qualifier), so
+# instrumenting `MyPkg.foo` reads as `foo`. `repr` would module-qualify it on
+# recent Julia. Fall back to `repr` for callables that aren't plain functions --
+# closures/anonymous (gensym names), ComposedFunction, Fix*, callable structs --
+# where the bare name is uninformative or `nameof` throws. Construction is cold.
+function funcname(f)
+    if f isa Function && fieldcount(typeof(f)) == 0
+        name = string(nameof(f))
+        startswith(name, "#") || return name
+    end
+    return repr(f)
+end
 
 InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
 
