@@ -534,6 +534,15 @@ end
     disable_timer!(to)
     @test (@notimeit to enable_timer!(to)) == true
     @test !TimerOutputs.isenabled(to)
+
+    # the functional form respects the disabled state like the macro does
+    to2 = TimerOutput()
+    disable_timer!(to2)
+    @test timeit(() -> 42, to2, "recorded") == 42
+    @test !haskey(to2, "recorded")
+    enable_timer!(to2)
+    @test timeit(() -> 42, to2, "kept") == 42
+    @test haskey(to2, "kept")
 end
 
 # Type inference with @timeit_debug
@@ -589,6 +598,27 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
         @test ncalls(subto["bar"]) == 1
         @test ncalls(subto["baz"]) == 2
     end
+
+    # a plain merge derives its total from the merged children (no override)
+    @test to_merged.measured === nothing
+
+    # merging a flattened timer must keep the original total, not the sum of
+    # the flattened rows (which double-counts nested measurements)
+    tof = TimerOutput()
+    @timeit tof "outer" begin
+        @timeit tof "inner" begin
+            @timeit tof "leaf" identity(nothing)
+        end
+    end
+    flat = flatten(tof)
+    @test TimerOutputs.tottime(flat) == TimerOutputs.tottime(tof)
+    @test TimerOutputs.totallocated(flat) == TimerOutputs.totallocated(tof)
+    m = merge(flat)
+    @test TimerOutputs.tottime(m) == TimerOutputs.tottime(flat)
+    @test TimerOutputs.totallocated(m) == TimerOutputs.totallocated(flat)
+    # merging two flattened timers sums their (original) totals
+    m2 = merge(flat, flat)
+    @test TimerOutputs.tottime(m2) == 2 * TimerOutputs.tottime(flat)
 end
 
 # Issue #118
@@ -799,6 +829,10 @@ end
     end
     flamegraph(to)
     flamegraph(to, crop_root = true)
+
+    # cropping an empty timer must not throw (no children to crop to)
+    @test flamegraph(TimerOutput(); crop_root = true) !== nothing
+    @test flamegraph(TimerOutput()) !== nothing
 end
 
 function foo_77(::Float64) end
@@ -931,9 +965,14 @@ end
     f_nt(t) = @timeit t "sec" (1 + 1)
     @test f_nt(nt) == 2
     # compiles away entirely when the timer type is known (code coverage
-    # inserts extra statements and inhibits inlining, so only check without)
+    # inserts extra statements and inhibits inlining, so only check without).
+    # Julia 1.10 leaves a benign `nothing` placeholder for the elided timer
+    # binding, so count the statements that actually do something and check no
+    # try/finally scaffolding survives.
     if Base.JLOptions().code_coverage == 0
-        @test length(code_typed(f_nt, Tuple{NoTimerOutput})[1].first.code) == 1
+        code = code_typed(f_nt, Tuple{NoTimerOutput})[1].first.code
+        @test count(s -> s !== nothing, code) == 1
+        @test !any(s -> s isa Expr && s.head === :enter, code)
     end
     @test (@allocated f_nt(nt)) == 0
     @test timeit(() -> 42, nt, "x") == 42
@@ -1036,6 +1075,24 @@ end
     @test !occursin("\e[90m ~", sprint((io, x) -> show(io, x; complement = true), to)) # no color, no ansi
     # works for a bare section too
     @test occursin("~outer~", sprint((io, x) -> show(io, x; complement = true), to["outer"]))
+end
+
+@testset "complement! keeps user sections named ~name~" begin
+    # a section a user literally named `~outer~` holds real data and must not
+    # be mistaken for a generated complement and deleted
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "~outer~" begin
+            @timeit to "payload" identity(nothing)
+        end
+    end
+    TimerOutputs.complement!(to)
+    @test haskey(to["outer"], "~outer~")
+    @test haskey(to["outer", "~outer~"], "payload")
+    @test ncalls(to["outer", "~outer~", "payload"]) == 1
+    # repeated calls refresh generated complements without losing user data
+    TimerOutputs.complement!(to)
+    @test ncalls(to["outer", "~outer~", "payload"]) == 1
 end
 
 @testset "compact show in containers" begin

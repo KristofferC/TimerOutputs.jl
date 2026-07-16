@@ -9,9 +9,12 @@
 #   @timeit [to|label] function f() ... end   (label defaults to the function name)
 #
 # `to` and `label` may be arbitrary expressions evaluated at run time. The user
-# expression is wrapped in a raw `Expr(:tryfinally)` so timing is exception
-# safe; unlike surface `try` this introduces no scope block, so assignments,
-# `return`, `break` and `continue` behave as in the unwrapped code.
+# expression is spliced into an enabled branch (wrapped in a raw
+# `Expr(:tryfinally)` so timing is exception safe) and a disabled branch (a
+# bare copy). Unlike surface `try` the wrapper introduces no scope block, so
+# assignments, `return`, `break` and `continue` behave as in the unwrapped
+# code. When `isenabled(to)` folds to a compile-time `false` the enabled branch
+# is dead and the whole thing reduces to just the expression.
 
 """
     @timeit [to::TimerOutput] label codeblock
@@ -85,71 +88,64 @@ function is_func_def(ex)
     return ex isa Expr && (ex.head === :function || Base.is_short_function_def(ex))
 end
 
-# The code that runs when entering and leaving a section. All functions are
-# interpolated as objects so this works in any module.
-function section_bookends(mod::Module, is_debug::Bool, to, label)
+# The full timed expression: run `ex` under section `label` of timer `to`,
+# accumulating into a try/finally so it is exception safe, and evaluating to
+# the value of `ex`. All functions are interpolated as objects so this works in
+# any module.
+#
+# `ex` is spliced verbatim into both an enabled (timed) branch and a disabled
+# branch. When `isenabled(to)` folds to a compile-time `false` — a
+# `NoTimerOutput`, or a debug-disabled `@timeit_debug` — the enabled branch is
+# dead and the whole thing reduces to a bare `ex` with no try/finally. That
+# keeps `NoTimerOutput` genuinely zero-overhead, including on Julia 1.10 which
+# does not elide an empty try/finally. Splicing `ex` verbatim (rather than
+# behind a closure or temporary) also preserves its line numbers and lets
+# `return`, `break`, `continue` and assignments behave as in the unwrapped code.
+function timed_section(to, label, ex)
     @gensym to_local enabled data b₀ t₀
-    setup = quote
+    cleanup = quote
+        $(do_accumulate!)($data, $t₀, $b₀)
+        $(pop!)($to_local)
+    end
+    return quote
         $to_local = $to
         $enabled = $(isenabled)($to_local)
         if $enabled
             $data = $(push!)($to_local, $label)
             $b₀ = $(gc_bytes)()
             $t₀ = $(time_ns)()
+            $(Expr(:tryfinally, ex, cleanup))
+        else
+            $ex
         end
     end
-    cleanup = quote
-        if $enabled
-            $(do_accumulate!)($data, $t₀, $b₀)
-            $(pop!)($to_local)
-        end
-    end
-    if is_debug
-        setup = :(
-            if $mod.timeit_debug_enabled()
-                $setup
-            end
-        )
-        cleanup = :(
-            if $mod.timeit_debug_enabled()
-                $cleanup
-            end
-        )
-    end
-    return setup, cleanup
 end
 
-# `@timeit to label ex` for code blocks. The user expression is escaped
-# verbatim so its line numbers survive into stacktraces and coverage.
+# gate `core` behind the per-module debug switch, falling back to a bare `ex`
+# so a disabled `@timeit_debug` compiles away
+function debug_gated(mod::Module, core, ex)
+    return quote
+        if $mod.timeit_debug_enabled()
+            $core
+        else
+            $ex
+        end
+    end
+end
+
+# `@timeit to label ex` for code blocks. The whole expression is escaped so the
+# user code (and its line numbers) survives verbatim into stacktraces and coverage.
 function timed_block_expr(source::LineNumberNode, mod::Module, is_debug::Bool, to, label, ex)
-    setup, cleanup = section_bookends(mod, is_debug, to, label)
-    return Expr(
-        :block,
-        source,
-        esc(setup),
-        Expr(:tryfinally, esc(ex), esc(cleanup))
-    )
+    core = timed_section(to, label, ex)
+    is_debug && (core = debug_gated(mod, core, ex))
+    return Expr(:block, source, esc(core))
 end
 
 # an (unescaped) expression that times `ex` and evaluates to its value
 function timed_value_expr(mod::Module, is_debug::Bool, to, label, ex)
-    setup, cleanup = section_bookends(mod, false, to, label)
-    @gensym val
-    timed = quote
-        $setup
-        $(Expr(:tryfinally, :($val = $ex), cleanup))
-        $val
-    end
-    if is_debug
-        return quote
-            if $mod.timeit_debug_enabled()
-                $timed
-            else
-                $ex
-            end
-        end
-    end
-    return timed
+    core = timed_section(to, label, ex)
+    is_debug && (core = debug_gated(mod, core, ex))
+    return core
 end
 
 # `@timeit [to] [label] function f() ... end`
