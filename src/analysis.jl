@@ -330,9 +330,10 @@ struct InstrumentedFunction{F} <: Function
     name::String
 end
 
-# plain runtime repr: construction is a cold path, and computing the name at
-# code generation time gives a module qualified repr on Julia 1.13
-funcname(f) = repr(f)
+# plain runtime repr: construction is a cold path. Recent Julia versions qualify
+# a function's repr with its module (`Main.foo`); strip a leading `Main.` so the
+# common top-level case reads as `foo` while submodules stay qualified.
+funcname(f) = String(chopprefix(repr(f), "Main."))
 
 InstrumentedFunction(f, t) = InstrumentedFunction(f, t, funcname(f))
 

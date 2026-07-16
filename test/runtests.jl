@@ -769,6 +769,9 @@ end
     compare(to, todict(to))
 end
 
+# top-level named function: its label should drop the `Main.` module qualifier
+instrumented_named(x) = x + 1
+
 @testset "InstrumentedFunctions" begin
     to = TimerOutput()
     f = to(x -> x^2, "f")
@@ -783,6 +786,8 @@ end
     t = to(s)
     t(1)
     @test ncalls(to.inner_timers[repr(s)]) == 1
+    to(instrumented_named)(1)
+    @test haskey(to.inner_timers, "instrumented_named")
 end
 
 @testset "Interleaved sections" begin

@@ -156,7 +156,7 @@ Similar information is available for allocations:
  │  └─ example.jl:6: x += i        10   105ns    0.0%  10.5ns      0.00B    0.0%    0.00B
  └─ example.jl:4: x = 0             1  13.0ns    0.0%  13.0ns      0.00B    0.0%    0.00B
  funcdef                            1  15.0ns    0.0%  15.0ns      0.00B    0.0%    0.00B
- Main.foo                           1  14.0ns    0.0%  14.0ns      0.00B    0.0%    0.00B
+ foo                                1  14.0ns    0.0%  14.0ns      0.00B    0.0%    0.00B
 ──────────────────────────────────────────────────────────────────────────────────────────
 ```
 
