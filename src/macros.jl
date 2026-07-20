@@ -45,15 +45,44 @@ macro timeit_debug(args...)
     return timer_expr(__source__, __module__, true, args...)
 end
 
-function enable_debug_timings(m::Module)
-    return if !getfield(m, :timeit_debug_enabled)()
-        Core.eval(m, :(timeit_debug_enabled() = true))
+"""
+    TimerOutputs.enable_debug_timings(m::Module; recursive::Bool = true)
+
+Enable `@timeit_debug` sections in module `m`. With `recursive = true` (the
+default) this also enables them in every submodule of `m`, so instrumenting a
+whole package takes a single call on its top module. Pass `recursive = false`
+to affect only `m` itself.
+"""
+enable_debug_timings(m::Module; recursive::Bool = true) = set_debug_timings(m, true, recursive)
+
+"""
+    TimerOutputs.disable_debug_timings(m::Module; recursive::Bool = true)
+
+Disable `@timeit_debug` sections in module `m` (and its submodules unless
+`recursive = false`). The inverse of [`enable_debug_timings`](@ref).
+"""
+disable_debug_timings(m::Module; recursive::Bool = true) = set_debug_timings(m, false, recursive)
+
+function set_debug_timings(m::Module, value::Bool, recursive::Bool, seen::Base.IdSet{Module} = Base.IdSet{Module}())
+    m in seen && return nothing
+    push!(seen, m)
+    # only modules that actually use `@timeit_debug` define this switch; skip
+    # the rest so recursion over a package doesn't error on plain submodules
+    if isdefined(m, :timeit_debug_enabled) && getfield(m, :timeit_debug_enabled)() != value
+        Core.eval(m, :(timeit_debug_enabled() = $value))
     end
-end
-function disable_debug_timings(m::Module)
-    return if getfield(m, :timeit_debug_enabled)()
-        Core.eval(m, :(timeit_debug_enabled() = false))
+    if recursive
+        for name in names(m; all = true)
+            isdefined(m, name) || continue
+            sub = getfield(m, name)
+            # descend only into genuine child submodules (not `m` itself, its
+            # parent, or `using`-imported modules), guarding against cycles
+            if sub isa Module && sub !== m && parentmodule(sub) === m
+                set_debug_timings(sub, value, recursive, seen)
+            end
+        end
     end
+    return nothing
 end
 
 const TIMEIT_USAGE = "invalid macro usage for @timeit, use as @timeit [to] label codeblock"

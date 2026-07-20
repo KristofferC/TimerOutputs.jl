@@ -44,6 +44,10 @@ internals may need updating (see "Internal changes" below).
   each set (nested sets nest in the timer), so `print_timer()` after the tests
   shows where the test time went. `Test` stays a non-dependency; the emitted
   `@testset` is resolved at the call site.
+* **Recursive debug timings**: `enable_debug_timings`/`disable_debug_timings`
+  now recurse into submodules by default, so one call on a package's top module
+  instruments the whole package (#75). Pass `recursive = false` for the old
+  single-module behavior.
 * **`maxdepth` keyword**: limit how deeply nested sections are printed.
 * **`complement = true` display option**: show what was *not* timed, in gray —
   an `~untimed~` row for the wall time outside all sections, and a `~name~`
