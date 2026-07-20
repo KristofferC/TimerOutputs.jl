@@ -277,6 +277,54 @@ function notimeit_expr(to, ex::Expr)
     end
 end
 
+##################
+# @timed_testset #
+##################
+
+"""
+    @timed_testset [to::TimerOutput] "title" [options...] body
+
+Run a `Test.@testset` while timing it under `title` in `to` (the default timer
+if not given). A drop-in replacement for `@testset`: any options and the body
+are forwarded verbatim, and nested `@timed_testset`s nest in the timer, so
+`print_timer()` after the tests shows where test time went.
+
+Requires `Test` to be loaded at the call site (it is not a dependency of
+TimerOutputs); the emitted `@testset` is resolved there.
+
+```julia
+@timed_testset "trig" begin
+    @timed_testset "sin" begin
+        @test sin(0) == 0
+    end
+    @timed_testset "cos" begin
+        @test cos(0) == 1
+    end
+end
+```
+"""
+macro timed_testset(args...)
+    return timed_testset_expr(__source__, __module__, args...)
+end
+
+const TIMED_TESTSET_USAGE = "invalid macro usage for @timed_testset, use as @timed_testset [to] \"title\" [options...] body"
+
+function timed_testset_expr(source::LineNumberNode, mod::Module, args...)
+    length(args) >= 2 || throw(ArgumentError(TIMED_TESTSET_USAGE))
+    # a leading string is the title (default timer); otherwise it is the timer
+    if is_label_expr(args[1])
+        to, title, rest = default_timer_expr(), args[1], args[2:end]
+    else
+        length(args) >= 3 || throw(ArgumentError(TIMED_TESTSET_USAGE))
+        to, title, rest = args[1], args[2], args[3:end]
+    end
+    # emit an unqualified `@testset` so it resolves in the caller's module; the
+    # surrounding machinery escapes it. `title` labels the timer section and
+    # names the testset.
+    testset = Expr(:macrocall, Symbol("@testset"), source, title, rest...)
+    return timed_block_expr(source, mod, false, to, title, testset)
+end
+
 ###############
 # @timeit_all #
 ###############

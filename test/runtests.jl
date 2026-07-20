@@ -1444,4 +1444,56 @@ const timeit_all_error_line = @__LINE__() - 2
     @test any(f -> f.line == timeit_all_error_line && endswith(String(f.file), "runtests.jl"), st)
 end
 
+@testset "@timed_testset (#165)" begin
+    to = TimerOutput()
+    ran = Ref(0)
+
+    # explicit timer; nested timed testsets nest in the timer and the bodies run
+    @timed_testset to "outer" begin
+        @timed_testset to "inner 1" begin
+            ran[] += 1
+            @test true
+        end
+        @timed_testset to "inner 2" begin
+            ran[] += 1
+            @test 1 + 1 == 2
+        end
+    end
+    @test ran[] == 2
+    @test ncalls(to["outer"]) == 1
+    @test haskey(to["outer"].inner_timers, "inner 1")
+    @test haskey(to["outer"].inner_timers, "inner 2")
+
+    # testset options are forwarded verbatim to @testset
+    @timed_testset to "opts" verbose = true begin
+        @test true
+    end
+    @test ncalls(to["opts"]) == 1
+
+    # a `for` testset body runs per iteration but is timed once
+    @timed_testset to "loop" for i in 1:3
+        @test i > 0
+    end
+    @test ncalls(to["loop"]) == 1
+
+    # an interpolated title reads as a label, not the timer
+    label = "dynamic"
+    @timed_testset to "$label" begin
+        @test true
+    end
+    @test haskey(to.inner_timers, "dynamic")
+
+    # no explicit timer -> default timer
+    reset_timer!()
+    @timed_testset "default" begin
+        @test true
+    end
+    @test haskey(DEFAULT_TIMER.inner_timers, "default")
+    reset_timer!()
+
+    # invalid forms give the usage error
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timed_testset "onlytitle"))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timed_testset))
+end
+
 include("test_coverage.jl")

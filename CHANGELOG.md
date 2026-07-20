@@ -40,6 +40,10 @@ internals may need updating (see "Internal changes" below).
   (`@timeit foo(args)`). Qualified calls keep their qualification
   (`Mod.foo` → `"Mod.foo"`); operators and other non-name calls still need an
   explicit label.
+* **`@timed_testset`**: a drop-in replacement for `Test.@testset` that times
+  each set (nested sets nest in the timer), so `print_timer()` after the tests
+  shows where the test time went. `Test` stays a non-dependency; the emitted
+  `@testset` is resolved at the call site.
 * **`maxdepth` keyword**: limit how deeply nested sections are printed.
 * **`complement = true` display option**: show what was *not* timed, in gray —
   an `~untimed~` row for the wall time outside all sections, and a `~name~`
