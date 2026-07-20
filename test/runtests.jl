@@ -1079,6 +1079,46 @@ end
     @test_throws ArgumentError render(; columns = [:bogus])
 end
 
+@testset "GC time column (#173)" begin
+    to = TimerOutput()
+    @timeit to "gc" begin
+        acc = Any[]
+        for _ in 1:200
+            push!(acc, rand(10_000))
+        end
+        GC.gc()
+    end
+    @timeit to "cheap" 1 + 1
+
+    header_line(s) = first(filter(l -> occursin("Section", l), split(s, "\n")))
+
+    # off by default, opt in with gc = true or the :gc_time column
+    @test !occursin("GC", header_line(sprint(show, to)))
+    @test occursin("GC", header_line(sprint((io, x) -> show(io, x; gc = true), to)))
+    @test occursin("GC", header_line(sprint((io, x) -> show(io, x; columns = [:time, :gc_time]), to)))
+
+    # a section that forced a collection records nonzero GC time
+    @test TimerOutputs.gctime(to["gc"]) > 0
+    @test TimerOutputs.gctime(to) == TimerOutputs.gctime(to.root)
+    @test TimerOutputs.gctime(to["cheap"]) == 0
+
+    # zero GC time renders as a null glyph, not "0.00ns" (a "-" in ascii mode)
+    @test strip(TimerOutputs.prettygc(0, false)) == "∅"
+    @test strip(TimerOutputs.prettygc(0, true)) == "-"
+    @test strip(TimerOutputs.prettygc(1500, false)) == "1.50μs"
+    gcstr = sprint((io, x) -> show(io, x; gc = true), to)
+    @test occursin("∅", gcstr) && !occursin("0.00ns", gcstr)
+
+    # merge sums GC time by section
+    to2 = TimerOutput()
+    @timeit to2 "gc" GC.gc()
+    m = merge(to, to2)
+    @test TimerOutputs.gctime(m["gc"]) == TimerOutputs.gctime(to["gc"]) + TimerOutputs.gctime(to2["gc"])
+
+    # exposed through the serialization dict
+    @test todict(to)["inner_timers"]["gc"]["gc_time_ns"] == TimerOutputs.gctime(to["gc"])
+end
+
 @testset "heat bar columns" begin
     # bar rendering: eighth-block resolution, empty remainder
     @test heatbar(0.0, false) == " "^8
@@ -1208,7 +1248,7 @@ end
     cols = Tables.columntable(to)
     @test cols.ncalls == [1, 1, 1]
     @test Tables.schema(to).names ==
-        (:path, :section, :depth, :ncalls, :time_ns, :allocated_bytes, :firstexec_ns)
+        (:path, :section, :depth, :ncalls, :time_ns, :gc_time_ns, :allocated_bytes, :firstexec_ns)
 
     # a bare section includes itself as the first row
     @test [r.path for r in Tables.rows(to["outer"])] == ["outer", "outer/inner"]

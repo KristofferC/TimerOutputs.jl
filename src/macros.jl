@@ -102,12 +102,12 @@ end
 # behind a closure or temporary) also preserves its line numbers and lets
 # `return`, `break`, `continue` and assignments behave as in the unwrapped code.
 function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing)
-    @gensym to_local enabled data b₀ t₀
+    @gensym to_local enabled data b₀ t₀ g₀
     # `@timeit_all` sections record the source file their label refers to
     push_call = srcfile === nothing ? :($(push!)($to_local, $label)) :
         :($(push_srcfile!)($to_local, $label, $srcfile))
     cleanup = quote
-        $(do_accumulate!)($data, $t₀, $b₀)
+        $(do_accumulate!)($data, $t₀, $b₀, $g₀)
         $(pop!)($to_local)
     end
     return quote
@@ -115,6 +115,7 @@ function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing)
         $enabled = $(isenabled)($to_local)
         if $enabled
             $data = $push_call
+            $g₀ = $(gc_time)()
             $b₀ = $(gc_bytes)()
             $t₀ = $(time_ns)()
             $(Expr(:tryfinally, ex, cleanup))

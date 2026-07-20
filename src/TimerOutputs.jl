@@ -18,6 +18,9 @@ function gc_bytes()
     return b[]
 end
 
+# cumulative time spent in GC, in ns; sections record the delta over their extent
+gc_time() = Base.gc_time_ns()
+
 include("core.jl")
 include("macros.jl")
 include("analysis.jl")

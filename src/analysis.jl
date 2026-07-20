@@ -23,13 +23,22 @@ The accumulated allocations in the section in bytes.
 """
 allocated(s::Section) = s.allocs
 
+"""
+    TimerOutputs.gctime(x = DEFAULT_TIMER)
+
+The accumulated garbage collection time in the section in nanoseconds.
+"""
+gctime(s::Section) = s.gc_time
+
 ncalls(to::TimerOutput) = ncalls(to.root)
 time(to::TimerOutput) = time(to.root)
 allocated(to::TimerOutput) = allocated(to.root)
+gctime(to::TimerOutput) = gctime(to.root)
 
 time() = time(DEFAULT_TIMER)
 ncalls() = ncalls(DEFAULT_TIMER)
 allocated() = allocated(DEFAULT_TIMER)
+gctime() = gctime(DEFAULT_TIMER)
 
 # total (time, allocs) covered by the top level sections
 function totmeasured(s::Section)
@@ -196,13 +205,15 @@ end
 function complement_section(s::Section)
     rem_time = s.time
     rem_allocs = s.allocs
+    rem_gc = s.gc_time
     for child in s.children
         rem_time -= child.time
         rem_allocs -= child.allocs
+        rem_gc -= child.gc_time
     end
     return Section(
         string("~", s.name, "~"), max(1, s.ncalls), max(rem_time, 0), max(rem_allocs, 0),
-        s.firstexec, Section[], nothing, nothing, true, false, s.srcfile
+        max(rem_gc, 0), s.firstexec, Section[], nothing, nothing, true, false, s.srcfile
     )
 end
 
@@ -239,6 +250,7 @@ Converts a timer into a nested set of dictionaries, with keys and value types:
 
 * `"n_calls"`: `Int`
 * `"time_ns"`: `Int`
+* `"gc_time_ns"`: `Int`
 * `"allocated_bytes"`: `Int`
 * `"total_allocated_bytes"`: `Int`
 * `"total_time_ns"`: `Int`
@@ -249,6 +261,7 @@ function todict(s::Section)
     return Dict{String, Any}(
         "n_calls" => ncalls(s),
         "time_ns" => time(s),
+        "gc_time_ns" => gctime(s),
         "allocated_bytes" => allocated(s),
         "total_time_ns" => tottime(s),
         "total_allocated_bytes" => totallocated(s),
@@ -265,6 +278,7 @@ struct SectionTimeData
     data::Section
     allocs_start::Int64
     time_start::Int64
+    gc_start::Int64
 end
 
 """
@@ -276,9 +290,10 @@ object that should be passed to `end_timed_section!` when the section is done.
 begin_timed_section!(label::String) = begin_timed_section!(DEFAULT_TIMER, label)
 function begin_timed_section!(to::TimerOutput, label::String)
     data = push!(to, label)
+    g₀ = gc_time()
     b₀ = gc_bytes()
     t₀ = time_ns()
-    return SectionTimeData(label, data, b₀, t₀)
+    return SectionTimeData(label, data, b₀, t₀, g₀)
 end
 
 """
@@ -290,6 +305,7 @@ end_timed_section!(section::SectionTimeData) = end_timed_section!(DEFAULT_TIMER,
 function end_timed_section!(to::TimerOutput, section::SectionTimeData)
     section.data.time += time_ns() - section.time_start
     section.data.allocs += gc_bytes() - section.allocs_start
+    section.data.gc_time += gc_time() - section.gc_start
     section.data.ncalls += 1
     return pop!(to)
 end
@@ -351,12 +367,13 @@ function (inst::InstrumentedFunction)(args...; kwargs...)
     isenabled(to) || return inst.func(args...; kwargs...)
     data = push!(to, inst.name)
     inst.qualified && (data.qualified = true)
+    g₀ = gc_time()
     b₀ = gc_bytes()
     t₀ = time_ns()
     try
         return inst.func(args...; kwargs...)
     finally
-        do_accumulate!(data, t₀, b₀)
+        do_accumulate!(data, t₀, b₀, g₀)
         pop!(to)
     end
 end

@@ -166,6 +166,10 @@ asciitime(str, ascii::Bool) = ascii ? replace(str, "μs" => "us") : str
 # integer percentage of the enclosing section; blank at the top level (#192)
 prettypar(v, parent) = parent <= 0 ? "" : string(round(Int, v / parent * 100), "%")
 
+# GC time: sections that never triggered a collection show a null glyph rather
+# than a noisy column of "0.00ns" (a plain "-" in pure-ASCII mode, #115)
+prettygc(t, ascii::Bool) = t == 0 ? lpad(ascii ? "-" : "∅", 6) : asciitime(prettytime(t), ascii)
+
 ###########
 # Columns #
 ###########
@@ -194,6 +198,7 @@ const COLUMNS = (;
     ncalls = ColumnSpec("ncalls", "", true, (c, p, ctx) -> prettycount(c.ncalls)),
     time = ColumnSpec("time", "Time", false, (c, p, ctx) -> asciitime(prettytime(c.time), ctx.ascii)),
     time_pct = ColumnSpec("%tot", "Time", true, (c, p, ctx) -> prettypercent(c.time, ctx.∑t)),
+    gc_time = ColumnSpec("GC", "Time", true, (c, p, ctx) -> prettygc(c.gc_time, ctx.ascii)),
     time_par = ColumnSpec("%par", "Time", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.time, p.time)),
     time_avg = ColumnSpec("avg", "Time", true, (c, p, ctx) -> asciitime(prettytime(c.time / c.ncalls), ctx.ascii)),
     allocs = ColumnSpec("alloc", "Allocations", false, (c, p, ctx) -> prettymemory(c.allocs)),
@@ -204,10 +209,11 @@ const COLUMNS = (;
     allocs_bar = ColumnSpec("", "Allocations", true, (c, p, ctx) -> heatbar(ctx.∑b > 0 ? c.allocs / ctx.∑b : 0.0, ctx.ascii)),
 )
 
-# the selection the `allocations`, `compact` and `bars` keywords correspond
-# to; the %par columns are opt-in through the `columns` keyword
-function default_columns(allocations::Bool, compact::Bool, bars::Bool)
+# the selection the `allocations`, `compact`, `bars` and `gc` keywords
+# correspond to; the %par columns are opt-in through the `columns` keyword
+function default_columns(allocations::Bool, compact::Bool, bars::Bool, gc::Bool)
     columns = [:ncalls, :time, :time_pct]
+    gc && push!(columns, :gc_time)
     compact || push!(columns, :time_avg)
     compact || !bars || push!(columns, :time_bar)
     if allocations
@@ -356,7 +362,7 @@ function Base.show(io::IO, s::Section; kwargs...)
     return show_table(io, s; kwargs...)
 end
 
-function validated_options(; sortby, allocations, compact, bars, columns, linechars, maxdepth, complement)
+function validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
@@ -365,7 +371,7 @@ function validated_options(; sortby, allocations, compact, bars, columns, linech
         throw(ArgumentError("maxdepth should be at least 1, got $maxdepth"))
     # like 0.5, the most minimal selection also drops the header block
     header = !(compact && !allocations && columns === nothing)
-    columns = resolve_columns(columns === nothing ? default_columns(allocations, compact, bars) : columns)
+    columns = resolve_columns(columns === nothing ? default_columns(allocations, compact, bars, gc) : columns)
     return TableOptions(
         sortby, columns, linechars === :ascii, maxdepth, complement, header,
         tree_guides(linechars)
@@ -378,11 +384,11 @@ has_group(opts::TableOptions, group::String) = any(c -> c.group == group, opts.c
 function show_table(
         io::IO, to::TimerOutput;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        bars::Bool = true, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
+        bars::Bool = true, gc::Bool = false, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
         complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, bars, columns, linechars, maxdepth, complement)
+    opts = validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
 
     Δt = time_ns() - to.start_time
     Δb = gc_bytes() - to.start_allocs
@@ -391,7 +397,7 @@ function show_table(
     # wall clock time and allocations not measured by any section
     extra = if complement
         untimed = Section(
-            "~untimed~", 0, max(Δt - ∑t, 0), max(Δb - ∑b, 0), typemax(Int64),
+            "~untimed~", 0, max(Δt - ∑t, 0), max(Δb - ∑b, 0), 0, typemax(Int64),
             Section[], nothing, nothing
         )
         ComplementRow(untimed, false)
@@ -417,15 +423,15 @@ end
 function show_table(
         io::IO, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        bars::Bool = true, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
+        bars::Bool = true, gc::Bool = false, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
         complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, bars, columns, linechars, maxdepth, complement)
+    opts = validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     # `_show_table` renders the children of its root. Wrap the section in a
     # detached display-only root so the section itself is the first row.
-    display_root = Section("", 0, 0, 0, s.firstexec, Section[s], nothing, nothing)
+    display_root = Section("", 0, 0, 0, 0, s.firstexec, Section[s], nothing, nothing)
     return _show_table(io, display_root, ∑t, ∑b, opts, title, nothing, nothing)
 end
 

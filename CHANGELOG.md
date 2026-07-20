@@ -17,8 +17,8 @@ internals may need updating (see "Internal changes" below).
 * **Tables.jl interface**: timers are tables — `DataFrame(to)`,
   `CSV.write("timings.csv", to)` and any other Tables.jl consumer work
   directly, with one row per section holding the raw measurements
-  (`path`, `section`, `depth`, `ncalls`, `time_ns`, `allocated_bytes`,
-  `firstexec_ns`).
+  (`path`, `section`, `depth`, `ncalls`, `time_ns`, `gc_time_ns`,
+  `allocated_bytes`, `firstexec_ns`).
 * **New table layout** (now built on PrettyTables.jl): tree guides (`├─`, `└─`)
   instead of plain indentation, and an optional `%par` column showing each
   section's share of its enclosing section (`columns = [..., :time_par]`).
@@ -31,6 +31,9 @@ internals may need updating (see "Internal changes" below).
 * **Column selection**: `print_timer(to; columns = [:ncalls, :time, :time_pct])`
   picks exactly which columns to show, in order; `allocations` and `compact`
   remain as shorthands.
+* **GC time column**: `print_timer(to; gc = true)` (or the `:gc_time` column)
+  adds a column with the time spent in garbage collection within each section.
+  Off by default. Also available programmatically as `TimerOutputs.gctime(to)`.
 * **`maxdepth` keyword**: limit how deeply nested sections are printed.
 * **`complement = true` display option**: show what was *not* timed, in gray —
   an `~untimed~` row for the wall time outside all sections, and a `~name~`
