@@ -175,6 +175,31 @@ foo()
 end_timed_section!(to, section)
 ```
 
+## Timing test sets
+
+`@timed_testset` is a drop-in replacement for `Test.@testset` that also times
+each set, so `print_timer()` after the tests shows where the test time went.
+Replace `@testset` with `@timed_testset` and, at the end of `runtests.jl`, print
+the default timer:
+
+```julia
+using Test, TimerOutputs
+
+@timed_testset "trig" begin
+    @timed_testset "sin" begin
+        @test sin(0) == 0
+    end
+    @timed_testset "cos" begin
+        @test cos(0) == 1
+    end
+end
+
+print_timer()  # or e.g. @timed_testset to "trig" begin ... end to use another timer
+```
+
+`Test` is not a dependency of TimerOutputs; the emitted `@testset` is resolved at
+the call site, so `using Test` there is enough.
+
 ## Settings for printing:
 
 The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes a number of keyword arguments to change the output. They are listed here:
