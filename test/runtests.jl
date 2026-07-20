@@ -1189,6 +1189,31 @@ end
     @test todict(to)["inner_timers"]["gc"]["gc_time_ns"] == TimerOutputs.gctime(to["gc"])
 end
 
+@testset "zero allocations render as null glyph" begin
+    @test strip(TimerOutputs.prettyallocs(0, false)) == "∅"
+    @test strip(TimerOutputs.prettyallocs(0, true)) == "-"
+    @test strip(TimerOutputs.prettyallocs(176, false)) == "176B"
+
+    to = TimerOutput()
+    @timeit to "work" begin
+        rand(1000)
+        @timeit to "noalloc" 1 + 1
+    end
+    # the section may pick up compilation allocations on the first call
+    to["work"]["noalloc"].allocs = 0
+
+    str = sprint(show, to)
+    @test occursin("∅", str) && !occursin("0.00B", str)
+    astr = sprint((io, x) -> show(io, x; linechars = :ascii), to)
+    @test !occursin("∅", astr) && !occursin("0.00B", astr)
+
+    # all allocation cells show the glyph, including the opt-in %par column
+    pstr = sprint((io, x) -> show(io, x; columns = [:allocs, :allocs_pct, :allocs_par, :allocs_avg]), to)
+    noalloc_row = first(filter(l -> occursin("noalloc", l), split(pstr, "\n")))
+    @test length(collect(eachmatch(r"∅", noalloc_row))) == 4
+    @test !occursin("0.0%", noalloc_row) && !occursin("0%", noalloc_row)
+end
+
 @testset "heat bar columns" begin
     # bar rendering: eighth-block resolution, empty remainder
     @test heatbar(0.0, false) == " "^8
