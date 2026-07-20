@@ -951,11 +951,41 @@ end
     @test (@timeit to "nothing" nothing) === nothing
     @test ncalls(to["lit"]) == 1
     # invalid forms give the friendly usage error
-    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit f(x)))
     @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit 42))
     @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit))
+    # a call body with no derivable label (operator, indexing) still errors
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit a + b))
+    @test_throws ArgumentError macroexpand(@__MODULE__, :(@timeit a[i]))
     # an empty timer still renders
     @test sprint(show, TimerOutput()) isa String
+end
+
+@testset "call shorthand (#159)" begin
+    g(x) = x + 1
+
+    # 1-arg: default timer, label derived from the callee
+    reset_timer!()
+    @test (@timeit g(41)) == 42
+    @test ncalls(DEFAULT_TIMER["g"]) == 1
+
+    # 2-arg: explicit timer, label derived from the callee
+    to = TimerOutput()
+    @test (@timeit to g(41)) == 42
+    @test ncalls(to["g"]) == 1
+
+    # qualified calls keep the qualification in the label
+    @test (@timeit to Base.identity(3)) == 3
+    @test ncalls(to["Base.identity"]) == 1
+
+    # an explicit (literal or interpolated) label is never treated as a timer
+    i = 2
+    @timeit to "lit" g(0)
+    @timeit to "iter_$i" g(0)
+    @test ncalls(to["lit"]) == 1 && ncalls(to["iter_2"]) == 1
+
+    # composes with the zero-overhead NoTimerOutput
+    nt = NoTimerOutput()
+    @test (@timeit nt g(41)) == 42
 end
 
 @testset "ascii output is pure ASCII (#115)" begin
