@@ -21,6 +21,7 @@ mutable struct Section
     ncalls::Int64
     time::Int64      # ns
     allocs::Int64    # bytes
+    gc_time::Int64   # ns spent in GC over the section's extent
     firstexec::Int64 # time_ns() timestamp of when the section was first entered
     const children::Vector{Section}
     index::Union{Dict{String, Section}, Nothing}
@@ -40,9 +41,9 @@ end
 
 # `is_complement`/`qualified`/`srcfile` default off; the positional call sites
 # that predate them, and the single-argument form, don't need to pass them
-Section(name, ncalls, time, allocs, firstexec, children, index, prev_child) =
-    Section(name, ncalls, time, allocs, firstexec, children, index, prev_child, false, false, nothing)
-Section(name::String) = Section(name, 0, 0, 0, time_ns(), Section[], nothing, nothing)
+Section(name, ncalls, time, allocs, gc_time, firstexec, children, index, prev_child) =
+    Section(name, ncalls, time, allocs, gc_time, firstexec, children, index, prev_child, false, false, nothing)
+Section(name::String) = Section(name, 0, 0, 0, 0, time_ns(), Section[], nothing, nothing)
 
 const INDEX_THRESHOLD = 8
 
@@ -85,9 +86,10 @@ function child_section(parent::Section, label::String)
 end
 
 # The macro-generated cleanup calls this with the timestamps taken at section entry
-@inline function do_accumulate!(s::Section, t₀, b₀)
+@inline function do_accumulate!(s::Section, t₀, b₀, g₀)
     s.time += time_ns() - t₀
     s.allocs += gc_bytes() - b₀
+    s.gc_time += gc_time() - g₀
     s.ncalls += 1
     return s
 end
@@ -96,6 +98,7 @@ function combine!(a::Section, b::Section)
     a.ncalls += b.ncalls
     a.time += b.time
     a.allocs += b.allocs
+    a.gc_time += b.gc_time
     a.firstexec = min(a.firstexec, b.firstexec)
     a.srcfile === nothing && (a.srcfile = b.srcfile)
     return a
@@ -103,7 +106,7 @@ end
 
 # Copy of a single node without its children
 function copy_node(s::Section)
-    return Section(s.name, s.ncalls, s.time, s.allocs, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified, s.srcfile)
+    return Section(s.name, s.ncalls, s.time, s.allocs, s.gc_time, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified, s.srcfile)
 end
 
 function Base.copy(s::Section)
@@ -181,6 +184,7 @@ function reset_timer!(to::TimerOutput)
     root.ncalls = 0
     root.time = 0
     root.allocs = 0
+    root.gc_time = 0
     root.firstexec = time_ns()
     empty!(to.stack)
     to.start_time = time_ns()

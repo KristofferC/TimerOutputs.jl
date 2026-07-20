@@ -176,14 +176,16 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 
 * `title::String` ─ title for the timer
 * `columns::Vector{Symbol}` ─ exactly which columns to show, in order. Available:
-  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`, `:time_bar`,
+  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`, `:gc_time`, `:time_bar`,
   `:allocs`, `:allocs_pct`, `:allocs_par`, `:allocs_avg`, `:allocs_bar`, and `:spacer` (an empty
   gap column). For example `columns = [:ncalls, :time, :time_pct, :time_par]`.
   The `_bar` columns show each section's share of the total as a bar, colored
-  from blue (cheap) to red (expensive) in color-capable terminals
+  from blue (cheap) to red (expensive) in color-capable terminals. The `:gc_time`
+  column shows the time spent in garbage collection within each section
 * `allocations::Bool` ─ show the allocation columns (default `true`); shorthand for a `columns` selection
 * `compact::Bool` ─ hide the `avg` and bar columns (default `false`); shorthand for a `columns` selection
 * `bars::Bool` ─ show the bar columns (default `true`); shorthand for a `columns` selection
+* `gc::Bool` ─ show the GC time column (default `false`); shorthand for a `columns` selection
 * `sortby::Symbol` ─ sort the sections according to `:time` (default), `:ncalls`, `:allocations`, `:name` or `:firstexec`
 * `linechars::Symbol` ─ use either `:unicode` (default) or `:ascii` for a pure ASCII table
 * `maxdepth::Int` ─ only print sections nested up to this depth (default: no limit)
@@ -565,6 +567,7 @@ julia> Tables.columntable(to)
  depth = [0, 1, 1, 0, ...],
  ncalls = [1, 1, 20, 1, ...],
  time_ns = [625648679, 100547624, 422780218, 435925439, ...],
+ gc_time_ns = [0, 0, 0, 0, ...],
  allocated_bytes = [1392, 112, 2240, 944, ...],
  firstexec_ns = [40605122592791, 40605223345650, 40605324068660, ...])
 ```
@@ -586,18 +589,19 @@ julia> @timeit to "nest 1" begin
        end
 
 julia> TimerOutputs.todict(to)
-Dict{String, Any} with 6 entries:
+Dict{String, Any} with 7 entries:
   "total_time_ns" => 726721166
   "total_allocated_bytes" => 474662
   "time_ns" => 0
   "n_calls" => 0
+  "gc_time_ns" => 0
   "allocated_bytes" => 0
-  "inner_timers" => Dict{String, Any}("nest 1"=>Dict{String, Any}("total_time_ns"=>611383374, "total_allocated_bytes"=>11888, "time_ns"=>726721166, "n_calls"=>1, "allocated_bytes"=>474662, "inner_timers"=>Dict{String, Any}("level 2.1"=>Dict{String, Any}("total_time_ns"=>0, "total_allocated_bytes"=>0, "time_ns"=>115773750, "n_calls"=>1, "allocated_bytes"=>8064, "inner_timers"=>Dict{String, Any}()), "level 2.2"=>Dict{String, Any}("total_time_ns"=>0, "total_allocated_bytes"=>0, "time_ns"=>495609624, "n_calls"=>20, "allocated_bytes"=>3824, "inner_timers"=>Dict{String, Any}()))))
+  "inner_timers" => Dict{String, Any}("nest 1"=>Dict{String, Any}("total_time_ns"=>611383374, "total_allocated_bytes"=>11888, "time_ns"=>726721166, "n_calls"=>1, "gc_time_ns"=>0, "allocated_bytes"=>474662, "inner_timers"=>Dict{String, Any}("level 2.1"=>Dict{String, Any}("total_time_ns"=>0, "total_allocated_bytes"=>0, "time_ns"=>115773750, "n_calls"=>1, "gc_time_ns"=>0, "allocated_bytes"=>8064, "inner_timers"=>Dict{String, Any}()), "level 2.2"=>Dict{String, Any}("total_time_ns"=>0, "total_allocated_bytes"=>0, "time_ns"=>495609624, "n_calls"=>20, "gc_time_ns"=>0, "allocated_bytes"=>3824, "inner_timers"=>Dict{String, Any}()))))
 
 julia> using JSON3 # or JSON
 
 julia> JSON3.write(TimerOutputs.todict(to))
-"{\"total_time_ns\":712143250,\"total_allocated_bytes\":5680,\"time_ns\":0,\"n_calls\":0,\"allocated_bytes\":0,\"inner_timers\":{\"nest 1\":{\"total_time_ns\":605922416,\"total_allocated_bytes\":4000,\"time_ns\":712143250,\"n_calls\":1,\"allocated_bytes\":5680,\"inner_timers\":{\"level 2.1\":{\"total_time_ns\":0,\"total_allocated_bytes\":0,\"time_ns\":106111333,\"n_calls\":1,\"allocated_bytes\":176,\"inner_timers\":{}},\"level 2.2\":{\"total_time_ns\":0,\"total_allocated_bytes\":0,\"time_ns\":499811083,\"n_calls\":20,\"allocated_bytes\":3824,\"inner_timers\":{}}}}}}"
+"{\"total_time_ns\":712143250,\"total_allocated_bytes\":5680,\"time_ns\":0,\"n_calls\":0,\"gc_time_ns\":0,\"allocated_bytes\":0,\"inner_timers\":{\"nest 1\":{\"total_time_ns\":605922416,\"total_allocated_bytes\":4000,\"time_ns\":712143250,\"n_calls\":1,\"gc_time_ns\":0,\"allocated_bytes\":5680,\"inner_timers\":{\"level 2.1\":{\"total_time_ns\":0,\"total_allocated_bytes\":0,\"time_ns\":106111333,\"n_calls\":1,\"gc_time_ns\":0,\"allocated_bytes\":176,\"inner_timers\":{}},\"level 2.2\":{\"total_time_ns\":0,\"total_allocated_bytes\":0,\"time_ns\":499811083,\"n_calls\":20,\"gc_time_ns\":0,\"allocated_bytes\":3824,\"inner_timers\":{}}}}}}"
 ```
 
 ## FlameGraphs
