@@ -90,6 +90,47 @@ function prettycount(t::Integer)
     return str
 end
 
+########
+# Heat #
+########
+
+# Heat color for a section's share of the total: cold sections fade toward
+# blue, hot ones ramp through orange to red, and the middle band keeps the
+# terminal's default color. The sqrt spreads out the small percentages most
+# sections live at, so they don't all collapse into the blue end.
+const COLD_STOPS = ((59, 76, 192), (110, 130, 180))
+const HOT_STOPS = ((200, 120, 90), (210, 60, 60), (200, 10, 30))
+const COLD_MAX = 0.35 # in sqrt space: below ~12% of the total is "cold"
+const HOT_MIN = 0.6  # in sqrt space: above ~36% of the total is "hot"
+
+# piecewise-linear interpolation through the color stops, t in [0, 1]
+function lerp_stops(stops, t)
+    x = t * (length(stops) - 1)
+    i = clamp(floor(Int, x) + 1, 1, length(stops) - 1)
+    s = x - (i - 1)
+    a, b = stops[i], stops[i + 1]
+    return ntuple(k -> round(Int, a[k] + (b[k] - a[k]) * s), 3)
+end
+
+function heat_crayon(frac)
+    t = sqrt(clamp(frac, 0.0, 1.0))
+    t < COLD_MAX && return Crayon(foreground = lerp_stops(COLD_STOPS, t / COLD_MAX))
+    t > HOT_MIN && return Crayon(foreground = lerp_stops(HOT_STOPS, (t - HOT_MIN) / (1 - HOT_MIN)))
+    return Crayon()
+end
+
+# A fixed-width bar filled proportionally to `frac`, quasi-continuous through
+# eighth blocks, with the remainder left empty; the heat highlighter colors it
+const BAR_EIGHTHS = ("▏", "▎", "▍", "▌", "▋", "▊", "▉")
+
+function heatbar(frac, ascii::Bool; width::Int = 8)
+    frac = clamp(frac, 0.0, 1.0)
+    ascii && return rpad(repeat('#', round(Int, frac * width)), width, '.')
+    full, part = divrem(round(Int, frac * width * 8), 8)
+    bar = repeat('█', full) * (part == 0 ? "" : BAR_EIGHTHS[part])
+    return rpad(bar, width)
+end
+
 ##################
 # Table building #
 ##################
@@ -159,16 +200,20 @@ const COLUMNS = (;
     allocs_pct = ColumnSpec("%tot", "Allocations", true, (c, p, ctx) -> prettypercent(c.allocs, ctx.∑b)),
     allocs_par = ColumnSpec("%par", "Allocations", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.allocs, p.allocs)),
     allocs_avg = ColumnSpec("avg", "Allocations", true, (c, p, ctx) -> prettymemory(c.allocs / c.ncalls)),
+    time_bar = ColumnSpec("", "Time", true, (c, p, ctx) -> heatbar(ctx.∑t > 0 ? c.time / ctx.∑t : 0.0, ctx.ascii)),
+    allocs_bar = ColumnSpec("", "Allocations", true, (c, p, ctx) -> heatbar(ctx.∑b > 0 ? c.allocs / ctx.∑b : 0.0, ctx.ascii)),
 )
 
-# the selection the `allocations` and `compact` keywords correspond to;
-# the %par columns are opt-in through the `columns` keyword
-function default_columns(allocations::Bool, compact::Bool)
+# the selection the `allocations`, `compact` and `bars` keywords correspond
+# to; the %par columns are opt-in through the `columns` keyword
+function default_columns(allocations::Bool, compact::Bool, bars::Bool)
     columns = [:ncalls, :time, :time_pct]
     compact || push!(columns, :time_avg)
+    compact || !bars || push!(columns, :time_bar)
     if allocations
         append!(columns, [:spacer, :allocs, :allocs_pct])
         compact || push!(columns, :allocs_avg)
+        compact || !bars || push!(columns, :allocs_bar)
     end
     return columns
 end
@@ -240,7 +285,8 @@ end
 # the indices of complement rows for the highlighter. `extra` is a synthetic
 # complement row to show among the children of `s`.
 function table_rows!(
-        rows::Vector{Vector{String}}, gray::Vector{Int}, s::Section, ∑t, ∑b,
+        rows::Vector{Vector{String}}, gray::Vector{Int}, heats::Vector{NTuple{2, Float64}},
+        s::Section, ∑t, ∑b,
         prefix::String, depth::Int, opts::TableOptions, extra::Union{ComplementRow, Nothing}
     )
     depth > opts.maxdepth && return rows
@@ -262,6 +308,7 @@ function table_rows!(
             row[k + 1] = blank && column.blankable ? "" : column.cell(child, s, ctx)
         end
         push!(rows, row)
+        push!(heats, (∑t > 0 ? child.time / ∑t : 0.0, ∑b > 0 ? child.allocs / ∑b : 0.0))
         synthetic && push!(gray, length(rows))
         child_extra = if opts.complement && !synthetic && !isempty(child.children)
             ComplementRow(complement_section(child), true)
@@ -269,7 +316,7 @@ function table_rows!(
             nothing
         end
         child_prefix = toplevel ? "" : string(prefix, islast ? opts.guides[4] : opts.guides[3])
-        table_rows!(rows, gray, child, ∑t, ∑b, child_prefix, depth + 1, opts, child_extra)
+        table_rows!(rows, gray, heats, child, ∑t, ∑b, child_prefix, depth + 1, opts, child_extra)
     end
     return rows
 end
@@ -309,7 +356,7 @@ function Base.show(io::IO, s::Section; kwargs...)
     return show_table(io, s; kwargs...)
 end
 
-function validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
+function validated_options(; sortby, allocations, compact, bars, columns, linechars, maxdepth, complement)
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
@@ -318,7 +365,7 @@ function validated_options(; sortby, allocations, compact, columns, linechars, m
         throw(ArgumentError("maxdepth should be at least 1, got $maxdepth"))
     # like 0.5, the most minimal selection also drops the header block
     header = !(compact && !allocations && columns === nothing)
-    columns = resolve_columns(columns === nothing ? default_columns(allocations, compact) : columns)
+    columns = resolve_columns(columns === nothing ? default_columns(allocations, compact, bars) : columns)
     return TableOptions(
         sortby, columns, linechars === :ascii, maxdepth, complement, header,
         tree_guides(linechars)
@@ -331,11 +378,11 @@ has_group(opts::TableOptions, group::String) = any(c -> c.group == group, opts.c
 function show_table(
         io::IO, to::TimerOutput;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
+        bars::Bool = true, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
         complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
+    opts = validated_options(; sortby, allocations, compact, bars, columns, linechars, maxdepth, complement)
 
     Δt = time_ns() - to.start_time
     Δb = gc_bytes() - to.start_allocs
@@ -370,11 +417,11 @@ end
 function show_table(
         io::IO, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
-        columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
+        bars::Bool = true, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
         complement::Bool = false, title::String = ""
     )
-    opts = validated_options(; sortby, allocations, compact, columns, linechars, maxdepth, complement)
+    opts = validated_options(; sortby, allocations, compact, bars, columns, linechars, maxdepth, complement)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     # `_show_table` renders the children of its root. Wrap the section in a
     # detached display-only root so the section itself is the first row.
@@ -421,7 +468,8 @@ end
 function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, totals, extra)
     rows = Vector{Vector{String}}()
     gray = Int[]
-    table_rows!(rows, gray, s, ∑t, ∑b, "", 1, opts, extra)
+    heats = NTuple{2, Float64}[]
+    table_rows!(rows, gray, heats, s, ∑t, ∑b, "", 1, opts, extra)
 
     labels = String["Section"; [c.label for c in opts.columns]]
     ncols = length(labels)
@@ -451,6 +499,30 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
         permutedims(reduce(hcat, rows))
     end
 
+    # complement rows are shown in gray (first match wins, so gray beats heat)
+    highlighters = TextHighlighter[]
+    if !isempty(gray)
+        grayset = Set(gray)
+        push!(highlighters, TextHighlighter((_, i, _) -> i in grayset, crayon"dark_gray"))
+    end
+    # the bar columns are colored by their share of the total
+    heat_which = Dict{Int, Int}() # data column index -> which fraction (1 = time, 2 = allocs)
+    for (k, c) in enumerate(opts.columns)
+        if c === COLUMNS.time_bar
+            heat_which[k + 1] = 1
+        elseif c === COLUMNS.allocs_bar
+            heat_which[k + 1] = 2
+        end
+    end
+    if !isempty(heat_which)
+        push!(
+            highlighters, TextHighlighter(
+                (_, i, j) -> haskey(heat_which, j),
+                (h, _, i, j) -> heat_crayon(heats[i][heat_which[j]])
+            )
+        )
+    end
+
     pretty_table(
         io, data;
         column_labels = column_labels,
@@ -474,13 +546,7 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             merged_column_label = crayon"default",
             column_label = crayon"default"
         ),
-        # complement rows are shown in gray
-        highlighters = if isempty(gray)
-            TextHighlighter[]
-        else
-            grayset = Set(gray)
-            [TextHighlighter((_, i, _) -> i in grayset, crayon"dark_gray")]
-        end,
+        highlighters = highlighters,
         # crop to the display width in the REPL and on terminals so long
         # section names never make lines wrap (#166); the Section column is
         # shrunk first so the numeric columns survive

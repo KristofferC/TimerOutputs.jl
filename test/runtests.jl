@@ -2,7 +2,8 @@ using TimerOutputs
 using Test
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
-    prettytime, prettymemory, prettypercent, prettycount, todict
+    prettytime, prettymemory, prettypercent, prettycount, todict,
+    heatbar, heat_crayon
 
 using FlameGraphs
 
@@ -1067,12 +1068,60 @@ end
         split(
         header_line(
             render(;
-                columns = [:ncalls, :time, :time_pct, :time_avg, :spacer, :allocs, :allocs_pct, :allocs_avg]
+                columns = [
+                    :ncalls, :time, :time_pct, :time_avg, :time_bar,
+                    :spacer, :allocs, :allocs_pct, :allocs_avg, :allocs_bar,
+                ]
             )
         )
     )
 
     @test_throws ArgumentError render(; columns = [:bogus])
+end
+
+@testset "heat bar columns" begin
+    # bar rendering: eighth-block resolution, empty remainder
+    @test heatbar(0.0, false) == " "^8
+    @test heatbar(0.5, false) == "████    "
+    @test heatbar(1 / 16, false) == "▌       "
+    @test heatbar(1.0, false) == "█"^8
+    @test heatbar(2.0, false) == "█"^8 # clamped
+    @test heatbar(0.5, false; width = 4) == "██  "
+    # ascii mode keeps a track to show the extent in colorless logs
+    @test heatbar(0.5, true) == "####...."
+
+    # color ramp: cold -> blue, middle band -> default, hot -> red
+    @test heat_crayon(0.0) == TimerOutputs.Crayon(foreground = (59, 76, 192))
+    @test heat_crayon(1.0) == TimerOutputs.Crayon(foreground = (200, 10, 30))
+    @test heat_crayon(0.2) == TimerOutputs.Crayon() # sqrt(0.2) ≈ 0.45 is inside the uncolored band
+
+    to = TimerOutput()
+    @timeit to "a" @timeit to "b" 1 + 1
+
+    # bars are in the default columns, dropped by compact or bars = false
+    str = sprint(show, to)
+    @test occursin("█", str)
+    @test !occursin("█", sprint((io, x) -> show(io, x; compact = true), to))
+    nobars = sprint((io, x) -> show(io, x; bars = false), to)
+    @test !occursin("█", nobars) && occursin("avg", nobars)
+    # the bar glyphs render but no escape codes are emitted without color
+    @test !occursin("\e[", str)
+    # with color the bar cells get a truecolor foreground
+    cstr = sprint(show, to; context = :color => true)
+    @test occursin("\e[38;2;", cstr)
+
+    # opt-in through the columns keyword
+    sel = sprint((io, x) -> show(io, x; columns = [:ncalls, :time, :time_bar]), to)
+    @test occursin("█", sel) && !occursin("alloc", sel)
+
+    # a displayed subsection is its own 100% reference: full bar
+    @test occursin("█"^8, sprint(show, to["a"]))
+
+    # complement rows stay gray, never heat colored
+    ccstr = sprint((io, x) -> show(io, x; complement = true), to; context = :color => true)
+    for line in split(ccstr, '\n')
+        occursin('~', line) && @test occursin("\e[90m", line)
+    end
 end
 
 @testset "totals row styling" begin

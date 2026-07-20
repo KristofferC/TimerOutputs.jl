@@ -22,6 +22,12 @@ internals may need updating (see "Internal changes" below).
 * **New table layout** (now built on PrettyTables.jl): tree guides (`├─`, `└─`)
   instead of plain indentation, and an optional `%par` column showing each
   section's share of its enclosing section (`columns = [..., :time_par]`).
+* **Heat bars**: the default table shows a small bar per section visualizing
+  its share of the total time / allocations, colored from blue (cheap) to red
+  (expensive) in color-capable terminals. Displaying a subsection rescales the
+  bars to that subsection's total. Hide them with `bars = false` (`compact =
+  true` also drops them), or select them explicitly through the `columns`
+  keyword (`:time_bar`, `:allocs_bar`).
 * **Column selection**: `print_timer(to; columns = [:ncalls, :time, :time_pct])`
   picks exactly which columns to show, in order; `allocations` and `compact`
   remain as shorthands.
