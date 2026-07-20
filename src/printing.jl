@@ -166,9 +166,12 @@ asciitime(str, ascii::Bool) = ascii ? replace(str, "μs" => "us") : str
 # integer percentage of the enclosing section; blank at the top level (#192)
 prettypar(v, parent) = parent <= 0 ? "" : string(round(Int, v / parent * 100), "%")
 
-# GC time: sections that never triggered a collection show a null glyph rather
-# than a noisy column of "0.00ns" (a plain "-" in pure-ASCII mode, #115)
-prettygc(t, ascii::Bool) = t == 0 ? lpad(ascii ? "-" : "∅", 6) : asciitime(prettytime(t), ascii)
+# Sections where nothing happened show a null glyph rather than a noisy column
+# of zeros (a plain "-" in pure-ASCII mode, #115): GC time when no collection
+# was triggered, and the allocation cells when the section never allocated
+nullglyph(ascii::Bool, width::Int = 0) = lpad(ascii ? "-" : "∅", width)
+prettygc(t, ascii::Bool) = t == 0 ? nullglyph(ascii, 6) : asciitime(prettytime(t), ascii)
+prettyallocs(b, ascii::Bool) = b == 0 ? nullglyph(ascii, 7) : prettymemory(b)
 
 ###########
 # Columns #
@@ -201,10 +204,10 @@ const COLUMNS = (;
     gc_time = ColumnSpec("GC", "Time", true, (c, p, ctx) -> prettygc(c.gc_time, ctx.ascii)),
     time_par = ColumnSpec("%par", "Time", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.time, p.time)),
     time_avg = ColumnSpec("avg", "Time", true, (c, p, ctx) -> asciitime(prettytime(c.time / c.ncalls), ctx.ascii)),
-    allocs = ColumnSpec("alloc", "Allocations", false, (c, p, ctx) -> prettymemory(c.allocs)),
-    allocs_pct = ColumnSpec("%tot", "Allocations", true, (c, p, ctx) -> prettypercent(c.allocs, ctx.∑b)),
-    allocs_par = ColumnSpec("%par", "Allocations", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.allocs, p.allocs)),
-    allocs_avg = ColumnSpec("avg", "Allocations", true, (c, p, ctx) -> prettymemory(c.allocs / c.ncalls)),
+    allocs = ColumnSpec("alloc", "Allocations", false, (c, p, ctx) -> prettyallocs(c.allocs, ctx.ascii)),
+    allocs_pct = ColumnSpec("%tot", "Allocations", true, (c, p, ctx) -> c.allocs == 0 ? nullglyph(ctx.ascii, 6) : prettypercent(c.allocs, ctx.∑b)),
+    allocs_par = ColumnSpec("%par", "Allocations", true, (c, p, ctx) -> ctx.toplevel ? "" : c.allocs == 0 ? nullglyph(ctx.ascii) : prettypar(c.allocs, p.allocs)),
+    allocs_avg = ColumnSpec("avg", "Allocations", true, (c, p, ctx) -> prettyallocs(c.allocs / c.ncalls, ctx.ascii)),
     time_bar = ColumnSpec("", "Time", true, (c, p, ctx) -> heatbar(ctx.∑t > 0 ? c.time / ctx.∑t : 0.0, ctx.ascii)),
     allocs_bar = ColumnSpec("", "Allocations", true, (c, p, ctx) -> heatbar(ctx.∑b > 0 ? c.allocs / ctx.∑b : 0.0, ctx.ascii)),
 )
