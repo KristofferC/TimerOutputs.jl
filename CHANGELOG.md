@@ -1,8 +1,8 @@
 # TimerOutputs changelog
 
-## Version 0.5.30
+## Version 1.0.0
 
-TimerOutputs 0.5.30 is a rewrite of the package internals with a number of new
+TimerOutputs 1.0.0 is a rewrite of the package internals with a number of new
 features. The documented API keeps working; code that relied on undocumented
 internals may need updating (see "Internal changes" below).
 
