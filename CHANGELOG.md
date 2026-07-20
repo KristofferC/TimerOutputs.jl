@@ -34,6 +34,12 @@ internals may need updating (see "Internal changes" below).
 * **GC time column**: `print_timer(to; gc = true)` (or the `:gc_time` column)
   adds a column with the time spent in garbage collection within each section.
   Off by default. Also available programmatically as `TimerOutputs.gctime(to)`.
+* **Call shorthand**: `@timeit to foo(args)` times the call under a label
+  derived from the callee (here `"foo"`), a shorthand for
+  `@timeit to "foo" foo(args)`. Works with the default timer too
+  (`@timeit foo(args)`). Qualified calls keep their qualification
+  (`Mod.foo` → `"Mod.foo"`); operators and other non-name calls still need an
+  explicit label.
 * **`maxdepth` keyword**: limit how deeply nested sections are printed.
 * **`complement = true` display option**: show what was *not* timed, in gray —
   an `~untimed~` row for the wall time outside all sections, and a `~name~`

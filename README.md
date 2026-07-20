@@ -111,6 +111,10 @@ end
 
 funcdef(2)
 
+# Timing a function call with no label uses the callee's name as the label,
+# i.e. this is shorthand for @timeit to "sum" sum(1:100)
+@timeit to sum(1:100)
+
 # @timeit_all additionally times every statement in a block or function body
 @timeit_all to function line_profile(n)
     x = 0
@@ -157,6 +161,7 @@ Similar information is available for allocations:
  ├─ L5: for i = 1:n              1  2.15μs    0.0%  2.15μs                 176B    0.0%     176B
  │  └─ L6: x += i               10   103ns    0.0%  10.3ns                0.00B    0.0%    0.00B
  └─ L4: x = 0                    1  16.0ns    0.0%  16.0ns                0.00B    0.0%    0.00B
+ sum                             1  22.0ns    0.0%  22.0ns                0.00B    0.0%    0.00B
  foo                             1  16.0ns    0.0%  16.0ns                0.00B    0.0%    0.00B
  funcdef                         1  15.0ns    0.0%  15.0ns                0.00B    0.0%    0.00B
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -19,9 +19,14 @@
 """
     @timeit [to::TimerOutput] label codeblock
     @timeit [to::TimerOutput] [label] function ... end
+    @timeit [to::TimerOutput] funccall(args...)
 
 Time the code block or function body under `label`, accumulating into `to`
 (the default timer if not given). Returns the value of the timed expression.
+
+When the timed expression is a plain or qualified function call and no label is
+given, the label is derived from the callee, so `@timeit to foo(x)` is shorthand
+for `@timeit to "foo" foo(x)`.
 """
 macro timeit(args...)
     return timer_expr(__source__, __module__, false, args...)
@@ -57,14 +62,18 @@ default_timer_expr() = :($(TimerOutputs).DEFAULT_TIMER)
 
 timer_expr(::LineNumberNode, ::Module, ::Bool, args...) = throw(ArgumentError(TIMEIT_USAGE))
 
-# one macro argument: only valid for function definitions
+# one macro argument: a function definition, or `@timeit foo(args)` timing a
+# call under a label derived from the callee (#159)
 function timer_expr(source::LineNumberNode, mod::Module, is_debug::Bool, ex)
-    is_func_def(ex) || throw(ArgumentError(TIMEIT_USAGE))
-    return timed_function_expr(source, mod, is_debug, default_timer_expr(), nothing, ex)
+    is_func_def(ex) && return timed_function_expr(source, mod, is_debug, default_timer_expr(), nothing, ex)
+    label = call_label(ex)
+    label === nothing && throw(ArgumentError(TIMEIT_USAGE))
+    return timed_block_expr(source, mod, is_debug, default_timer_expr(), label, ex)
 end
 
 # two macro arguments: (label, ex), or for function definitions (to, funcdef)
-# unless the first argument is a literal label
+# unless the first argument is a literal label, or `@timeit to foo(args)` timing
+# a call on `to` under a label derived from the callee (#159)
 function timer_expr(source::LineNumberNode, mod::Module, is_debug::Bool, to_or_label, ex)
     if is_func_def(ex)
         if to_or_label isa String
@@ -72,6 +81,14 @@ function timer_expr(source::LineNumberNode, mod::Module, is_debug::Bool, to_or_l
         else
             return timed_function_expr(source, mod, is_debug, to_or_label, nothing, ex)
         end
+    end
+    # `@timeit to call(args)`: derive the label from the call and keep the timer.
+    # Only when the first argument isn't itself a (literal or interpolated) label
+    # and the body is a plain/qualified function call; otherwise the first
+    # argument is the label and the default timer is used, as before.
+    if !is_label_expr(to_or_label)
+        label = call_label(ex)
+        label === nothing || return timed_block_expr(source, mod, is_debug, to_or_label, label, ex)
     end
     return timed_block_expr(source, mod, is_debug, default_timer_expr(), to_or_label, ex)
 end
@@ -86,6 +103,31 @@ end
 
 function is_func_def(ex)
     return ex isa Expr && (ex.head === :function || Base.is_short_function_def(ex))
+end
+
+# a literal or string-interpolation label (`"foo"`, `"foo_$i"`); anything else in
+# the first position of a two-argument `@timeit` is taken to be the timer
+is_label_expr(x) = x isa String || (x isa Expr && x.head === :string)
+
+# The label #159 derives from a timed call: the callee spelled as written, for a
+# plain (`foo(args)` -> "foo") or qualified (`Mod.foo(args)` -> "Mod.foo") call.
+# Operators, broadcasts, constructors with type parameters, indexing, etc. return
+# `nothing`, so those still require an explicit label.
+function call_label(ex)
+    (ex isa Expr && ex.head === :call && !isempty(ex.args)) || return nothing
+    return callee_name(ex.args[1])
+end
+
+function callee_name(callee)
+    if callee isa Symbol
+        return Base.isidentifier(callee) ? string(callee) : nothing
+    elseif callee isa Expr && callee.head === :. && length(callee.args) == 2 && callee.args[2] isa QuoteNode
+        left = callee_name(callee.args[1])
+        right = callee.args[2].value
+        (left === nothing || !(right isa Symbol) || !Base.isidentifier(right)) && return nothing
+        return string(left, ".", right)
+    end
+    return nothing
 end
 
 # The full timed expression: run `ex` under section `label` of timer `to`,
