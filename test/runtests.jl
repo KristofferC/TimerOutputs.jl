@@ -470,6 +470,46 @@ TimerOutputs.enable_debug_timings(@__MODULE__)
 @test f(3) == 6
 TimerOutputs.disable_debug_timings(@__MODULE__)
 
+# Recursive enable/disable of debug timings across submodules (#75)
+module DebugRec
+    using TimerOutputs
+    const to = TimerOutput()
+    outer() = @timeit_debug to "outer" 1 + 1
+    module Inner
+        using TimerOutputs
+        import ..to
+        inner() = @timeit_debug to "inner" 2 + 2
+    end
+    module Plain # never uses @timeit_debug
+        plain() = 3
+    end
+end
+
+@testset "recursive debug timings #75" begin
+    to = DebugRec.to
+    DebugRec.outer(); DebugRec.Inner.inner()
+    @test isempty(to.inner_timers)
+
+    # recursive is the default: enabling the top module reaches the submodule
+    TimerOutputs.enable_debug_timings(DebugRec)
+    DebugRec.outer(); DebugRec.Inner.inner()
+    @test "outer" in keys(to.inner_timers)
+    @test "inner" in keys(to.inner_timers)
+
+    TimerOutputs.disable_debug_timings(DebugRec)
+    reset_timer!(to)
+    DebugRec.outer(); DebugRec.Inner.inner()
+    @test isempty(to.inner_timers)
+
+    # recursive = false affects only the given module
+    TimerOutputs.enable_debug_timings(DebugRec; recursive = false)
+    reset_timer!(to)
+    DebugRec.outer(); DebugRec.Inner.inner()
+    @test "outer" in keys(to.inner_timers)
+    @test !("inner" in keys(to.inner_timers))
+    TimerOutputs.disable_debug_timings(DebugRec)
+end
+
 @testset "Not too many allocations #59" begin
     function doit(timer, n)
         ret = 0

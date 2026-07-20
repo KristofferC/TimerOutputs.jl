@@ -671,6 +671,8 @@ Because you may wish to turn on only certain portions of your instrumented code 
 By default, debug timings are disabled, and this conditional should be optimized away, allowing for truly zero-overhead.
 If a user calls `TimerOutputs.enable_debug_timings(<module>)`, the `<module>.timeit_debug_enabled()` method will be redefined, causing all dependent methods to be recompiled within that module.
 This may take a while, and hence is intended only for debugging usage, however all calls to `@timeit_debug` (within that Module) will thereafter be enabled.
+By default this recurses into submodules, so a single call on a package's top module instruments the whole package; pass `recursive = false` to affect only the given module.
+`TimerOutputs.disable_debug_timings(<module>)` turns them back off (also recursive by default).
 
 An alternative zero-overhead mechanism is `NoTimerOutput`: a dummy timer where
 every timing operation is a no-op. When the type of the timer is known to the
