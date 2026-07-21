@@ -1149,6 +1149,33 @@ end
     @test_throws ArgumentError render(; columns = [:bogus])
 end
 
+@testset "min/max/std columns (#160)" begin
+    to = TimerOutput()
+    for _ in 1:20
+        @timeit to "s" (x = sum(rand(100)))
+    end
+    header_line(s) = first(filter(l -> occursin("Section", l), split(s, "\n")))
+    render(; kwargs...) = sprint((io, x) -> show(io, x; kwargs...), to)
+
+    # off by default
+    dflt = header_line(render())
+    @test !occursin("min", dflt) && !occursin("max", dflt) && !occursin("std", dflt)
+
+    # opt in via the columns keyword
+    hdr = header_line(render(; columns = [:ncalls, :time, :time_min, :time_max, :time_std]))
+    @test occursin("min", hdr) && occursin("max", hdr) && occursin("std", hdr)
+
+    # min <= avg <= max on the accumulated data
+    s = to["s"]
+    @test s.time_min <= s.time / s.ncalls <= s.time_max
+    @test s.time_min != TimerOutputs.NO_MIN
+
+    # a single-call section has no standard deviation ("-")
+    to1 = TimerOutput()
+    @timeit to1 "once" 1 + 1
+    @test occursin("-", sprint((io, x) -> show(io, x; columns = [:ncalls, :time_std]), to1))
+end
+
 @testset "GC time column (#173)" begin
     to = TimerOutput()
     @timeit to "gc" begin
@@ -1343,7 +1370,13 @@ end
     cols = Tables.columntable(to)
     @test cols.ncalls == [1, 1, 1]
     @test Tables.schema(to).names ==
-        (:path, :section, :depth, :ncalls, :time_ns, :gc_time_ns, :allocated_bytes, :firstexec_ns)
+        (
+        :path, :section, :depth, :ncalls, :time_ns, :gc_time_ns, :allocated_bytes, :firstexec_ns,
+        :min_time_ns, :max_time_ns,
+    )
+    # min <= time <= max for a single-call section
+    @test rows[2].min_time_ns <= rows[2].time_ns
+    @test rows[2].time_ns <= rows[2].max_time_ns
 
     # a bare section includes itself as the first row
     @test [r.path for r in Tables.rows(to["outer"])] == ["outer", "outer/inner"]

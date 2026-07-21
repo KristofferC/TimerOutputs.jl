@@ -206,10 +206,14 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 
 * `title::String` ─ title for the timer
 * `columns::Vector{Symbol}` ─ exactly which columns to show, in order. Available:
-  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`, `:gc_time`, `:time_bar`,
-  `:allocs`, `:allocs_pct`, `:allocs_par`, `:allocs_avg`, `:allocs_bar`, and `:spacer` (an empty
+  `:ncalls`, `:time`, `:time_pct`, `:time_par`, `:time_avg`, `:time_min`, `:time_max`,
+  `:time_std`, `:gc_time`, `:time_bar`, `:allocs`, `:allocs_pct`, `:allocs_par`,
+  `:allocs_avg`, `:allocs_bar`, and `:spacer` (an empty
   gap column). For example `columns = [:ncalls, :time, :time_pct, :time_par]`.
-  The `_bar` columns show each section's share of the total as a bar, colored
+  The `:time_min`, `:time_max` and `:time_std` columns show the fastest and slowest
+  single call and the standard deviation across calls (useful, like `@btime`'s
+  minimum, to gauge run-to-run variation); they are off by default. The `_bar`
+  columns show each section's share of the total as a bar, colored
   from blue (cheap) to red (expensive) in color-capable terminals. The `:gc_time`
   column shows the time spent in garbage collection within each section
 * `allocations::Bool` ─ show the allocation columns (default `true`); shorthand for a `columns` selection

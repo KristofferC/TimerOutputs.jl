@@ -173,6 +173,20 @@ nullglyph(ascii::Bool, width::Int = 0) = lpad(ascii ? "-" : "∅", width)
 prettygc(t, ascii::Bool) = t == 0 ? nullglyph(ascii, 6) : asciitime(prettytime(t), ascii)
 prettyallocs(b, ascii::Bool) = b == 0 ? nullglyph(ascii, 7) : prettymemory(b)
 
+# smallest/largest single call (ns), or "-" for a node with no completed calls
+prettymin(c) = prettytime(c.time_min == NO_MIN ? NaN : c.time_min)
+prettymax(c) = prettytime(c.time_min == NO_MIN ? NaN : c.time_max)
+
+# sample standard deviation of the per-call times (ns); "-" (via NaN) when there
+# are fewer than two calls or no per-call data was recorded
+function prettystd(c)
+    n = c.ncalls
+    (n < 2 || c.time_min == NO_MIN) && return prettytime(NaN)
+    mean = c.time / n
+    var = (Float64(c.time_sq) - Float64(c.time) * mean) / (n - 1)
+    return prettytime(sqrt(max(var, 0.0)))
+end
+
 ###########
 # Columns #
 ###########
@@ -204,6 +218,9 @@ const COLUMNS = (;
     gc_time = ColumnSpec("GC", "Time", true, (c, p, ctx) -> prettygc(c.gc_time, ctx.ascii)),
     time_par = ColumnSpec("%par", "Time", true, (c, p, ctx) -> ctx.toplevel ? "" : prettypar(c.time, p.time)),
     time_avg = ColumnSpec("avg", "Time", true, (c, p, ctx) -> asciitime(prettytime(c.time / c.ncalls), ctx.ascii)),
+    time_min = ColumnSpec("min", "Time", true, (c, p, ctx) -> asciitime(prettymin(c), ctx.ascii)),
+    time_max = ColumnSpec("max", "Time", true, (c, p, ctx) -> asciitime(prettymax(c), ctx.ascii)),
+    time_std = ColumnSpec("std", "Time", true, (c, p, ctx) -> asciitime(prettystd(c), ctx.ascii)),
     allocs = ColumnSpec("alloc", "Allocations", false, (c, p, ctx) -> prettyallocs(c.allocs, ctx.ascii)),
     allocs_pct = ColumnSpec("%tot", "Allocations", true, (c, p, ctx) -> c.allocs == 0 ? nullglyph(ctx.ascii, 6) : prettypercent(c.allocs, ctx.∑b)),
     allocs_par = ColumnSpec("%par", "Allocations", true, (c, p, ctx) -> ctx.toplevel ? "" : c.allocs == 0 ? nullglyph(ctx.ascii) : prettypar(c.allocs, p.allocs)),

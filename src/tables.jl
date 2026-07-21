@@ -12,6 +12,7 @@
 const SectionRow = @NamedTuple{
     path::String, section::String, depth::Int,
     ncalls::Int64, time_ns::Int64, gc_time_ns::Int64, allocated_bytes::Int64, firstexec_ns::Int64,
+    min_time_ns::Int64, max_time_ns::Int64,
 }
 
 Tables.istable(::Type{<:Union{TimerOutput, Section}}) = true
@@ -39,6 +40,7 @@ function _section_rows!(rows::Vector{SectionRow}, s::Section, prefix::String, de
             path, section = s.name, depth,
             ncalls = s.ncalls, time_ns = s.time, gc_time_ns = s.gc_time,
             allocated_bytes = s.allocs, firstexec_ns = s.firstexec,
+            min_time_ns = s.time_min == NO_MIN ? Int64(0) : s.time_min, max_time_ns = s.time_max,
         )
     )
     for child in s.children
