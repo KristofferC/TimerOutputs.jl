@@ -250,6 +250,8 @@ Converts a timer into a nested set of dictionaries, with keys and value types:
 
 * `"n_calls"`: `Int`
 * `"time_ns"`: `Int`
+* `"min_time_ns"`: `Int`
+* `"max_time_ns"`: `Int`
 * `"gc_time_ns"`: `Int`
 * `"allocated_bytes"`: `Int`
 * `"total_allocated_bytes"`: `Int`
@@ -261,6 +263,8 @@ function todict(s::Section)
     return Dict{String, Any}(
         "n_calls" => ncalls(s),
         "time_ns" => time(s),
+        "min_time_ns" => s.time_min == NO_MIN ? 0 : s.time_min,
+        "max_time_ns" => s.time_max,
         "gc_time_ns" => gctime(s),
         "allocated_bytes" => allocated(s),
         "total_time_ns" => tottime(s),
@@ -303,10 +307,7 @@ Stop timing a section started with `begin_timed_section!`.
 """
 end_timed_section!(section::SectionTimeData) = end_timed_section!(DEFAULT_TIMER, section)
 function end_timed_section!(to::TimerOutput, section::SectionTimeData)
-    section.data.time += time_ns() - section.time_start
-    section.data.allocs += gc_bytes() - section.allocs_start
-    section.data.gc_time += gc_time() - section.gc_start
-    section.data.ncalls += 1
+    do_accumulate!(section.data, section.time_start, section.allocs_start, section.gc_start)
     return pop!(to)
 end
 

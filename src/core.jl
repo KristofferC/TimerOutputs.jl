@@ -37,8 +37,23 @@ mutable struct Section
     # basename of the source file of the `@timeit_all` expansion that created
     # this section; lets the printer show the file once instead of on every row
     srcfile::Union{String, Nothing}
+    # per-call time statistics (ns): the smallest and largest single call, and
+    # the sum of squared call times, from which the standard deviation is
+    # computed at print time. The sum is Int128 so it cannot overflow. `time_min`
+    # starts at the NO_MIN sentinel; a node that never completed a call keeps it,
+    # and the printer renders such stats as "-".
+    time_min::Int64
+    time_max::Int64
+    time_sq::Int128
 end
 
+# sentinel `time_min` for a section with no completed calls
+const NO_MIN = typemax(Int64)
+
+# `time_min`/`time_max`/`time_sq` default to "no data recorded"; the positional
+# call sites that predate them don't need to pass them
+Section(name, ncalls, time, allocs, gc_time, firstexec, children, index, prev_child, is_complement, qualified, srcfile) =
+    Section(name, ncalls, time, allocs, gc_time, firstexec, children, index, prev_child, is_complement, qualified, srcfile, NO_MIN, 0, Int128(0))
 # `is_complement`/`qualified`/`srcfile` default off; the positional call sites
 # that predate them, and the single-argument form, don't need to pass them
 Section(name, ncalls, time, allocs, gc_time, firstexec, children, index, prev_child) =
@@ -87,10 +102,14 @@ end
 
 # The macro-generated cleanup calls this with the timestamps taken at section entry
 @inline function do_accumulate!(s::Section, t₀, b₀, g₀)
-    s.time += time_ns() - t₀
+    dt = time_ns() - t₀
+    s.time += dt
     s.allocs += gc_bytes() - b₀
     s.gc_time += gc_time() - g₀
     s.ncalls += 1
+    s.time_min = min(s.time_min, dt)
+    s.time_max = max(s.time_max, dt)
+    s.time_sq += widemul(dt, dt) # widemul: Int64 × Int64 -> Int128, no overflow
     return s
 end
 
@@ -99,6 +118,9 @@ function combine!(a::Section, b::Section)
     a.time += b.time
     a.allocs += b.allocs
     a.gc_time += b.gc_time
+    a.time_min = min(a.time_min, b.time_min)
+    a.time_max = max(a.time_max, b.time_max)
+    a.time_sq += b.time_sq
     a.firstexec = min(a.firstexec, b.firstexec)
     a.srcfile === nothing && (a.srcfile = b.srcfile)
     return a
@@ -106,7 +128,11 @@ end
 
 # Copy of a single node without its children
 function copy_node(s::Section)
-    return Section(s.name, s.ncalls, s.time, s.allocs, s.gc_time, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified, s.srcfile)
+    c = Section(s.name, s.ncalls, s.time, s.allocs, s.gc_time, s.firstexec, Section[], nothing, nothing, s.is_complement, s.qualified, s.srcfile)
+    c.time_min = s.time_min
+    c.time_max = s.time_max
+    c.time_sq = s.time_sq
+    return c
 end
 
 function Base.copy(s::Section)
@@ -185,6 +211,9 @@ function reset_timer!(to::TimerOutput)
     root.time = 0
     root.allocs = 0
     root.gc_time = 0
+    root.time_min = NO_MIN
+    root.time_max = 0
+    root.time_sq = 0
     root.firstexec = time_ns()
     empty!(to.stack)
     to.start_time = time_ns()
