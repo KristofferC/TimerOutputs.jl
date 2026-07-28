@@ -232,13 +232,14 @@ function timed_function_expr(source::LineNumberNode, mod::Module, is_debug::Bool
         label = haskey(def, :name) ? string(def[:name]) : string(source.file, ":", source.line)
     end
     body = def[:body]
-    wrapped = if is_debug
-        # the closure lets the debug-disabled branch reduce to a plain call
+    wrapped = if is_debug || has_goto(body)
+        # The inner function keeps @label/@goto out of the duplicated timing
+        # branches and lets the debug-disabled branch reduce to a plain call.
         quote
             @inline function inner()
                 $body
             end
-            $(timed_value_expr(mod, true, to, label, :(inner())))
+            $(timed_value_expr(mod, is_debug, to, label, :(inner())))
         end
     else
         timed_value_expr(mod, false, to, label, body)

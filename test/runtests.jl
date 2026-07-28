@@ -958,6 +958,26 @@ const dbg_168_error_line = @__LINE__() - 2
     @test any(f -> f.line == dbg_168_error_line && endswith(String(f.file), "runtests.jl"), st)
 end
 
+const issue_228_timer = TimerOutput()
+
+@timeit issue_228_timer function issue_228_function(n)
+    i = 0
+    @label loop
+    i += 1
+    i < n && @goto loop
+    return i
+end
+
+@testset "@timeit function with @label/@goto (#228)" begin
+    @test issue_228_function(3) == 3
+    @test ncalls(issue_228_timer["issue_228_function"]) == 1
+
+    disable_timer!(issue_228_timer)
+    @test issue_228_function(2) == 2
+    @test ncalls(issue_228_timer["issue_228_function"]) == 1
+    enable_timer!(issue_228_timer)
+end
+
 @testset "reset_timer! inside a timed section (#172)" begin
     to = TimerOutput()
     @timeit to function foo_172(x)
