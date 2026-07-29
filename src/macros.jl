@@ -233,12 +233,15 @@ function timed_function_expr(source::LineNumberNode, mod::Module, is_debug::Bool
     end
     body = def[:body]
     wrapped = if is_debug
-        # the closure lets the debug-disabled branch reduce to a plain call
+        # the closure lets the debug-disabled branch reduce to a plain call. Its
+        # name is gensym'd since it lands in the user's scope, where a plain
+        # `inner` would shadow whatever the body means by that name.
+        @gensym inner
         quote
-            @inline function inner()
+            @inline function $inner()
                 $body
             end
-            $(timed_value_expr(mod, true, to, label, :(inner())))
+            $(timed_value_expr(mod, true, to, label, :($inner())))
         end
     else
         timed_value_expr(mod, false, to, label, body)

@@ -948,14 +948,44 @@ const dbg_168_error_line = @__LINE__() - 2
     @test st[i].line == foo_168_error_line
     @test endswith(String(st[i].file), "runtests.jl")
 
-    # debug variant: the user body lives in the `inner` closure, but the error
-    # line must still be visible in the trace
+    # debug variant: the user body lives in a closure, but the error line must
+    # still be visible in the trace
     st = try
         dbg_168()
     catch
         stacktrace(catch_backtrace())
     end
     @test any(f -> f.line == dbg_168_error_line && endswith(String(f.file), "runtests.jl"), st)
+end
+
+# the closure `@timeit_debug` wraps a function body in must not collide with
+# names the body itself uses
+module DebugInner
+    using TimerOutputs
+    const to = TimerOutput()
+    inner(x) = 2x
+    @timeit_debug to function calls_inner(x)
+        return inner(x)
+    end
+    @timeit_debug to function arg_named_inner(inner)
+        return inner + 1
+    end
+    @timeit_debug to function local_named_inner(x)
+        inner = x + 1
+        return inner
+    end
+end
+
+@testset "closure name does not shadow user names" begin
+    @test DebugInner.calls_inner(3) == 6
+    @test DebugInner.arg_named_inner(3) == 4
+    @test DebugInner.local_named_inner(3) == 4
+    TimerOutputs.enable_debug_timings(DebugInner)
+    @test DebugInner.calls_inner(3) == 6
+    @test DebugInner.arg_named_inner(3) == 4
+    @test DebugInner.local_named_inner(3) == 4
+    @test ncalls(DebugInner.to["calls_inner"]) == 1
+    TimerOutputs.disable_debug_timings(DebugInner)
 end
 
 @testset "reset_timer! inside a timed section (#172)" begin
