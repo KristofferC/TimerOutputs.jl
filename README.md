@@ -226,6 +226,21 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 * `complement::Bool` ─ also show what was *not* timed, in gray: a `~untimed~` row with the
   wall time and allocations outside all sections, and a `~name~` row under each section with
   the part not covered by its subsections (default `false`)
+* `pretty_table_kwargs::NamedTuple` ─ an escape hatch: forwarded verbatim to
+  [`PrettyTables.pretty_table`](https://ronisbr.github.io/PrettyTables.jl/stable/), which
+  renders the table (default `(;)`). It is splatted last, so it overrides anything
+  TimerOutputs sets itself. For example, on a terminal shorter than the table PrettyTables
+  crops it and prints `... rows omitted`; to always print every section instead, use
+
+  ```julia
+  print_timer(to; pretty_table_kwargs = (; fit_table_in_display_vertically = false))
+  ```
+
+  Note that these keywords belong to PrettyTables, not to TimerOutputs, and are therefore
+  **not covered by TimerOutputs' semantic versioning** ─ they may change when the
+  PrettyTables compat bound is raised. Overriding the arguments TimerOutputs computes
+  (`column_labels`, `highlighters`, `alignment`, `table_format`, `style`) will produce a
+  malformed table.
 
 ## Flattening
 

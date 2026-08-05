@@ -406,7 +406,8 @@ function show_table(
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         bars::Bool = true, gc::Bool = false, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
-        complement::Bool = false, title::String = ""
+        complement::Bool = false, title::String = "",
+        pretty_table_kwargs::NamedTuple = (;)
     )
     opts = validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
 
@@ -435,7 +436,7 @@ function show_table(
     else
         nothing
     end
-    return _show_table(io, to.root, ∑t, ∑b, opts, title, totals, extra)
+    return _show_table(io, to.root, ∑t, ∑b, opts, title, totals, extra, pretty_table_kwargs)
 end
 
 # A bare section prints as a table too, but has no meaningful wall-clock
@@ -445,14 +446,15 @@ function show_table(
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         bars::Bool = true, gc::Bool = false, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
-        complement::Bool = false, title::String = ""
+        complement::Bool = false, title::String = "",
+        pretty_table_kwargs::NamedTuple = (;)
     )
     opts = validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     # `_show_table` renders the children of its root. Wrap the section in a
     # detached display-only root so the section itself is the first row.
     display_root = Section("", 0, 0, 0, 0, s.firstexec, Section[s], nothing, nothing)
-    return _show_table(io, display_root, ∑t, ∑b, opts, title, nothing, nothing)
+    return _show_table(io, display_root, ∑t, ∑b, opts, title, nothing, nothing, pretty_table_kwargs)
 end
 
 # the merged header row: contiguous runs of columns in the same group. If
@@ -491,7 +493,7 @@ function group_header(columns::Vector{ColumnSpec}, content = nothing, row_label 
     return cells
 end
 
-function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, totals, extra)
+function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, totals, extra, pretty_table_kwargs)
     rows = Vector{Vector{String}}()
     gray = Int[]
     heats = NTuple{2, Float64}[]
@@ -582,7 +584,9 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
         title = title,
         title_alignment = :c,
         subtitle = subtitle,
-        subtitle_alignment = :c
+        subtitle_alignment = :c,
+        # splatted last, so anything above can be overridden
+        pretty_table_kwargs...
     )
     return nothing
 end

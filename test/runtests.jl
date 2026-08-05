@@ -1169,6 +1169,40 @@ end
     @test occursin("ncalls", str) && occursin("time", str)
 end
 
+@testset "pretty_table_kwargs escape hatch" begin
+    to = TimerOutput()
+    for i in 1:30
+        @timeit to "section $i" 1 + 1
+    end
+    ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (10, 200))
+    # by default a short display still crops vertically, as PrettyTables does
+    str = sprint(io -> show(IOContext(io, ctx), to))
+    @test occursin("omitted", str)
+    # ... and the escape hatch turns that off, printing every section
+    full = sprint(
+        io -> show(
+            IOContext(io, ctx), to;
+            pretty_table_kwargs = (; fit_table_in_display_vertically = false)
+        )
+    )
+    @test !occursin("omitted", full)
+    @test all(i -> occursin("section $i ", full), 1:30)
+
+    # the splat comes last, so it also overrides what TimerOutputs itself sets
+    plain = sprint((io, x) -> show(io, x; pretty_table_kwargs = (; title = "custom")), to)
+    @test occursin("custom", plain)
+
+    # a bare section takes the keyword too
+    @test !occursin(
+        "omitted", sprint(
+            io -> show(
+                IOContext(io, ctx), to["section 1"];
+                pretty_table_kwargs = (; fit_table_in_display_vertically = false)
+            )
+        )
+    )
+end
+
 @testset "NoTimerOutput (#109)" begin
     nt = NoTimerOutput()
     f_nt(t) = @timeit t "sec" (1 + 1)
