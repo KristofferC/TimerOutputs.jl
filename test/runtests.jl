@@ -1169,20 +1169,27 @@ end
     @test occursin("ncalls", str) && occursin("time", str)
 end
 
-@testset "vertical cropping only on interactive displays (#235)" begin
+@testset "vertical cropping only for huge tables (#235)" begin
     to = TimerOutput()
     for i in 1:30
         @timeit to "section $i" 1 + 1
     end
-    # non-interactive IO (files, pipes, CI logs) gets the whole table, even
-    # though displaysize falls back to (24, 80) there
-    str = sprint(print_timer, to)
+    # a REPL-like display shows every row even on a short screen: the table is
+    # meant to be read in full and the terminal scrolls
+    ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (10, 200))
+    str = sprint(io -> show(IOContext(io, ctx), to))
     @test !occursin("omitted", str)
     @test all(i -> occursin("section $i ", str), 1:30)
-    # a REPL-like display (:limit set, short screen) still crops to fit
-    ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (10, 200))
-    cropped = sprint(io -> show(IOContext(io, ctx), to))
-    @test occursin("omitted", cropped)
+    # and so does non-interactive IO (files, pipes, CI logs)
+    @test !occursin("omitted", sprint(print_timer, to))
+
+    # only an absurdly long table is cut off, and only interactively
+    big = TimerOutput()
+    for i in 1:(TimerOutputs.MAX_INTERACTIVE_ROWS + 10)
+        @timeit big "section $i" 1 + 1
+    end
+    @test occursin("omitted", sprint(io -> show(IOContext(io, ctx), big)))
+    @test !occursin("omitted", sprint(print_timer, big))
 end
 
 @testset "NoTimerOutput (#109)" begin

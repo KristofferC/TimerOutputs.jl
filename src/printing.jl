@@ -491,6 +491,10 @@ function group_header(columns::Vector{ColumnSpec}, content = nothing, row_label 
     return cells
 end
 
+# Interactively, a table longer than this is cut off at the bottom so a
+# pathologically large timer cannot bury the scrollback.
+const MAX_INTERACTIVE_ROWS = 1000
+
 function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, totals, extra)
     rows = Vector{Vector{String}}()
     gray = Int[]
@@ -549,6 +553,9 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
         )
     end
 
+    # the REPL and terminals set/imply :limit; files, pipes and CI logs do not
+    interactive = get(io, :limit, io isa Base.TTY)::Bool
+
     pretty_table(
         io, data;
         column_labels = column_labels,
@@ -573,16 +580,18 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             column_label = crayon"default"
         ),
         highlighters = highlighters,
-        # crop to the display size in the REPL and on terminals only: width so
-        # long section names never make lines wrap (#166), height so huge
-        # timers don't scroll the screen away — but never for non-interactive
-        # IO (files, pipes, CI logs), where displaysize is a meaningless
-        # fallback (#235); the Section column is shrunk first so the numeric
-        # columns survive
-        fit_table_in_display_horizontally = get(io, :limit, io isa Base.TTY)::Bool,
-        fit_table_in_display_vertically = get(io, :limit, io isa Base.TTY)::Bool,
+        # crop to the display width in the REPL and on terminals so long
+        # section names never make lines wrap (#166); the Section column is
+        # shrunk first so the numeric columns survive
+        fit_table_in_display_horizontally = interactive,
         shrinkable_data_column = 1,
         shrinkable_column_minimum_width = 10,
+        # never crop to the display height: the table is meant to be read in
+        # full and terminals scroll, while for files, pipes and CI logs the
+        # displaysize fallback is meaningless anyway (#235). Only an absurdly
+        # long table is cut, and only interactively.
+        fit_table_in_display_vertically = false,
+        maximum_number_of_rows = interactive ? MAX_INTERACTIVE_ROWS : -1,
         title = title,
         title_alignment = :c,
         subtitle = subtitle,
