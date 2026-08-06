@@ -1169,6 +1169,22 @@ end
     @test occursin("ncalls", str) && occursin("time", str)
 end
 
+@testset "vertical cropping only on interactive displays (#235)" begin
+    to = TimerOutput()
+    for i in 1:30
+        @timeit to "section $i" 1 + 1
+    end
+    # non-interactive IO (files, pipes, CI logs) gets the whole table, even
+    # though displaysize falls back to (24, 80) there
+    str = sprint(print_timer, to)
+    @test !occursin("omitted", str)
+    @test all(i -> occursin("section $i ", str), 1:30)
+    # a REPL-like display (:limit set, short screen) still crops to fit
+    ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (10, 200))
+    cropped = sprint(io -> show(IOContext(io, ctx), to))
+    @test occursin("omitted", cropped)
+end
+
 @testset "NoTimerOutput (#109)" begin
     nt = NoTimerOutput()
     f_nt(t) = @timeit t "sec" (1 + 1)

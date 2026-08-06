@@ -573,10 +573,14 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             column_label = crayon"default"
         ),
         highlighters = highlighters,
-        # crop to the display width in the REPL and on terminals so long
-        # section names never make lines wrap (#166); the Section column is
-        # shrunk first so the numeric columns survive
+        # crop to the display size in the REPL and on terminals only: width so
+        # long section names never make lines wrap (#166), height so huge
+        # timers don't scroll the screen away — but never for non-interactive
+        # IO (files, pipes, CI logs), where displaysize is a meaningless
+        # fallback (#235); the Section column is shrunk first so the numeric
+        # columns survive
         fit_table_in_display_horizontally = get(io, :limit, io isa Base.TTY)::Bool,
+        fit_table_in_display_vertically = get(io, :limit, io isa Base.TTY)::Bool,
         shrinkable_data_column = 1,
         shrinkable_column_minimum_width = 10,
         title = title,
