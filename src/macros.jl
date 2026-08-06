@@ -172,8 +172,8 @@ end
 # does not elide an empty try/finally. Splicing `ex` verbatim (rather than
 # behind a closure or temporary) also preserves its line numbers and lets
 # `return`, `break`, `continue` and assignments behave as in the unwrapped code.
-# A `@label` is the one thing that cannot be duplicated, so bodies defining one
-# take the `single_copy_section` variant below.
+# Bodies that cannot be duplicated — a `@label` or a named function definition,
+# see `cannot_duplicate` — take the `single_copy_section` variant below.
 function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing, debug_mod::Union{Module, Nothing} = nothing)
     @gensym to_local enabled data b₀ t₀ g₀
     # `@timeit_all` sections record the source file their label refers to
@@ -189,7 +189,7 @@ function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing,
         $(do_accumulate!)($data, $t₀, $b₀, $g₀)
         $(pop!)($to_local)
     end
-    if defines_label(ex)
+    if cannot_duplicate(ex)
         return single_copy_section(debug_mod, to, ex, to_local, enabled, start, cleanup)
     end
     core = quote
@@ -206,9 +206,9 @@ function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing,
     return debug_gated(debug_mod, core, ex)
 end
 
-# Duplicating a body that defines a `@label` is a syntax error (#228), so such
-# bodies get a single copy of `ex` with an unconditional try/finally, `enabled`
-# deciding at run time whether to accumulate. Not the default because the
+# Bodies that `cannot_duplicate` (#228, #234) get a single copy of `ex` with an
+# unconditional try/finally, `enabled` deciding at run time whether to
+# accumulate. Not the default because the
 # try/finally then survives even when `isenabled(to)` folds to `false`, which
 # costs a little on Julia 1.10.
 function single_copy_section(debug_mod::Union{Module, Nothing}, to, ex, to_local, enabled, start::Vector{Any}, cleanup)
@@ -514,12 +514,18 @@ function macro_name(ex::Expr)
     return name
 end
 
-# `ex` defines a label, so it may not be duplicated
-function defines_label(ex)
+# `ex` may not be spliced into both branches of `timed_section`: a duplicated
+# `@label` is a syntax error (#228), and a duplicated function definition
+# defines the same method twice — for a named local function both copies lower
+# to one closure type, which is method overwriting and fails precompilation
+# (#234). Anonymous functions (`->`, `do`) are fine: each copy lowers to its
+# own closure type.
+function cannot_duplicate(ex)
     ex isa Expr || return false
     ex.head === :symboliclabel && return true
     ex.head === :macrocall && macro_name(ex) === Symbol("@label") && return true
-    return any(defines_label, ex.args)
+    is_func_def(ex) && return true
+    return any(cannot_duplicate, ex.args)
 end
 
 # Jumping across a `tryfinally` boundary is a lowering error, so a statement

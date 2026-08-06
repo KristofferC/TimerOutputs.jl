@@ -1063,6 +1063,151 @@ end
     TimerOutputs.disable_debug_timings(Debug228)
 end
 
+# a body defining a named local function cannot be spliced into two branches:
+# both copies lower to methods on one closure type, which is method
+# overwriting and fails precompilation (#234)
+const to_234 = TimerOutput()
+
+function inner_func_block_234(n)
+    return @timeit to_234 "inner_block" begin
+        f(x) = x * n
+        f(2)
+    end
+end
+
+@timeit to_234 function inner_func_func_234(n)
+    f(x) = x * n
+    return f(2)
+end
+
+@timeit_all to_234 function inner_func_all_234(n)
+    f(x) = x * n
+    return f(2)
+end
+
+@timeit to_234 function inner_func_throw_234()
+    f(x) = error("boom")
+    return f(2)
+end
+
+@timeit TimerOutputs.NoTimerOutput() function inner_func_notimer_234(n)
+    f(x) = x * x
+    return f(n)
+end
+
+module Debug234
+    using TimerOutputs
+    const to = TimerOutput()
+    @timeit_debug to function inner_func(n)
+        f(x) = x * n
+        return f(2)
+    end
+    function inner_block(n)
+        return @timeit_debug to "inner_block" begin
+            f(x) = x * n
+            f(2)
+        end
+    end
+end
+
+@testset "local function in a timed body (#234)" begin
+    @test inner_func_block_234(3) == 6
+    @test ncalls(to_234["inner_block"]) == 1
+    @test inner_func_func_234(3) == 6
+    @test ncalls(to_234["inner_func_func_234"]) == 1
+    @test inner_func_all_234(3) == 6
+    @test ncalls(to_234["inner_func_all_234"]) == 1
+    # every section opened above was closed again
+    @test isempty(to_234.timer_stack)
+
+    @test_throws ErrorException inner_func_throw_234()
+    @test ncalls(to_234["inner_func_throw_234"]) == 1
+    @test isempty(to_234.timer_stack)
+
+    # a disabled timer runs the body without timing it
+    disable_timer!(to_234)
+    @test inner_func_func_234(5) == 10
+    @test ncalls(to_234["inner_func_func_234"]) == 1
+    enable_timer!(to_234)
+
+    # `NoTimerOutput` still compiles away to nothing
+    @test inner_func_notimer_234(5) == 25
+    @test @allocated(inner_func_notimer_234(5)) == 0
+
+    # `@timeit_debug` does not evaluate its timer expression while disabled
+    @test Debug234.inner_func(3) == 6
+    @test Debug234.inner_block(4) == 8
+    @test isempty(Debug234.to.inner_timers)
+    TimerOutputs.enable_debug_timings(Debug234)
+    @test Base.invokelatest(Debug234.inner_func, 3) == 6
+    @test Base.invokelatest(Debug234.inner_block, 4) == 8
+    @test ncalls(Debug234.to["inner_func"]) == 1
+    @test ncalls(Debug234.to["inner_block"]) == 1
+    TimerOutputs.disable_debug_timings(Debug234)
+
+    # the body is spliced only once when it defines a named function, so the
+    # closure's methods are only defined once
+    expanded = macroexpand(
+        @__MODULE__, :(
+            @timeit "s" begin
+                f_234(x) = x * x; f_234(2)
+            end
+        )
+    )
+    count_defs(ex) = ex isa Expr ?
+        Int(TimerOutputs.is_func_def(ex)) + sum(count_defs, ex.args; init = 0) : 0
+    @test count_defs(expanded) == 1
+
+    # a module whose timed body defines a (non-capturing, so hoisted to top
+    # level) inner function precompiles — method overwriting is an error there.
+    # Precompile in a fresh process from the on-disk sources, so the check does
+    # not depend on this session's loaded (possibly Revise'd) TimerOutputs.
+    mktempdir() do dir
+        pkg = joinpath(dir, "Precompile234")
+        mkpath(joinpath(pkg, "src"))
+        write(
+            joinpath(pkg, "Project.toml"), """
+            name = "Precompile234"
+            uuid = "44eff8c2-4b39-4287-a86c-6ba55daf7cb2"
+            version = "0.1.0"
+
+            [deps]
+            TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+            """
+        )
+        write(
+            joinpath(pkg, "src", "Precompile234.jl"), """
+            module Precompile234
+            using TimerOutputs
+            function foo()
+                @timeit "foo" begin
+                    f(x) = x * x
+                    f(2)
+                end
+            end
+            end
+            """
+        )
+        # `Pkg.precompile` treats "not precompilable" as a soft skip even with
+        # `strict = true`, so assert through `Base.compilecache`, which returns
+        # a cache path tuple on success and a `PrecompilableError` for it
+        code = """
+        using Pkg
+        Pkg.activate($(repr(pkg)); io = devnull)
+        Pkg.develop(path = $(repr(pkgdir(TimerOutputs))); io = devnull)
+        id = Base.identify_package("Precompile234")
+        exit(Base.compilecache(id) isa Tuple ? 0 : 1)
+        """
+        cmd = addenv(
+            `$(Base.julia_cmd()) --startup-file=no -e $code`,
+            # keep `Pkg.develop` from touching the network (or prompting for
+            # credentials) with a registry update
+            "JULIA_PKG_OFFLINE" => "true",
+        )
+        @test success(pipeline(cmd; stdout = devnull))
+    end
+end
+
 @testset "reset_timer! inside a timed section (#172)" begin
     to = TimerOutput()
     @timeit to function foo_172(x)
