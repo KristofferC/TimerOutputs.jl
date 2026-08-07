@@ -1203,8 +1203,15 @@ end
             # keep `Pkg.develop` from touching the network (or prompting for
             # credentials) with a registry update
             "JULIA_PKG_OFFLINE" => "true",
+            # `Pkg.test` runs us with `JULIA_LOAD_PATH = "@:<pkg>/test"`, which
+            # has no `@stdlib`, so the child could not even load `Pkg`
+            "JULIA_LOAD_PATH" => nothing,
+            "JULIA_PROJECT" => nothing,
         )
-        @test success(pipeline(cmd; stdout = devnull))
+        output = IOBuffer()
+        ok = success(pipeline(cmd; stdout = output, stderr = output))
+        ok || print(stderr, String(take!(output)))
+        @test ok
     end
 end
 
