@@ -172,8 +172,11 @@ end
 # does not elide an empty try/finally. Splicing `ex` verbatim (rather than
 # behind a closure or temporary) also preserves its line numbers and lets
 # `return`, `break`, `continue` and assignments behave as in the unwrapped code.
-# A `@label` is the one thing that cannot be duplicated, so bodies defining one
-# take the `single_copy_section` variant below.
+# Two kinds of bodies take the `single_copy_section` variant below instead:
+# bodies defining a `@label` (duplicating one is a syntax error) and bodies
+# lexically containing another section (each nesting level would double the
+# code, growing the innermost body 2^depth-fold; with the fallback only the
+# innermost section duplicates, capping total growth at 2x).
 function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing, debug_mod::Union{Module, Nothing} = nothing)
     @gensym to_local enabled data b₀ t₀ g₀
     # `@timeit_all` sections record the source file their label refers to
@@ -189,7 +192,7 @@ function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing,
         $(do_accumulate!)($data, $t₀, $b₀, $g₀)
         $(pop!)($to_local)
     end
-    if defines_label(ex)
+    if defines_label(ex) || contains_section(ex)
         return single_copy_section(debug_mod, to, ex, to_local, enabled, start, cleanup)
     end
     core = quote
@@ -206,11 +209,14 @@ function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing,
     return debug_gated(debug_mod, core, ex)
 end
 
-# Duplicating a body that defines a `@label` is a syntax error (#228), so such
-# bodies get a single copy of `ex` with an unconditional try/finally, `enabled`
-# deciding at run time whether to accumulate. Not the default because the
-# try/finally then survives even when `isenabled(to)` folds to `false`, which
-# costs a little on Julia 1.10.
+# Duplicating a body that defines a `@label` is a syntax error (#228), and
+# duplicating one that contains another section compounds exponentially across
+# nesting levels, so such bodies get a single copy of `ex` with an
+# unconditional try/finally, `enabled` deciding at run time whether to
+# accumulate. Not the default because the try/finally then survives whenever
+# the body may throw — a few ns per entry with a disabled timer, and even when
+# `isenabled(to)` folds to `false` (the handler is only elided for provably
+# nothrow bodies, and not at all on Julia 1.10).
 function single_copy_section(debug_mod::Union{Module, Nothing}, to, ex, to_local, enabled, start::Vector{Any}, cleanup)
     init = quote
         $to_local = $to
@@ -520,6 +526,27 @@ function defines_label(ex)
     ex.head === :symboliclabel && return true
     ex.head === :macrocall && macro_name(ex) === Symbol("@label") && return true
     return any(defines_label, ex.args)
+end
+
+# macros that expand to a section around their body (`@notimeit` does not
+# duplicate anything and is deliberately absent)
+const SECTION_MACROS = (
+    Symbol("@timeit"), Symbol("@timeit_debug"), Symbol("@timeit_all"), Symbol("@timed_testset"),
+)
+
+# `ex` lexically contains another timer section, so it may not be duplicated
+# (nesting would compound the copies 2^depth-fold). Detected as an unexpanded
+# `@timeit`-family macrocall, or — for bodies that were already expanded, like
+# function bodies (`timed_function_expr` runs `macroexpand` first) and
+# `@timeit_all`'s bottom-up statement instrumentation — as the interpolated
+# `isenabled` function object every expanded section contains. A miss (say, a
+# user macro that expands to `@timeit`) only forgoes the compile-time saving;
+# a false positive only costs the try/finally of the single-copy variant.
+function contains_section(ex)
+    ex === isenabled && return true
+    ex isa Expr || return false
+    ex.head === :macrocall && macro_name(ex) in SECTION_MACROS && return true
+    return any(contains_section, ex.args)
 end
 
 # Jumping across a `tryfinally` boundary is a lowering error, so a statement

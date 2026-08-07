@@ -1063,6 +1063,86 @@ end
     TimerOutputs.disable_debug_timings(Debug228)
 end
 
+# a section whose body contains another section takes the single-copy path, so
+# lexical nesting cannot grow the innermost body 2^depth-fold
+count_leaf(ex, x) = Int(ex === x) + (ex isa Expr ? sum(count_leaf(a, x) for a in ex.args; init = 0) : 0)
+
+@testset "nested sections are not duplicated exponentially" begin
+    # only the innermost section duplicates its body: 2 copies, not 2^3
+    ex = macroexpand(
+        @__MODULE__, :(
+            @timeit to "a" begin
+                @timeit to "b" begin
+                    @timeit to "c" begin
+                        nesting_marker(x)
+                    end
+                end
+            end
+        )
+    )
+    @test count_leaf(ex, :nesting_marker) == 2
+
+    # ... also when the sections come from a `@timeit`ed function definition
+    # (the body is macroexpanded before the outer section wraps it)
+    ex = macroexpand(
+        @__MODULE__, :(
+            @timeit to function f(x)
+                @timeit to "b" nesting_marker(x)
+            end
+        )
+    )
+    @test count_leaf(ex, :nesting_marker) == 2
+
+    # ... and for `@timeit_all`'s per-statement instrumentation of nested blocks
+    ex = macroexpand(
+        @__MODULE__, :(
+            @timeit_all to "a" begin
+                for i in 1:2
+                    for j in 1:2
+                        nesting_marker(i, j)
+                    end
+                end
+            end
+        )
+    )
+    @test count_leaf(ex, :nesting_marker) == 2
+
+    # ... and for nested `@timed_testset`s (testset bodies are often large)
+    ex = macroexpand(
+        @__MODULE__, :(
+            @timed_testset to_nested "outer" begin
+                @timed_testset to_nested "inner" begin
+                    nesting_marker()
+                end
+            end
+        )
+    )
+    @test count_leaf(ex, :nesting_marker) == 2
+
+    # nested sections still measure correctly through the single-copy outer
+    to_nested = TimerOutput()
+    function nested_break(to)
+        acc = 0
+        for i in 1:10
+            @timeit to "outer" begin
+                @timeit to "inner" acc += i
+                i == 3 && break
+            end
+        end
+        return acc
+    end
+    @test nested_break(to_nested) == 6
+    @test ncalls(to_nested["outer"]) == 3
+    @test ncalls(to_nested["outer"]["inner"]) == 3
+    @test isempty(to_nested.timer_stack)
+
+    # a disabled timer runs the body untimed, and the sections still nest
+    disable_timer!(to_nested)
+    @test nested_break(to_nested) == 6
+    @test ncalls(to_nested["outer"]) == 3
+    enable_timer!(to_nested)
+end
+
 @testset "reset_timer! inside a timed section (#172)" begin
     to = TimerOutput()
     @timeit to function foo_172(x)
