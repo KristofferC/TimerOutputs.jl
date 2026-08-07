@@ -229,8 +229,8 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
 * `pretty_table_kwargs::NamedTuple` ─ escape hatch forwarded verbatim to
   [`PrettyTables.pretty_table`](https://ronisbr.github.io/PrettyTables.jl/stable/) and
   splatted last, so it overrides anything TimerOutputs sets (default `(;)`). For example,
-  `(; fit_table_in_display_vertically = false)` prints every section instead of cropping the
-  table to a short terminal.
+  the whole table is printed no matter the terminal height;
+  `(; fit_table_in_display_vertically = true)` crops it to the display instead.
 
 ## Flattening
 

@@ -1327,32 +1327,38 @@ end
         @timeit to "section $i" 1 + 1
     end
     ctx = IOContext(IOBuffer(), :limit => true, :displaysize => (10, 200))
-    # by default a short display still crops vertically, as PrettyTables does
-    str = sprint(io -> show(IOContext(io, ctx), to))
-    @test occursin("omitted", str)
-    # ... and the escape hatch turns that off, printing every section
-    full = sprint(
+
+    # the splat comes last, so it overrides what TimerOutputs itself sets: here
+    # it puts back the vertical cropping that TimerOutputs turns off (#235)
+    cropped = sprint(
         io -> show(
             IOContext(io, ctx), to;
-            pretty_table_kwargs = (; fit_table_in_display_vertically = false)
+            pretty_table_kwargs = (; fit_table_in_display_vertically = true)
         )
     )
-    @test !occursin("omitted", full)
-    @test all(i -> occursin("section $i ", full), 1:30)
-
-    # the splat comes last, so it also overrides what TimerOutputs itself sets
+    @test occursin("omitted", cropped)
+    # ... including keywords TimerOutputs derives from its own arguments
     plain = sprint((io, x) -> show(io, x; pretty_table_kwargs = (; title = "custom")), to)
     @test occursin("custom", plain)
 
-    # a bare section takes the keyword too
-    @test !occursin(
-        "omitted", sprint(
-            io -> show(
-                IOContext(io, ctx), to["section 1"];
-                pretty_table_kwargs = (; fit_table_in_display_vertically = false)
+    # keywords TimerOutputs never sets are simply forwarded: pin a
+    # non-interactive table to a fixed width instead of letting it run wide
+    narrow = sprint(
+        (io, x) -> show(
+            io, x;
+            pretty_table_kwargs = (;
+                fit_table_in_display_horizontally = true, display_size = (-1, 60),
             )
-        )
+        ), to
     )
+    @test all(l -> textwidth(l) <= 60, split(narrow, "\n"))
+
+    # a bare section takes the keyword too
+    sec = sprint(
+        (io, x) -> show(io, x; pretty_table_kwargs = (; title = "custom")),
+        to["section 1"]
+    )
+    @test occursin("custom", sec)
 end
 
 @testset "vertical cropping only for huge tables (#235)" begin
