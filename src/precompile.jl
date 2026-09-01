@@ -10,6 +10,7 @@ function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
     @assert Base.precompile(Tuple{typeof(print_timer), typeof(stdout), TimerOutput})
     @assert Base.precompile(Tuple{typeof(print_timer), TimerOutput})
+    @assert Base.precompile(Tuple{typeof(print_timer), Type{String}, TimerOutput})
     @assert Base.precompile(Tuple{typeof(push!), TimerOutput, String})
     @assert Base.precompile(Tuple{typeof(pop!), TimerOutput})
     @assert Base.precompile(Tuple{typeof(reset_timer!), TimerOutput})

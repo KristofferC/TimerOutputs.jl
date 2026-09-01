@@ -234,6 +234,35 @@ The `print_timer([io::IO = stdout], to::TimerOutput, kwargs)`, (or `show`) takes
   Note that these keywords belong to PrettyTables, not to TimerOutputs, and are therefore
   **not covered by TimerOutputs' semantic versioning** ─ they may change when the
   PrettyTables compat bound is raised.
+* `backend::Symbol` ─ PrettyTables output backend (default `:text`). PrettyTables 3.5 or
+  later is required for `:markdown`, `:html`, `:latex`, `:typst`, and `:excel`
+
+The formatted timer table can be returned as a string in Markdown, HTML, LaTeX, or Typst
+format. Backend-specific PrettyTables options can be passed alongside the timer display
+options:
+
+```julia
+markdown = print_timer(String, to; backend = :markdown)
+html = print_timer(
+    String, to;
+    backend = :html,
+    pretty_table_kwargs = (; stand_alone = true),
+)
+latex = print_timer(String, to; backend = :latex)
+typst = print_timer(String, to; backend = :typst)
+```
+
+The Excel backend writes a workbook rather than returning a string and is activated by
+loading XLSX.jl:
+
+```julia
+using XLSX
+print_timer(
+    to;
+    backend = :excel,
+    pretty_table_kwargs = (; filename = "timings.xlsx"),
+)
+```
 
 ## Flattening
 
