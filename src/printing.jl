@@ -124,6 +124,19 @@ function heat_crayon(frac)
     return color === nothing ? Crayon() : Crayon(foreground = color)
 end
 
+# The neutral band of the scale is the default foreground on a terminal. In a
+# document that would be black, heavier than the hot end, so it gets a gray.
+const NEUTRAL_HEAT = (140, 140, 140)
+portable_heat_color(frac) = something(heat_color(frac), NEUTRAL_HEAT)
+hexcolor((r, g, b)) = @sprintf("%02X%02X%02X", r, g, b)
+
+# A spreadsheet has no bar to scale, so the %tot cell background carries both:
+# the hue says where on the scale the share is, the intensity how large it is
+function heat_tint(frac)
+    mix = clamp(sqrt(clamp(frac, 0.0, 1.0)), 0.1, 1.0)
+    return map(c -> round(Int, 255 + (c - 255) * mix), portable_heat_color(frac))
+end
+
 # A fixed-width bar filled proportionally to `frac`, quasi-continuous through
 # eighth blocks, with the remainder left empty; the heat highlighter colors it
 const BAR_EIGHTHS = ("▏", "▎", "▍", "▌", "▋", "▊", "▉")
@@ -134,6 +147,21 @@ function heatbar(frac, ascii::Bool; width::Int = 8, pad::Char = ' ')
     full, part = divrem(round(Int, frac * width * 8), 8)
     bar = repeat('█', full) * (part == 0 ? "" : BAR_EIGHTHS[part])
     return rpad(bar, width, pad)
+end
+
+# Document back ends draw the bar instead of typing it: block glyphs show seams
+# in every renderer and need a font that has them.
+const BAR_EM = 5.0 # width of a full bar, in em
+
+function drawn_bar(backend::Symbol, frac)
+    frac = clamp(frac, 0.0, 1.0)
+    color = hexcolor(portable_heat_color(frac))
+    w = round(frac * BAR_EM; digits = 2)
+    backend === :html && return Base.Docs.HTML(
+        "<span style=\"display: inline-block; width: $(w)em; height: 0.7em; background: #$color;\"></span>"
+    )
+    backend === :latex && return LatexCell("\\textcolor[HTML]{$color}{\\rule{$(w)em}{0.7em}}")
+    throw(ArgumentError("no drawn bar for backend $backend"))
 end
 
 ##################
@@ -159,13 +187,22 @@ function sort_sections!(sections::Vector{Section}, sortby::Symbol)
     end
 end
 
+# Document back ends indent nested sections instead of drawing tree guides:
+# the vertical guide pieces stop joining up once rows have padding, and a
+# space has a different width in every font. Em and en spaces are defined
+# relative to the font size, so nesting lines up in proportional fonts too.
+# Markdown renderers trim leading whitespace from cells, so there the indent
+# is spelled as entities.
+portable_indent(backend::Symbol) = backend === :markdown ? "&emsp;&ensp;" : "\u2003\u2002"
+
 # tree guide pieces: (branch, last branch, continuation, blank);
 # ascii mode uses plain indentation like TimerOutputs 0.5 did
-function tree_guides(linechars::Symbol, portable::Bool = false)
-    space = portable ? '\u00a0' : ' '
-    return linechars === :unicode ?
-        ("├─$space", "└─$space", "│$space$space", "$space$space$space") :
-        ("$space$space", "$space$space", "$space$space", "$space$space")
+function tree_guides(linechars::Symbol, backend::Symbol = :text)
+    if backend ∉ (:auto, :text)
+        indent = portable_indent(backend)
+        return (indent, indent, indent, indent)
+    end
+    return linechars === :unicode ? ("├─ ", "└─ ", "│  ", "   ") : ("  ", "  ", "  ", "  ")
 end
 
 # with linechars = :ascii the output should be pure ASCII, including in the
@@ -419,8 +456,9 @@ end
 
 function validated_options(;
         sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement,
-        portable = false
+        backend = :text
     )
+    portable = backend ∉ (:auto, :text)
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
@@ -430,9 +468,13 @@ function validated_options(;
     # like 0.5, the most minimal selection also drops the header block
     header = !(compact && !allocations && columns === nothing)
     columns = resolve_columns(columns === nothing ? default_columns(allocations, compact, bars, gc) : columns)
+    # a spreadsheet cannot draw bars; the %tot cells carry the heat instead
+    if backend === :excel
+        columns = filter(c -> !(c === COLUMNS.time_bar || c === COLUMNS.allocs_bar), columns)
+    end
     return TableOptions(
         sortby, columns, linechars === :ascii, maxdepth, complement, header,
-        portable, tree_guides(linechars, portable)
+        portable, tree_guides(linechars, backend)
     )
 end
 
@@ -447,10 +489,9 @@ function show_table(
         complement::Bool = false, title::String = "", backend::Symbol = :text,
         pretty_table_kwargs::NamedTuple = (;)
     )
-    portable = backend ∉ (:auto, :text)
     opts = validated_options(;
         sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement,
-        portable
+        backend
     )
 
     Δt = time_ns() - to.start_time
@@ -494,10 +535,9 @@ function show_table(
         complement::Bool = false, title::String = "", backend::Symbol = :text,
         pretty_table_kwargs::NamedTuple = (;)
     )
-    portable = backend ∉ (:auto, :text)
     opts = validated_options(;
         sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement,
-        portable
+        backend
     )
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     # `_show_table` renders the children of its root. Wrap the section in a
@@ -587,7 +627,7 @@ function _text_table_decorations(opts::TableOptions, gray, heat_which, heats)
     return highlighters, table_format, style
 end
 
-function _portable_table_decorations(gray, heat_which, heats)
+function _portable_table_decorations(gray, heat_which, heats, backend::Symbol)
     isdefined(PrettyTables, :TableFormat) || throw(
         ArgumentError(
             "formatted timer export requires PrettyTables 3.5 or later; " *
@@ -602,18 +642,24 @@ function _portable_table_decorations(gray, heat_which, heats)
         grayset = Set(gray)
         push!(highlighters, Highlighter((_, i, _) -> i in grayset, Face(; foreground = :bright_black)))
     end
-    if !isempty(heat_which)
+    # HTML and LaTeX bars carry their color inside the drawn cell and Markdown
+    # has no color. Typst types the bar (it embeds DejaVu Sans Mono, so the
+    # glyphs are safe there) and Excel tints the %tot cells.
+    heat_face = if backend === :typst
+        frac -> Face(;
+            foreground = PrettyTables.SimpleColor(portable_heat_color(frac)...),
+            font = "DejaVu Sans Mono"
+        )
+    elseif backend === :excel
+        frac -> Face(; background = PrettyTables.SimpleColor(heat_tint(frac)...))
+    else
+        nothing
+    end
+    if !isempty(heat_which) && heat_face !== nothing
         push!(
             highlighters, Highlighter(
                 (_, i, j) -> haskey(heat_which, j),
-                (_, _, i, j) -> begin
-                    color = heat_color(heats[i][heat_which[j]])
-                    color === nothing && return Face(; font = "DejaVu Sans Mono")
-                    return Face(;
-                        foreground = PrettyTables.SimpleColor(color...),
-                        font = "DejaVu Sans Mono"
-                    )
-                end
+                (_, _, i, j) -> heat_face(heats[i][heat_which[j]])
             )
         )
     end
@@ -675,22 +721,36 @@ function _show_table(
 
     # the bar columns are colored by their share of the total
     heat_which = Dict{Int, Int}() # data column index -> which fraction (1 = time, 2 = allocs)
+    excel = backend === :excel
     for (k, c) in enumerate(opts.columns)
-        if c === COLUMNS.time_bar
+        if c === COLUMNS.time_bar || (excel && c === COLUMNS.time_pct)
             heat_which[k + 1] = 1
-        elseif c === COLUMNS.allocs_bar
+        elseif c === COLUMNS.allocs_bar || (excel && c === COLUMNS.allocs_pct)
             heat_which[k + 1] = 2
         end
     end
     highlighters, table_format, style = if opts.portable
-        _portable_table_decorations(gray, heat_which, heats)
+        _portable_table_decorations(gray, heat_which, heats, backend)
     else
         _text_table_decorations(opts, gray, heat_which, heats)
     end
 
+    alignment = [:l; fill(:r, ncols - 1)]
+    if opts.portable && !isempty(heat_which) && !excel
+        # bars grow from the left edge of the cell
+        foreach(j -> alignment[j] = :l, keys(heat_which))
+        if backend in (:html, :latex)
+            cells = Matrix{Any}(data)
+            for (j, which) in heat_which, i in axes(cells, 1)
+                cells[i, j] = drawn_bar(backend, heats[i][which])
+            end
+            data = cells
+        end
+    end
+
     common_options = (;
         column_labels = column_labels,
-        alignment = [:l; fill(:r, ncols - 1)],
+        alignment = alignment,
         table_format,
         style,
         highlighters = highlighters,

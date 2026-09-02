@@ -252,8 +252,11 @@ latex = print_timer(String, to; backend = :latex)
 typst = print_timer(String, to; backend = :typst)
 ```
 
+Document backends indent nested sections rather than drawing tree guides, and HTML and
+LaTeX draw the heat bars instead of typing them (the LaTeX output needs `xcolor`).
+
 The Excel backend writes a workbook rather than returning a string and is activated by
-loading XLSX.jl:
+loading XLSX.jl. Instead of bar columns, its `%tot` cells are tinted by their share:
 
 ```julia
 using XLSX

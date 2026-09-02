@@ -319,8 +319,10 @@ end
             @test occursin("nest 2", output)
         end
         @test startswith(html, "<!DOCTYPE html>")
-        @test occursin("\u00a0nest 2", html) # hierarchy indentation does not collapse
-        @test occursin("font-family: DejaVu Sans Mono", html) # heat bars stay aligned
+        @test occursin("\u2003\u2002nest 2", html) # nesting is indented with em spaces
+        @test occursin("display: inline-block", html) # heat bars are drawn, not typed
+        @test occursin("&emsp;&ensp;nest 2", markdown) # survives cell trimming
+        @test occursin("\\rule{", latex)
         @test occursin("\\begin{tabular}", latex)
         @test occursin("table(", typst)
         @test_throws ArgumentError print_timer(String, to2; backend = :excel)
