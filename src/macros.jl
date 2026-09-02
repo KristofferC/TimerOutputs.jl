@@ -172,8 +172,9 @@ end
 # does not elide an empty try/finally. Splicing `ex` verbatim (rather than
 # behind a closure or temporary) also preserves its line numbers and lets
 # `return`, `break`, `continue` and assignments behave as in the unwrapped code.
-# Bodies that cannot be duplicated — a `@label` or a named function definition,
-# see `cannot_duplicate` — take the `single_copy_section` variant below.
+# Bodies that cannot be duplicated — a `@label`, a named function definition
+# or a typed-local declaration, see `cannot_duplicate` — take the
+# `single_copy_section` variant below.
 function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing, debug_mod::Union{Module, Nothing} = nothing)
     @gensym to_local enabled data b₀ t₀ g₀
     # `@timeit_all` sections record the source file their label refers to
@@ -515,17 +516,29 @@ function macro_name(ex::Expr)
 end
 
 # `ex` may not be spliced into both branches of `timed_section`: a duplicated
-# `@label` is a syntax error (#228), and a duplicated function definition
+# `@label` is a syntax error (#228), a duplicated function definition
 # defines the same method twice — for a named local function both copies lower
 # to one closure type, which is method overwriting and fails precompilation
-# (#234). Anonymous functions (`->`, `do`) are fine: each copy lowers to its
-# own closure type.
+# (#234) — and a duplicated typed-local declaration (`x::T = 0`, `local x::T`,
+# `x::T, y = t`) is a "multiple type declarations" syntax error (#241).
+# Anonymous functions (`->`, `do`) are fine: each copy lowers to its own
+# closure type. So is `::` in value position: an assertion, not a declaration.
 function cannot_duplicate(ex)
     ex isa Expr || return false
     ex.head === :symboliclabel && return true
     ex.head === :macrocall && macro_name(ex) === Symbol("@label") && return true
     is_func_def(ex) && return true
+    ex.head === :(=) && declares_type(ex.args[1]) && return true
+    ex.head === :local && any(declares_type, ex.args) && return true
     return any(cannot_duplicate, ex.args)
+end
+
+# `x::T` on an assignment left-hand side (possibly inside destructuring, e.g.
+# `x::T, y = t` or `(; x::T) = s`) or under `local` declares the type of `x`
+function declares_type(lhs)
+    lhs isa Expr || return false
+    lhs.head === :(::) && return length(lhs.args) == 2 && lhs.args[1] isa Symbol
+    return lhs.head in (:tuple, :parameters, :...) && any(declares_type, lhs.args)
 end
 
 # Jumping across a `tryfinally` boundary is a lowering error, so a statement
