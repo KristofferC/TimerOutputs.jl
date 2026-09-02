@@ -2,6 +2,7 @@ module TimerOutputs
 
 using ExprTools: splitdef, combinedef
 using Printf: @sprintf
+import PrettyTables
 using PrettyTables: pretty_table, MultiColumn, EmptyCells, TextTableFormat, TextTableStyle,
     TextHighlighter, text_table_borders__compact, @text__no_vertical_lines, @crayon_str, Crayon
 import Tables

@@ -112,23 +112,28 @@ function lerp_stops(stops, t)
     return ntuple(k -> round(Int, a[k] + (b[k] - a[k]) * s), 3)
 end
 
-function heat_crayon(frac)
+function heat_color(frac)
     t = sqrt(clamp(frac, 0.0, 1.0))
-    t < COLD_MAX && return Crayon(foreground = lerp_stops(COLD_STOPS, t / COLD_MAX))
-    t > HOT_MIN && return Crayon(foreground = lerp_stops(HOT_STOPS, (t - HOT_MIN) / (1 - HOT_MIN)))
-    return Crayon()
+    t < COLD_MAX && return lerp_stops(COLD_STOPS, t / COLD_MAX)
+    t > HOT_MIN && return lerp_stops(HOT_STOPS, (t - HOT_MIN) / (1 - HOT_MIN))
+    return nothing
+end
+
+function heat_crayon(frac)
+    color = heat_color(frac)
+    return color === nothing ? Crayon() : Crayon(foreground = color)
 end
 
 # A fixed-width bar filled proportionally to `frac`, quasi-continuous through
 # eighth blocks, with the remainder left empty; the heat highlighter colors it
 const BAR_EIGHTHS = ("▏", "▎", "▍", "▌", "▋", "▊", "▉")
 
-function heatbar(frac, ascii::Bool; width::Int = 8)
+function heatbar(frac, ascii::Bool; width::Int = 8, pad::Char = ' ')
     frac = clamp(frac, 0.0, 1.0)
     ascii && return rpad(repeat('#', round(Int, frac * width)), width, '.')
     full, part = divrem(round(Int, frac * width * 8), 8)
     bar = repeat('█', full) * (part == 0 ? "" : BAR_EIGHTHS[part])
-    return rpad(bar, width)
+    return rpad(bar, width, pad)
 end
 
 ##################
@@ -156,8 +161,12 @@ end
 
 # tree guide pieces: (branch, last branch, continuation, blank);
 # ascii mode uses plain indentation like TimerOutputs 0.5 did
-tree_guides(linechars::Symbol) =
-    linechars === :unicode ? ("├─ ", "└─ ", "│  ", "   ") : ("  ", "  ", "  ", "  ")
+function tree_guides(linechars::Symbol, portable::Bool = false)
+    space = portable ? '\u00a0' : ' '
+    return linechars === :unicode ?
+        ("├─$space", "└─$space", "│$space$space", "$space$space$space") :
+        ("$space$space", "$space$space", "$space$space", "$space$space")
+end
 
 # with linechars = :ascii the output should be pure ASCII, including in the
 # time unit (#115)
@@ -197,6 +206,7 @@ struct CellContext
     ∑b::Int64
     toplevel::Bool
     ascii::Bool
+    portable::Bool
 end
 
 # A table column: its header, the merged group header it sits under ("" for
@@ -225,8 +235,18 @@ const COLUMNS = (;
     allocs_pct = ColumnSpec("%tot", "Allocations", true, (c, p, ctx) -> c.allocs == 0 ? nullglyph(ctx.ascii, 6) : prettypercent(c.allocs, ctx.∑b)),
     allocs_par = ColumnSpec("%par", "Allocations", true, (c, p, ctx) -> ctx.toplevel ? "" : c.allocs == 0 ? nullglyph(ctx.ascii) : prettypar(c.allocs, p.allocs)),
     allocs_avg = ColumnSpec("avg", "Allocations", true, (c, p, ctx) -> prettyallocs(c.allocs / c.ncalls, ctx.ascii)),
-    time_bar = ColumnSpec("", "Time", true, (c, p, ctx) -> heatbar(ctx.∑t > 0 ? c.time / ctx.∑t : 0.0, ctx.ascii)),
-    allocs_bar = ColumnSpec("", "Allocations", true, (c, p, ctx) -> heatbar(ctx.∑b > 0 ? c.allocs / ctx.∑b : 0.0, ctx.ascii)),
+    time_bar = ColumnSpec(
+        "", "Time", true, (c, p, ctx) -> heatbar(
+            ctx.∑t > 0 ? c.time / ctx.∑t : 0.0, ctx.ascii;
+            pad = ctx.portable ? '\u00a0' : ' '
+        )
+    ),
+    allocs_bar = ColumnSpec(
+        "", "Allocations", true, (c, p, ctx) -> heatbar(
+            ctx.∑b > 0 ? c.allocs / ctx.∑b : 0.0, ctx.ascii;
+            pad = ctx.portable ? '\u00a0' : ' '
+        )
+    ),
 )
 
 # the selection the `allocations`, `compact`, `bars` and `gc` keywords
@@ -259,6 +279,7 @@ struct TableOptions
     maxdepth::Int
     complement::Bool
     header::Bool # show the group header and totals block above the column labels
+    portable::Bool
     guides::NTuple{4, String}
 end
 
@@ -317,7 +338,7 @@ function table_rows!(
     )
     depth > opts.maxdepth && return rows
     toplevel = depth == 1
-    ctx = CellContext(∑t, ∑b, toplevel, opts.ascii)
+    ctx = CellContext(∑t, ∑b, toplevel, opts.ascii, opts.portable)
     children = copy(s.children)
     extra === nothing || push!(children, extra.section)
     sort_sections!(children, opts.sortby)
@@ -354,7 +375,21 @@ end
 print_timer(; kwargs...) = print_timer(stdout; kwargs...)
 print_timer(to::TimerOutput; kwargs...) = print_timer(stdout, to; kwargs...)
 print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
-print_timer(io::IO, to::TimerOutput; kwargs...) = (show_table(io, to; kwargs...); println(io))
+function print_timer(io::IO, to::TimerOutput; backend::Symbol = :text, kwargs...)
+    result = show_table(io, to; backend, kwargs...)
+    backend in (:auto, :text) && println(io)
+    return result
+end
+
+"""
+    print_timer(String[, to::TimerOutput]; backend = :text, kwargs...) -> String
+
+Render a timer to a string. PrettyTables 3.5 or later is required for the `:markdown`,
+`:html`, `:latex`, and `:typst` back ends. The remaining keywords are the normal timer
+display options. Pass options belonging to PrettyTables in `pretty_table_kwargs`.
+"""
+print_timer(::Type{String}; kwargs...) = print_timer(String, DEFAULT_TIMER; kwargs...)
+print_timer(::Type{String}, to::TimerOutput; kwargs...) = show_table(String, to; kwargs...)
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
 
@@ -382,7 +417,10 @@ function Base.show(io::IO, s::Section; kwargs...)
     return show_table(io, s; kwargs...)
 end
 
-function validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
+function validated_options(;
+        sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement,
+        portable = false
+    )
     sortby in SORTBY_OPTIONS ||
         throw(ArgumentError("sortby should be :time, :allocations, :ncalls, :name, or :firstexec, got $sortby"))
     linechars in (:unicode, :ascii) ||
@@ -394,7 +432,7 @@ function validated_options(; sortby, allocations, compact, bars, gc, columns, li
     columns = resolve_columns(columns === nothing ? default_columns(allocations, compact, bars, gc) : columns)
     return TableOptions(
         sortby, columns, linechars === :ascii, maxdepth, complement, header,
-        tree_guides(linechars)
+        portable, tree_guides(linechars, portable)
     )
 end
 
@@ -402,14 +440,18 @@ end
 has_group(opts::TableOptions, group::String) = any(c -> c.group == group, opts.columns)
 
 function show_table(
-        io::IO, to::TimerOutput;
+        output::Union{IO, Type{String}}, to::TimerOutput;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         bars::Bool = true, gc::Bool = false, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
-        complement::Bool = false, title::String = "",
+        complement::Bool = false, title::String = "", backend::Symbol = :text,
         pretty_table_kwargs::NamedTuple = (;)
     )
-    opts = validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
+    portable = backend ∉ (:auto, :text)
+    opts = validated_options(;
+        sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement,
+        portable
+    )
 
     Δt = time_ns() - to.start_time
     Δb = gc_bytes() - to.start_allocs
@@ -436,25 +478,35 @@ function show_table(
     else
         nothing
     end
-    return _show_table(io, to.root, ∑t, ∑b, opts, title, totals, extra, pretty_table_kwargs)
+    return _show_table(
+        output, to.root, ∑t, ∑b, opts, title, totals, extra, backend,
+        pretty_table_kwargs
+    )
 end
 
 # A bare section prints as a table too, but has no meaningful wall-clock
 # reference, so no "% measured" subtitle.
 function show_table(
-        io::IO, s::Section;
+        output::Union{IO, Type{String}}, s::Section;
         sortby::Symbol = :time, allocations::Bool = true, compact::Bool = false,
         bars::Bool = true, gc::Bool = false, columns::Union{Nothing, AbstractVector{Symbol}} = nothing,
         linechars::Symbol = :unicode, maxdepth::Int = typemax(Int),
-        complement::Bool = false, title::String = "",
+        complement::Bool = false, title::String = "", backend::Symbol = :text,
         pretty_table_kwargs::NamedTuple = (;)
     )
-    opts = validated_options(; sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement)
+    portable = backend ∉ (:auto, :text)
+    opts = validated_options(;
+        sortby, allocations, compact, bars, gc, columns, linechars, maxdepth, complement,
+        portable
+    )
     ∑t, ∑b = s.ncalls > 0 ? (s.time, s.allocs) : totmeasured(s)
     # `_show_table` renders the children of its root. Wrap the section in a
     # detached display-only root so the section itself is the first row.
     display_root = Section("", 0, 0, 0, 0, s.firstexec, Section[s], nothing, nothing)
-    return _show_table(io, display_root, ∑t, ∑b, opts, title, nothing, nothing, pretty_table_kwargs)
+    return _show_table(
+        output, display_root, ∑t, ∑b, opts, title, nothing, nothing, backend,
+        pretty_table_kwargs
+    )
 end
 
 # the merged header row: contiguous runs of columns in the same group. If
@@ -497,7 +549,97 @@ end
 # pathologically large timer cannot bury the scrollback.
 const MAX_INTERACTIVE_ROWS = 1000
 
-function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, totals, extra, pretty_table_kwargs)
+function _text_table_decorations(opts::TableOptions, gray, heat_which, heats)
+    # complement rows are shown in gray (first match wins, so gray beats heat)
+    highlighters = TextHighlighter[]
+    if !isempty(gray)
+        grayset = Set(gray)
+        push!(highlighters, TextHighlighter((_, i, _) -> i in grayset, crayon"dark_gray"))
+    end
+    if !isempty(heat_which)
+        push!(
+            highlighters, TextHighlighter(
+                (_, i, j) -> haskey(heat_which, j),
+                (h, _, i, j) -> heat_crayon(heats[i][heat_which[j]])
+            )
+        )
+    end
+
+    # underline the Time/Allocations column group headers
+    table_format = if opts.ascii
+        TextTableFormat(;
+            borders = text_table_borders__compact,
+            horizontal_line_at_merged_column_labels = true,
+            @text__no_vertical_lines
+        )
+    else
+        TextTableFormat(; horizontal_line_at_merged_column_labels = true, @text__no_vertical_lines)
+    end
+    style = TextTableStyle(;
+        title = crayon"bold",
+        subtitle = crayon"dark_gray",
+        first_line_merged_column_label = crayon"bold",
+        # the totals row consists of merged label cells; the PrettyTables default for
+        # those is gray and underlined, so explicitly reset it
+        merged_column_label = crayon"default",
+        column_label = crayon"default"
+    )
+    return highlighters, table_format, style
+end
+
+function _portable_table_decorations(gray, heat_which, heats)
+    isdefined(PrettyTables, :TableFormat) || throw(
+        ArgumentError(
+            "formatted timer export requires PrettyTables 3.5 or later; " *
+                "the installed version is $(pkgversion(PrettyTables))"
+        )
+    )
+
+    Face = PrettyTables.Face
+    Highlighter = PrettyTables.Highlighter
+    highlighters = Highlighter[]
+    if !isempty(gray)
+        grayset = Set(gray)
+        push!(highlighters, Highlighter((_, i, _) -> i in grayset, Face(; foreground = :bright_black)))
+    end
+    if !isempty(heat_which)
+        push!(
+            highlighters, Highlighter(
+                (_, i, j) -> haskey(heat_which, j),
+                (_, _, i, j) -> begin
+                    color = heat_color(heats[i][heat_which[j]])
+                    color === nothing && return Face(; font = "DejaVu Sans Mono")
+                    return Face(;
+                        foreground = PrettyTables.SimpleColor(color...),
+                        font = "DejaVu Sans Mono"
+                    )
+                end
+            )
+        )
+    end
+
+    table_format = PrettyTables.TableFormat(;
+        horizontal_line_at_merged_column_labels = true,
+        vertical_line_at_beginning = false,
+        vertical_line_after_row_number_column = false,
+        vertical_line_after_row_label_column = false,
+        vertical_lines_at_data_columns = :none,
+        vertical_line_after_data_columns = false,
+    )
+    style = PrettyTables.TableStyle(;
+        title = Face(; weight = :bold),
+        subtitle = Face(; foreground = :bright_black),
+        first_line_merged_column_label = Face(; weight = :bold),
+        merged_column_label = Face(),
+        column_label = Face(),
+    )
+    return highlighters, table_format, style
+end
+
+function _show_table(
+        output::Union{IO, Type{String}}, s::Section, ∑t, ∑b, opts::TableOptions,
+        title, totals, extra, backend::Symbol, pretty_table_kwargs::NamedTuple
+    )
     rows = Vector{Vector{String}}()
     gray = Int[]
     heats = NTuple{2, Float64}[]
@@ -531,12 +673,6 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
         permutedims(reduce(hcat, rows))
     end
 
-    # complement rows are shown in gray (first match wins, so gray beats heat)
-    highlighters = TextHighlighter[]
-    if !isempty(gray)
-        grayset = Set(gray)
-        push!(highlighters, TextHighlighter((_, i, _) -> i in grayset, crayon"dark_gray"))
-    end
     # the bar columns are colored by their share of the total
     heat_which = Dict{Int, Int}() # data column index -> which fraction (1 = time, 2 = allocs)
     for (k, c) in enumerate(opts.columns)
@@ -546,60 +682,50 @@ function _show_table(io::IO, s::Section, ∑t, ∑b, opts::TableOptions, title, 
             heat_which[k + 1] = 2
         end
     end
-    if !isempty(heat_which)
-        push!(
-            highlighters, TextHighlighter(
-                (_, i, j) -> haskey(heat_which, j),
-                (h, _, i, j) -> heat_crayon(heats[i][heat_which[j]])
-            )
-        )
+    highlighters, table_format, style = if opts.portable
+        _portable_table_decorations(gray, heat_which, heats)
+    else
+        _text_table_decorations(opts, gray, heat_which, heats)
     end
 
-    # the REPL and terminals set/imply :limit; files, pipes and CI logs do not
-    interactive = get(io, :limit, io isa Base.TTY)::Bool
-
-    pretty_table(
-        io, data;
+    common_options = (;
         column_labels = column_labels,
         alignment = [:l; fill(:r, ncols - 1)],
-        # underline the Time/Allocations column group headers
-        table_format = if opts.ascii
-            TextTableFormat(;
-                borders = text_table_borders__compact,
-                horizontal_line_at_merged_column_labels = true,
-                @text__no_vertical_lines
-            )
-        else
-            TextTableFormat(; horizontal_line_at_merged_column_labels = true, @text__no_vertical_lines)
-        end,
-        style = TextTableStyle(;
-            title = crayon"bold",
-            subtitle = crayon"dark_gray",
-            first_line_merged_column_label = crayon"bold",
-            # the totals row consists of merged label cells; the PrettyTables
-            # default for those is gray and underlined
-            merged_column_label = crayon"default",
-            column_label = crayon"default"
-        ),
+        table_format,
+        style,
         highlighters = highlighters,
-        # crop to the display width in the REPL and on terminals so long
-        # section names never make lines wrap (#166); the Section column is
-        # shrunk first so the numeric columns survive
-        fit_table_in_display_horizontally = interactive,
-        shrinkable_data_column = 1,
-        shrinkable_column_minimum_width = 10,
-        # never crop to the display height: the table is meant to be read in
-        # full and terminals scroll, while for files, pipes and CI logs the
-        # displaysize fallback is meaningless anyway (#235). Only an absurdly
-        # long table is cut, and only interactively.
-        fit_table_in_display_vertically = false,
-        maximum_number_of_rows = interactive ? MAX_INTERACTIVE_ROWS : -1,
         title = title,
         title_alignment = :c,
         subtitle = subtitle,
         subtitle_alignment = :c,
-        # splatted last, so anything above can be overridden
-        pretty_table_kwargs...
     )
-    return nothing
+
+    output === String && backend === :excel && throw(
+        ArgumentError(
+            "the Excel backend writes a workbook; " *
+                "call print_timer(to; backend = :excel, ...) instead"
+        )
+    )
+
+    backend_options = if opts.portable
+        (; maximum_number_of_rows = -1)
+    else
+        # the REPL and terminals set/imply :limit; files, pipes and CI logs do not
+        interactive = output isa IO ? get(output, :limit, output isa Base.TTY)::Bool : false
+        (;
+            # crop to the display width in the REPL and on terminals so long section
+            # names never make lines wrap (#166); the Section column is shrunk first
+            fit_table_in_display_horizontally = interactive,
+            shrinkable_data_column = 1,
+            shrinkable_column_minimum_width = 10,
+            # terminals scroll, and file/pipe display sizes are meaningless (#235)
+            fit_table_in_display_vertically = false,
+            maximum_number_of_rows = interactive ? MAX_INTERACTIVE_ROWS : -1,
+        )
+    end
+
+    # The explicit escape hatch is splatted last so callers can override defaults and
+    # pass options belonging only to a selected backend.
+    options = merge(common_options, backend_options, pretty_table_kwargs)
+    return pretty_table(output, data; backend, options...)
 end

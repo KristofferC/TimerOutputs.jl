@@ -1,5 +1,6 @@
 using TimerOutputs
 using Test
+import PrettyTables
 
 import TimerOutputs: DEFAULT_TIMER, ncalls, flatten,
     prettytime, prettymemory, prettypercent, prettycount, todict,
@@ -295,6 +296,37 @@ end
     show(io, to; linechars = :ascii)
     show(io, to; title = "A short title")
     show(io, to; title = "A very long title that will be truncated")
+
+    # PrettyTables-shaped string output keeps the existing text rendering.
+    text = print_timer(String, to2; allocations = false, compact = true)
+    @test occursin("Section", text)
+    @test occursin("nest 1", text)
+
+    if isdefined(PrettyTables, :TableFormat)
+        # PrettyTables 3.5: the same formatted timer specification works in every
+        # string-producing backend. Backend-specific options are forwarded too.
+        markdown = print_timer(String, to2; backend = :markdown, allocations = false)
+        html = print_timer(
+            String, to2;
+            backend = :html,
+            allocations = false,
+            pretty_table_kwargs = (; stand_alone = true),
+        )
+        latex = print_timer(String, to2; backend = :latex, allocations = false)
+        typst = print_timer(String, to2; backend = :typst, allocations = false)
+        for output in (markdown, html, latex, typst)
+            @test occursin("nest 1", output)
+            @test occursin("nest 2", output)
+        end
+        @test startswith(html, "<!DOCTYPE html>")
+        @test occursin("\u00a0nest 2", html) # hierarchy indentation does not collapse
+        @test occursin("font-family: DejaVu Sans Mono", html) # heat bars stay aligned
+        @test occursin("\\begin{tabular}", latex)
+        @test occursin("table(", typst)
+        @test_throws ArgumentError print_timer(String, to2; backend = :excel)
+    else
+        @test_throws ArgumentError print_timer(String, to2; backend = :html)
+    end
 
     # issue 22: edge cases for rounding
     for (t, str) in (
