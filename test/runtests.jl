@@ -1989,4 +1989,16 @@ end
     @test_throws ArgumentError macroexpand(@__MODULE__, :(@timed_testset))
 end
 
+@testset "print_timer() for sections (#239)" begin
+    to = TimerOutput()
+
+    @timeit to "foo" begin
+        @timeit to "bar" 1 + 1
+    end
+
+    @test sprint(print_timer, to) != ""
+    @test sprint(print_timer, to["foo"]) != ""
+    @test sprint(print_timer, to["foo"]["bar"]) != ""
+end
+
 include("test_coverage.jl")

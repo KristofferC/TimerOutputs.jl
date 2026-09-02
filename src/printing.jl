@@ -352,9 +352,9 @@ end
 ############
 
 print_timer(; kwargs...) = print_timer(stdout; kwargs...)
-print_timer(to::TimerOutput; kwargs...) = print_timer(stdout, to; kwargs...)
+print_timer(to::Union{TimerOutput, Section}; kwargs...) = print_timer(stdout, to; kwargs...)
 print_timer(io::IO; kwargs...) = print_timer(io, DEFAULT_TIMER; kwargs...)
-print_timer(io::IO, to::TimerOutput; kwargs...) = (show_table(io, to; kwargs...); println(io))
+print_timer(io::IO, to::Union{TimerOutput, Section}; kwargs...) = (show_table(io, to; kwargs...); println(io))
 
 Base.show(to::TimerOutput; kwargs...) = show(stdout, to; kwargs...)
 
