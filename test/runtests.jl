@@ -1215,6 +1215,81 @@ end
     end
 end
 
+# a body declaring a typed local (`x::T = 0`) cannot be spliced into two
+# branches: the branches share their scope, and two type declarations for one
+# variable is a syntax error (#241)
+const to_241 = TimerOutput()
+
+function typed_local_block_241(timer)
+    @timeit timer "typed_block" begin
+        itest::Int32 = 0
+        itest += 1
+    end
+    return itest
+end
+
+function typed_decls_241(timer)
+    @timeit timer "typed_decls" begin
+        local a::Int8 = 1
+        local b::Int16
+        b = 2
+        c::Int32, d = 3, 4
+        (; e::Int64) = (; e = 5)
+    end
+    return a + b + c + d + e
+end
+
+@timeit to_241 function typed_local_func_241(n)
+    x::Int32 = n
+    return x + 1
+end
+
+@timeit_all to_241 function typed_local_all_241(n)
+    x::Int32 = n
+    return x + 1
+end
+
+@timeit TimerOutputs.NoTimerOutput() function typed_local_notimer_241(n)
+    x::Int32 = n
+    return x + 1
+end
+
+module Debug241
+    using TimerOutputs
+    const to = TimerOutput()
+    @timeit_debug to function typed_local(n)
+        x::Int32 = n
+        return x + 1
+    end
+end
+
+@testset "typed local in a timed body (#241)" begin
+    @test typed_local_block_241(to_241) == 1
+    @test ncalls(to_241["typed_block"]) == 1
+    @test typed_decls_241(to_241) == 15
+    @test typed_local_func_241(2) == 3
+    @test typed_local_all_241(2) == 3
+    @test isempty(to_241.timer_stack)
+
+    @test typed_local_notimer_241(5) == 6
+
+    # `@timeit_debug` does not evaluate its timer expression while disabled
+    @test Debug241.typed_local(2) == 3
+    @test isempty(Debug241.to.inner_timers)
+    TimerOutputs.enable_debug_timings(Debug241)
+    @test Base.invokelatest(Debug241.typed_local, 2) == 3
+    @test ncalls(Debug241.to["typed_local"]) == 1
+    TimerOutputs.disable_debug_timings(Debug241)
+
+    # `::` in value position is an assertion, not a declaration, and must keep
+    # the two-branch splice (one raw `tryfinally`, in the enabled branch only)
+    count_head(ex, head) = ex isa Expr ?
+        Int(ex.head === head) + sum(a -> count_head(a, head), ex.args; init = 0) : 0
+    asserted = macroexpand(@__MODULE__, :(@timeit "s" (y = z::Int32)))
+    @test count_head(asserted, :tryfinally) == 1
+    @test count_head(asserted, :if) == 1
+end
+
 @testset "reset_timer! inside a timed section (#172)" begin
     to = TimerOutput()
     @timeit to function foo_172(x)
