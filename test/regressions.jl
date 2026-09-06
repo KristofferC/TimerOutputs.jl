@@ -138,4 +138,36 @@ end
     end
 end
 
+@testset "flattened totals across operations" begin
+    to = TimerOutput()
+    @timeit to "outer" begin
+        @timeit to "inner" sleep(0.001)
+    end
+    flat = TO.flatten(to)
+    expected = TO.totmeasured(to)
+    @test TO.totmeasured(flat) == expected
+    @test TO.todict(flat)["total_time_ns"] == expected[1]
+    @test TO.todict(flat)["total_allocated_bytes"] == expected[2]
+    @test TO.totmeasured(copy(flat)) == expected
+    @test TO.totmeasured(TO.flatten(flat)) == expected
+    @test TO.totmeasured(merge(flat, flat)) == 2 .* expected
+    @test TO.totmeasured(merge(flat, to)) == 2 .* expected
+    @test TO.totmeasured(merge(to, flat)) == 2 .* expected
+
+    @timeit flat "more" begin
+        @timeit flat "nested" sleep(0.001)
+    end
+    delta = (flat["more"].time, flat["more"].allocs)
+    @test delta[1] > 0
+    @test TO.totmeasured(flat) == expected .+ delta
+
+    for destination in (copy(to), TO.flatten(to))
+        before = TO.totmeasured(destination)
+        merge!(destination, TO.flatten(to); tree_point = ["outer"])
+        @test TO.totmeasured(destination) == before
+    end
+    reset_timer!(flat)
+    @test TO.totmeasured(flat) == (0, 0)
+end
+
 end # module

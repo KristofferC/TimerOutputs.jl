@@ -174,7 +174,7 @@ mutable struct TimerOutput
     enabled::Bool
     start_time::Int64   # time_ns() at creation/reset, for the table header
     start_allocs::Int64
-    measured::Union{Nothing, Tuple{Int64, Int64}} # (time, allocs) override used by flatten
+    measured::Union{Nothing, Tuple{Int64, Int64}} # correction to child totals after flattening
 end
 
 function TimerOutput(name::String = "root")
