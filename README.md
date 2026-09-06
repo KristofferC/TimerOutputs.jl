@@ -667,7 +667,10 @@ ProfileView.view(flamegraph(to))
 ```
 
 You may want to crop the span of the graph to the children, not how long `to` has been open.
-To do that use `crop_root=true`
+To do that use `crop_root=true`. The graph groups accumulated durations; it is
+not a timeline of individual invocations. Sections are placed consecutively
+inside their parent. If merged parallel work exceeds its parent's duration,
+its children are scaled to fit.
 ```
 ProfileView.view(flamegraph(to, crop_root=true))
 ```

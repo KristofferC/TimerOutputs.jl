@@ -170,4 +170,34 @@ end
     @test TO.totmeasured(flat) == (0, 0)
 end
 
+@testset "flamegraph aggregate layout" begin
+    to = TimerOutput()
+    @timeit to "outer" sleep(0.001)
+    sleep(0.01)
+    @timeit to "outer" begin
+        @timeit to "inner" sleep(0.001)
+    end
+    @timeit to "sibling" sleep(0.001)
+    graph = flamegraph(to; crop_root = true)
+    parent = graph.child
+    child = parent.child
+    sibling = parent.sibling
+    @test length(graph.data.span) == TO.tottime(to)
+    @test length(parent.data.span) == to["outer"].time
+    @test length(child.data.span) == to["outer", "inner"].time
+    @test first(parent.data.span) <= first(child.data.span)
+    @test last(child.data.span) <= last(parent.data.span)
+    @test last(parent.data.span) < first(sibling.data.span)
+    @test length(flamegraph(to).data.span) >= length(graph.data.span)
+    @test flamegraph(TimerOutput(); crop_root = true) !== nothing
+
+    # Parallel work merged under a section can exceed its elapsed time.
+    merge!(to, copy(to); tree_point = ["sibling"])
+    graph = flamegraph(to; crop_root = true)
+    parent = graph.child.sibling
+    child = parent.child
+    @test first(parent.data.span) <= first(child.data.span)
+    @test last(child.data.span) <= last(parent.data.span)
+end
+
 end # module

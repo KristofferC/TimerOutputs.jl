@@ -9,6 +9,9 @@
 * Preserve user sections whose labels collide with generated complements.
 * Keep flattened totals consistent when recording more measurements, merging
   at a nested tree point, and exporting with `todict`.
+* Lay out flamegraphs by accumulated duration so repeated calls cannot place
+  a child outside its parent. Parallel work exceeding its parent's duration
+  is scaled to fit.
 
 ## Version 1.0.0
 
