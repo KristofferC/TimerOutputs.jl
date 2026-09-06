@@ -1,0 +1,111 @@
+module RegressionTests
+
+using TimerOutputs
+using Test
+using FlameGraphs
+
+const TO = TimerOutputs
+
+macro declare_local()
+    return esc(:(local x::Int = 1))
+end
+
+function generated_declaration(to)
+    return @timeit to "declaration" begin
+        @declare_local
+        x + 1
+    end
+end
+
+module Debug
+    using TimerOutputs
+    const to = TimerOutput()
+    @timeit_debug to function argument(inner)
+        return inner + 1
+    end
+    const evaluations = Ref(0)
+    target() = (evaluations[] += 1; "dynamic debug")
+    call() = @timeit_debug target() identity(3)
+end
+
+@testset "macro hygiene and dynamic labels" begin
+    reset_timer!()
+    evaluations = Ref(0)
+    label() = (evaluations[] += 1; "dynamic")
+    @test (@timeit label() identity(2)) == 2
+    @test evaluations[] == 1
+    @test TO.DEFAULT_TIMER["dynamic"].ncalls == 1
+
+    to = TimerOutput()
+    target() = (evaluations[] += 1; to)
+    @test (@timeit target() identity(3)) == 3
+    @test evaluations[] == 2
+    @test to["identity"].ncalls == 1
+    @test (@timeit NoTimerOutput() identity(4)) == 4
+
+    @test generated_declaration(to) == 2
+    @test to["declaration"].ncalls == 1
+    disable_timer!(to)
+    @test generated_declaration(to) == 2
+    @test to["declaration"].ncalls == 1
+    @test generated_declaration(NoTimerOutput()) == 2
+
+    @test Debug.argument(2) == 3
+    @test Debug.call() == 3
+    @test Debug.evaluations[] == 0
+    TO.enable_debug_timings(Debug)
+    @test Base.invokelatest(Debug.argument, 2) == 3
+    @test Base.invokelatest(Debug.call) == 3
+    @test Debug.evaluations[] == 1
+    @test Debug.to["argument"].ncalls == 1
+    @test TO.DEFAULT_TIMER["dynamic debug"].ncalls == 1
+    TO.disable_debug_timings(Debug)
+    reset_timer!()
+end
+
+exprnodes(ex) = ex isa Expr ? 1 + sum(exprnodes, ex.args; init = 0) : 1
+function nested_expansion(depth)
+    body = :(x += 1)
+    for _ in 1:depth
+        body = :(
+            if flag
+                $body
+            end
+        )
+    end
+    return macroexpand(@__MODULE__, :(@timeit_all to $body))
+end
+
+@timeit_all to function all_throw(to)
+    error("expected")
+end
+const all_throw_line = @__LINE__() - 2
+
+@testset "nested instrumentation grows linearly" begin
+    @test exprnodes(nested_expansion(12)) < 4 * exprnodes(nested_expansion(6))
+    body = nested_expansion(12)
+    f = Core.eval(
+        @__MODULE__, :(
+            function nested(to, flag)
+                x = 0
+                $body
+                return x
+            end
+        )
+    )
+    to = TimerOutput()
+    @test Base.invokelatest(f, to, true) == 1
+    @test Base.invokelatest(f, to, false) == 0
+    @test isempty(to.stack)
+    @test Base.invokelatest(f, NoTimerOutput(), true) == 1
+    for timer in (TimerOutput(), NoTimerOutput())
+        frames = try
+            all_throw(timer)
+        catch
+            stacktrace(catch_backtrace())
+        end
+        @test any(frame -> frame.func === :all_throw && frame.line == all_throw_line, frames)
+    end
+end
+
+end # module
