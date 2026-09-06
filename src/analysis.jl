@@ -189,7 +189,8 @@ end
     TimerOutputs.complement!(to::TimerOutput = DEFAULT_TIMER)
 
 Add to each section a `~name~` subsection accounting for the time and
-allocations not covered by its subsections.
+allocations not covered by its subsections. If that name is already used by
+a real timing section, omit the generated subsection.
 """
 complement!() = complement!(DEFAULT_TIMER)
 function complement!(to::TimerOutput)
@@ -235,7 +236,7 @@ function _complement!(s::Section)
     for child in s.children
         _complement!(child)
     end
-    add_child!(s, complement)
+    lookup_child(s, complement.name) === nothing && add_child!(s, complement)
     return
 end
 

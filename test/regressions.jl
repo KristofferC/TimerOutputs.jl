@@ -108,4 +108,34 @@ const all_throw_line = @__LINE__() - 2
     end
 end
 
+@testset "user labels take precedence over complements" begin
+    for fanout in (0, 8), user_first in (false, true)
+        to = TimerOutput()
+        @timeit to "outer" begin
+            @timeit to "payload" identity(0)
+            if user_first
+                @timeit to "~outer~" identity(1)
+            end
+            for i in 1:fanout
+                @timeit to string(i) identity(i)
+            end
+        end
+        TO.complement!(to)
+        @timeit to "outer" begin
+            @timeit to "~outer~" begin
+                @timeit to "user child" identity(2)
+            end
+        end
+        TO.complement!(to)
+        TO.complement!(to)
+        section = to["outer", "~outer~"]
+        @test !section.is_complement
+        @test section.ncalls == 1 + user_first
+        @test section["user child"].ncalls == 1
+        @test length(collect(keys(to["outer"]))) == length(unique(keys(to["outer"])))
+        exported = TO.todict(to)["inner_timers"]["outer"]["inner_timers"]["~outer~"]
+        @test haskey(exported["inner_timers"], "user child")
+    end
+end
+
 end # module
