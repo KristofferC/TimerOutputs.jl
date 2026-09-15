@@ -9,37 +9,25 @@ using Base.StackTraces: StackFrame
     flamegraph(to::TimerOutput; crop_root = false)
 
 Create a flamegraph from a TimerOutput. The flamegraph will show the time spent in each
-function, with the width of each box proportional to the time spent in that function.
-Use `crop_root = true` to crop the root node to the first and last child nodes.
+function, with the width of each box proportional to its accumulated time.
+Sections are laid out consecutively, not at their original timestamps: the timer
+does not retain individual invocations. Use `crop_root = true` to omit untimed
+wall time from the root. Children whose total exceeds their parent's time
+(for example, after merging parallel work) are scaled to fit the parent.
 """
 function FlameGraphs.flamegraph(to::TimerOutput; crop_root = false)
     root_section = to.root
-    # The root frame covers the total time being measured, so start when the
-    # timer (or, if cropping, the first section) was created and stop when the
-    # last section finished. With no sections there is nothing to crop to, so
-    # fall back to the timer start (`min_start_time` would error on no children).
-    very_start = crop_root && !isempty(root_section.children) ? min_start_time(root_section) : to.start_time
-    range = (Int(very_start):Int(max_end_time(root_section, very_start))) .- very_start
+    measured = child_time(root_section)
+    duration = crop_root ? measured : max(measured, Int(time_ns()) - to.start_time)
+    range = 0:(max(duration, 1) - 1)
     root = Node(NodeData(section_frame(root_section), 0x00, range))
-    return _to_flamegraph(root_section, root, very_start)
+    return _to_flamegraph(root_section, root)
 end
 
 
 ## internals
 
-# Sections are created when first entered, so firstexec is the section's start
-section_start(s::Section) = s.firstexec
-section_end(s::Section) = section_start(s) + s.time
-
-function min_start_time(s::Section)
-    return minimum(section_start(child) for child in values(s.children))
-end
-
-function max_end_time(s::Section, self_start)
-    self_end = self_start + s.time
-    isempty(s.children) && return self_end
-    return max(self_end, maximum(max_end_time(child, section_start(child)) for child in values(s.children)))
-end
+child_time(s::Section) = sum(c -> max(c.time, 0), s.children; init = Int64(0))
 
 function section_frame(s::Section)
     # TODO: Use a better conversion to a StackFrame so this contains the right kind of data
@@ -52,15 +40,20 @@ function section_frame(s::Section)
     return StackFrame(Symbol(label), Symbol("none"), 0, nothing, false, false, Base.objectid(s))
 end
 
-function _flamegraph_frame(s::Section, start_ns)
-    range = (Int(section_start(s)):Int(section_end(s))) .- start_ns
-    return NodeData(section_frame(s), 0x00, range)
-end
-
-function _to_flamegraph(s::Section, node, start_ns)
-    for child in values(s.children)
-        child_node = addchild(node, _flamegraph_frame(child, start_ns))
-        _to_flamegraph(child, child_node, start_ns)
+function _to_flamegraph(s::Section, node)
+    span = node.data.span
+    start = first(span)
+    total = child_time(s)
+    available = length(span)
+    for child in s.children
+        duration = max(child.time, 0)
+        if total > available
+            duration = Int(div(widemul(duration, available), total))
+        end
+        child_span = start:(start + duration - 1)
+        child_node = addchild(node, NodeData(section_frame(child), 0x00, child_span))
+        _to_flamegraph(child, child_node)
+        start += duration
     end
     return node
 end

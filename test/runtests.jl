@@ -2001,4 +2001,5 @@ end
     @test sprint(print_timer, to["foo"]["bar"]) != ""
 end
 
+include("regressions.jl")
 include("test_coverage.jl")

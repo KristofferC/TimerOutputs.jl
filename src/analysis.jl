@@ -50,9 +50,9 @@ function totmeasured(s::Section)
     return t, b
 end
 function totmeasured(to::TimerOutput)
-    measured = to.measured
-    measured === nothing || return measured
-    return totmeasured(to.root)
+    totals = totmeasured(to.root)
+    correction = to.measured
+    return correction === nothing ? totals : totals .+ correction
 end
 
 """
@@ -101,21 +101,17 @@ Base.merge(to::TimerOutput, others::TimerOutput...) = merge!(TimerOutput(), to, 
 
 function Base.merge!(to::TimerOutput, others::TimerOutput...; tree_point = String[])
     return lock(merge_lock) do
-        # If any input carries a `measured` override (as `flatten` sets, where
-        # the flattened rows no longer sum to the original total), the merged
-        # total is the sum of the inputs' measured totals. Compute it before
-        # mutating anything. Without an override it stays derived from children.
-        overridden = to.measured !== nothing || any(o -> o.measured !== nothing, others)
-        measured = if overridden
-            t, b = totmeasured(to)
+        # Flattening stores a correction for the overlap between its rows.
+        # Only root merges affect root totals; a nested merge is already
+        # accounted for by its enclosing section.
+        measured = to.measured
+        if isempty(tree_point)
             for other in others
-                ot, ob = totmeasured(other)
-                t += ot
-                b += ob
+                correction = other.measured
+                if correction !== nothing
+                    measured = measured === nothing ? correction : measured .+ correction
+                end
             end
-            (t, b)
-        else
-            nothing
         end
         for other in others
             combine!(to.root, other.root)
@@ -161,10 +157,10 @@ function flatten(to::TimerOutput)
     flat = TimerOutput("Flattened")
     flat.start_time = to.start_time
     flat.start_allocs = to.start_allocs
-    flat.measured = totmeasured(to)
     for child in to.root.children
         _flatten!(flat.root, child)
     end
+    flat.measured = totmeasured(to) .- totmeasured(flat.root)
     return flat
 end
 
@@ -189,7 +185,8 @@ end
     TimerOutputs.complement!(to::TimerOutput = DEFAULT_TIMER)
 
 Add to each section a `~name~` subsection accounting for the time and
-allocations not covered by its subsections.
+allocations not covered by its subsections. If that name is already used by
+a real timing section, omit the generated subsection.
 """
 complement!() = complement!(DEFAULT_TIMER)
 function complement!(to::TimerOutput)
@@ -235,7 +232,7 @@ function _complement!(s::Section)
     for child in s.children
         _complement!(child)
     end
-    add_child!(s, complement)
+    lookup_child(s, complement.name) === nothing && add_child!(s, complement)
     return
 end
 
@@ -258,7 +255,11 @@ Converts a timer into a nested set of dictionaries, with keys and value types:
 * `"total_time_ns"`: `Int`
 * `"inner_timers"`: `Dict{String, Dict{String, Any}}`
 """
-todict(to::TimerOutput) = todict(to.root)
+function todict(to::TimerOutput)
+    result = todict(to.root)
+    result["total_time_ns"], result["total_allocated_bytes"] = totmeasured(to)
+    return result
+end
 function todict(s::Section)
     return Dict{String, Any}(
         "n_calls" => ncalls(s),

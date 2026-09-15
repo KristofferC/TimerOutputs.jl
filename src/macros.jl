@@ -111,16 +111,21 @@ function timer_expr(source::LineNumberNode, mod::Module, is_debug::Bool, to_or_l
             return timed_function_expr(source, mod, is_debug, to_or_label, nothing, ex)
         end
     end
-    # `@timeit to call(args)`: derive the label from the call and keep the timer.
-    # Only when the first argument isn't itself a (literal or interpolated) label
-    # and the body is a plain/qualified function call; otherwise the first
-    # argument is the label and the default timer is used, as before.
+    # A nonliteral first argument may evaluate to either a timer or a label.
+    # Resolve it once at run time, inside the debug gate when applicable.
     if !is_label_expr(to_or_label)
         label = call_label(ex)
-        label === nothing || return timed_block_expr(source, mod, is_debug, to_or_label, label, ex)
+        if label !== nothing
+            @gensym resolved
+            to = :(($resolved = $(call_timer_label)($to_or_label, $label))[1])
+            return timed_block_expr(source, mod, is_debug, to, :($resolved[2]), ex)
+        end
     end
     return timed_block_expr(source, mod, is_debug, default_timer_expr(), to_or_label, ex)
 end
+
+call_timer_label(to, label::String) = (to, label)
+call_timer_label(label::String, ::String) = (DEFAULT_TIMER, label)
 
 # three macro arguments: (to, label, ex)
 function timer_expr(source::LineNumberNode, mod::Module, is_debug::Bool, to, label, ex)
@@ -134,8 +139,7 @@ function is_func_def(ex)
     return ex isa Expr && (ex.head === :function || Base.is_short_function_def(ex))
 end
 
-# a literal or string-interpolation label (`"foo"`, `"foo_$i"`); anything else in
-# the first position of a two-argument `@timeit` is taken to be the timer
+# a literal or string-interpolation label (`"foo"`, `"foo_$i"`)
 is_label_expr(x) = x isa String || (x isa Expr && x.head === :string)
 
 # The label #159 derives from a timed call: the callee spelled as written, for a
@@ -175,7 +179,7 @@ end
 # Bodies that cannot be duplicated — a `@label`, a named function definition
 # or a typed-local declaration, see `cannot_duplicate` — take the
 # `single_copy_section` variant below.
-function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing, debug_mod::Union{Module, Nothing} = nothing)
+function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing, debug_mod::Union{Module, Nothing} = nothing; single_copy::Bool = false)
     @gensym to_local enabled data b₀ t₀ g₀
     # `@timeit_all` sections record the source file their label refers to
     push_call = srcfile === nothing ? :($(push!)($to_local, $label)) :
@@ -190,7 +194,7 @@ function timed_section(to, label, ex, srcfile::Union{String, Nothing} = nothing,
         $(do_accumulate!)($data, $t₀, $b₀, $g₀)
         $(pop!)($to_local)
     end
-    if cannot_duplicate(ex)
+    if single_copy || cannot_duplicate(ex)
         return single_copy_section(debug_mod, to, ex, to_local, enabled, start, cleanup)
     end
     core = quote
@@ -258,6 +262,7 @@ end
 # `@timeit to label ex` for code blocks. The whole expression is escaped so the
 # user code (and its line numbers) survives verbatim into stacktraces and coverage.
 function timed_block_expr(source::LineNumberNode, mod::Module, is_debug::Bool, to, label, ex)
+    ex = macroexpand(mod, ex)
     return Expr(:block, source, esc(timed_section(to, label, ex, nothing, is_debug ? mod : nothing)))
 end
 
@@ -276,12 +281,13 @@ function timed_function_expr(source::LineNumberNode, mod::Module, is_debug::Bool
     end
     body = def[:body]
     wrapped = if is_debug
+        @gensym inner
         # the closure lets the debug-disabled branch reduce to a plain call
         quote
-            @inline function inner()
+            @inline function $inner()
                 $body
             end
-            $(timed_value_expr(mod, true, to, label, :(inner())))
+            $(timed_value_expr(mod, true, to, label, :($inner())))
         end
     else
         timed_value_expr(mod, false, to, label, body)
@@ -440,12 +446,22 @@ function timeit_all_expr(source::LineNumberNode, mod::Module, to, label, ex)
     # even when `to` has side effects or is reassigned inside the block
     @gensym to_local
     instrumented = instrument(mod, to_local, ex, source)
-    if label === nothing
-        body = Expr(:block, :($to_local = $to), instrumented)
-        return Expr(:block, source, esc(body))
+    if label !== nothing
+        instrumented = timed_section(to_local, label, instrumented, src_file(source); single_copy = true)
     end
-    body = Expr(:block, :($to_local = $to), timed_section(to_local, label, instrumented, src_file(source)))
+    body = Expr(:block, :($to_local = $to), all_timer_body(to_local, ex, instrumented))
     return Expr(:block, source, esc(body))
+end
+
+# Keep an uninstrumented branch once, at the @timeit_all boundary. Its nested
+# statements use single-copy wrappers to keep expansion linear, but Julia 1.10
+# cannot eliminate their try/finally even for NoTimerOutput. Declarations that
+# cannot be duplicated retain the same single-copy fallback as @timeit.
+function all_timer_body(to, original, instrumented)
+    cannot_duplicate(original) && return instrumented
+    # Construct the wrapper without source locations, retaining the locations
+    # of both user bodies for stacktraces and coverage.
+    return Expr(:block, Expr(:if, :($to isa $(NoTimerOutput)), original, instrumented))
 end
 
 # Like `timed_function_expr` but with the body instrumented per statement, and
@@ -457,9 +473,11 @@ function instrument_function_def(source::LineNumberNode, mod::Module, to, label,
     end
     # bind the timer once per call so every statement shares the same object
     @gensym to_local
-    body = instrument(mod, to_local, def[:body], source)
-    wrapped = timed_value_expr(mod, false, to_local, label, body, src_file(source))
-    remove_linenums_keep!(wrapped, body)
+    original = def[:body]
+    body = instrument(mod, to_local, original, source)
+    timed = timed_section(to_local, label, body, src_file(source); single_copy = true)
+    remove_linenums_keep!(timed, body)
+    wrapped = all_timer_body(to_local, original, timed)
     pushfirst!(wrapped.args, :($to_local = $to))
     pushfirst!(wrapped.args, source)
     def[:body] = wrapped
@@ -526,7 +544,9 @@ end
 function cannot_duplicate(ex)
     ex isa Expr || return false
     ex.head === :symboliclabel && return true
-    ex.head === :macrocall && macro_name(ex) === Symbol("@label") && return true
+    # Block/function forms expand macros before reaching this check. Macros
+    # left by @timeit_all may still introduce declarations, so keep one copy.
+    ex.head === :macrocall && return true
     is_func_def(ex) && return true
     ex.head === :(=) && declares_type(ex.args[1]) && return true
     ex.head === :local && any(declares_type, ex.args) && return true
@@ -563,7 +583,7 @@ function instrument_stmt(mod::Module, to, ex, line::LineNumberNode)
     if head === :return
         if length(ex.args) == 1 && ex.args[1] isa Expr
             operand = instrument_inner(mod, to, ex.args[1], line)
-            return Expr(:return, timed_value_expr(mod, false, to, stmt_label(ex, line), operand, src_file(line)))
+            return Expr(:return, timed_section(to, stmt_label(ex, line), operand, src_file(line); single_copy = true))
         end
         return ex
     end
@@ -610,7 +630,7 @@ end
 # bookkeeping code is stripped of line info.
 function timed_stmt_expr(to, label::String, line::LineNumberNode, stmt)
     inner = Expr(:block, line, stmt)
-    wrapped = timed_section(to, label, inner, src_file(line))
+    wrapped = timed_section(to, label, inner, src_file(line); single_copy = true)
     remove_linenums_keep!(wrapped, inner)
     return wrapped
 end

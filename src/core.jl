@@ -95,9 +95,21 @@ function child_section(parent::Section, label::String)
     child = lookup_child(parent, label)
     if child === nothing
         child = new_child!(parent, label)
+    elseif child.is_complement
+        child = replace_complement!(parent, child)
     end
     parent.prev_child = child
     return child
+end
+
+# A label used for real timing takes precedence over a previously generated
+# complement. Discard its derived measurements before recording real calls.
+@noinline function replace_complement!(parent::Section, child::Section)
+    replacement = Section(child.name)
+    parent.children[findfirst(c -> c === child, parent.children)] = replacement
+    index = parent.index
+    index === nothing || (index[child.name] = replacement)
+    return replacement
 end
 
 # The macro-generated cleanup calls this with the timestamps taken at section entry
@@ -162,7 +174,7 @@ mutable struct TimerOutput
     enabled::Bool
     start_time::Int64   # time_ns() at creation/reset, for the table header
     start_allocs::Int64
-    measured::Union{Nothing, Tuple{Int64, Int64}} # (time, allocs) override used by flatten
+    measured::Union{Nothing, Tuple{Int64, Int64}} # correction to child totals after flattening
 end
 
 function TimerOutput(name::String = "root")
