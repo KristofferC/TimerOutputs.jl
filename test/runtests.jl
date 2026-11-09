@@ -1663,9 +1663,9 @@ end
     @test !occursin("█", nobars) && occursin("avg", nobars)
     # the bar glyphs render but no escape codes are emitted without color
     @test !occursin("\e[", str)
-    # with color the bar cells get a truecolor foreground
+    # with color the bar cells get a foreground color, which is 256-color unless COLORTERM reports truecolor
     cstr = sprint(show, to; context = :color => true)
-    @test occursin("\e[38;2;", cstr)
+    @test occursin(r"\e\[38;[25];", cstr)
 
     # opt-in through the columns keyword
     sel = sprint((io, x) -> show(io, x; columns = [:ncalls, :time, :time_bar]), to)
