@@ -1290,6 +1290,100 @@ end
     @test count_head(asserted, :if) == 1
 end
 
+# a local assigned in a timed body and captured by a closure there must not be
+# boxed: it would be if the body were spliced into two branches (#248), or, for
+# `@timeit_all`, if it were assigned inside a statement's `tryfinally`
+const to_248 = TimerOutput()
+
+@timeit to_248 function capture_func_248(xs)
+    y = 2
+    return map(x -> x + y, xs)
+end
+
+@timeit to_248 function capture_comprehension_248(xs)
+    y = 2
+    return [x + y for x in xs]
+end
+
+capture_block_248(xs) = @timeit to_248 "block" begin
+    y = 2
+    map(xs) do x
+        x + y
+    end
+end
+
+capture_generator_248(xs) = @timeit to_248 "generator" begin
+    y::Int = 2
+    sum(x * y for x in xs)
+end
+
+@timeit_all to_248 function capture_all_248(xs)
+    y = 2
+    (a, b) = (1, 2)
+    return map(x -> x + y + a + b, xs)
+end
+
+@timeit TimerOutputs.NoTimerOutput() function capture_notimer_248(xs)
+    y = 2
+    return map(x -> x + y, xs)
+end
+
+module Debug248
+    using TimerOutputs
+    const to = TimerOutput()
+    @timeit_debug to function capture(xs)
+        y = 2
+        return map(x -> x + y, xs)
+    end
+end
+
+@testset "closure capturing a local of a timed body (#248)" begin
+    has_box(f) = occursin("Core.Box", string(code_lowered(f, (Vector{Int},))))
+    xs = [1, 2]
+    for f in (
+            capture_func_248, capture_comprehension_248, capture_block_248,
+            capture_generator_248, capture_all_248, capture_notimer_248, Debug248.capture,
+        )
+        @test !has_box(f)
+        @inferred f(xs)
+    end
+    @test capture_func_248(xs) == capture_comprehension_248(xs) == capture_block_248(xs) == [3, 4]
+    @test capture_generator_248(xs) == 6
+    @test capture_all_248(xs) == [6, 7]
+    # the assignment is still timed, under its usual label
+    @test count(endswith(": y = 2"), keys(to_248["capture_all_248"].inner_timers)) == 1
+    @test isempty(to_248.timer_stack)
+
+    # bodies without such a capture keep the two-branch splice
+    @test !TimerOutputs.cannot_duplicate(:(map(x -> x + y, xs)))
+    @test !TimerOutputs.cannot_duplicate(
+        :(
+            begin
+                y = 2
+                z .= y
+                [x + z for x in xs]
+            end
+        )
+    )
+    @test TimerOutputs.cannot_duplicate(
+        :(
+            begin
+                (a, b::Int) = t
+                () -> a
+            end
+        )
+    )
+    @test TimerOutputs.cannot_duplicate(
+        :(
+            begin
+                local q
+                q = 1
+                () -> q
+            end
+        )
+    )
+end
+
 @testset "reset_timer! inside a timed section (#172)" begin
     to = TimerOutput()
     @timeit to function foo_172(x)
