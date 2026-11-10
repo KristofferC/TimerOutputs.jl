@@ -540,8 +540,12 @@ end
 # (#234) — and a duplicated typed-local declaration (`x::T = 0`, `local x::T`,
 # `x::T, y = t`) is a "multiple type declarations" syntax error (#241).
 # Anonymous functions (`->`, `do`) are fine: each copy lowers to its own
-# closure type. So is `::` in value position: an assertion, not a declaration.
-function cannot_duplicate(ex)
+# closure type — unless they capture a local assigned in `ex`, see
+# `captures_assigned_local`. So is `::` in value position: an assertion, not a
+# declaration.
+cannot_duplicate(ex) = has_unduplicable_syntax(ex) || captures_assigned_local(ex)
+
+function has_unduplicable_syntax(ex)
     ex isa Expr || return false
     ex.head === :symboliclabel && return true
     # Block/function forms expand macros before reaching this check. Macros
@@ -550,7 +554,76 @@ function cannot_duplicate(ex)
     is_func_def(ex) && return true
     ex.head === :(=) && declares_type(ex.args[1]) && return true
     ex.head === :local && any(declares_type, ex.args) && return true
-    return any(cannot_duplicate, ex.args)
+    return any(has_unduplicable_syntax, ex.args)
+end
+
+# A local assigned in `ex` and captured by a closure in `ex` (`->`, `do`, a
+# comprehension or generator) is assigned in both branches of a duplicated
+# splice, so lowering boxes it (`Core.Box`), making the closure type unstable
+# and not `isbits` (#248). A single copy assigns it once. The check is
+# syntactic and errs towards matching (shadowing, keyword names, ...): a false
+# positive only costs the try/finally of `single_copy_section`.
+function captures_assigned_local(ex)
+    ex isa Expr || return false
+    assigned = Set{Symbol}()
+    captured = Set{Symbol}()
+    collect_captures!(assigned, captured, ex, false)
+    return !isdisjoint(assigned, captured)
+end
+
+function collect_captures!(assigned::Set{Symbol}, captured::Set{Symbol}, ex, in_closure::Bool)
+    if ex isa Symbol
+        in_closure && push!(captured, ex)
+        return
+    end
+    ex isa Expr || return
+    head = ex.head
+    # quoted code and globals are not locals of `ex`
+    (head === :quote || head === :inert || head === :global) && return
+    # assignments inside a closure bind the closure's own locals, or box an
+    # outer local whether or not `ex` is duplicated
+    if !in_closure
+        if is_assignment_head(head)
+            collect_lhs!(assigned, ex.args[1])
+        elseif head === :local
+            foreach(a -> collect_lhs!(assigned, a isa Expr && a.head === :(=) ? a.args[1] : a), ex.args)
+        end
+    end
+    in_closure |= head === :-> || head === :generator
+    for a in ex.args
+        collect_captures!(assigned, captured, a, in_closure)
+    end
+    return
+end
+
+# `=` and updating assignments (`+=`, ...) rebind; broadcasting ones (`.=`,
+# `.+=`) mutate in place
+function is_assignment_head(head::Symbol)
+    return Base.operator_precedence(head) == Base.prec_assignment && !startswith(String(head), '.')
+end
+
+# an assignment left-hand side that only binds variables (`x`, `x::T`, `(a, b)`,
+# `(; a)`), as opposed to `a[i] = v` or `a.f = v` which call a function
+function binds_locals(lhs)
+    lhs isa Symbol && return true
+    lhs isa Expr || return false
+    lhs.head === :(::) && return length(lhs.args) == 2 && binds_locals(lhs.args[1])
+    lhs.head === :... && return binds_locals(lhs.args[1])
+    return lhs.head in (:tuple, :parameters) && all(binds_locals, lhs.args)
+end
+
+function collect_lhs!(assigned::Set{Symbol}, lhs)
+    if lhs isa Symbol
+        push!(assigned, lhs)
+    elseif lhs isa Expr
+        if lhs.head === :(::)
+            # `x::T` declares `x`; a bare `::T` binds nothing
+            length(lhs.args) == 2 && collect_lhs!(assigned, lhs.args[1])
+        elseif lhs.head in (:tuple, :parameters, :...)
+            foreach(a -> collect_lhs!(assigned, a), lhs.args)
+        end
+    end
+    return
 end
 
 # `x::T` on an assignment left-hand side (possibly inside destructuring, e.g.
@@ -589,6 +662,12 @@ function instrument_stmt(mod::Module, to, ex, line::LineNumberNode)
     end
     head === :block && return instrument_block(mod, to, ex, line)
     is_func_def(ex) && return instrument_function_def(line, mod, to, nothing, ex)
+    # `x = e`: time `e` but bind `x` outside the `tryfinally`. A local assigned
+    # inside a try region and captured by a closure is boxed by lowering (#248).
+    if head === :(=) && binds_locals(ex.args[1])
+        rhs = timed_stmt_expr(to, stmt_label(ex, line), line, instrument_inner(mod, to, ex.args[2], line))
+        return Expr(:(=), ex.args[1], rhs)
+    end
     return timed_stmt_expr(to, stmt_label(ex, line), line, instrument_inner(mod, to, ex, line))
 end
 
